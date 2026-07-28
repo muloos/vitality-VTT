@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("vt_theme")||"dark"}catch(e){}</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vitality · Mesa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/theme.css?v=9">
+</head>
+<body class="mesa-page">
+<div id="fallback" class="solid"></div>
+
+<div class="topbar">
+  <a class="topbar-brand" href="app.html"><span class="mark">◈</span>VITALITY</a>
+  <div class="mesa-menu nav-user" id="mesa-menu">
+    <button type="button" class="chip mesa-menu-chip" id="mesa-menu-btn" aria-haspopup="menu" aria-expanded="false" onclick="toggleMesaMenu()">
+      <span class="hamburger"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>
+      <span id="mesa-av" class="mesa-av sm" style="display:none"></span>
+      <div class="title" id="mesa-name">…</div>
+    </button>
+  </div>
+  <nav id="tabs" class="mesa-toptabs" role="menu"></nav>
+  <div class="spacer"></div>
+  <div class="nav-user" id="nav-user">
+    <button type="button" class="chip" id="nav-user-btn" aria-haspopup="menu" aria-expanded="false" onclick="toggleUserMenu()">
+      <span class="av" id="nav-av">?</span><b id="who">…</b><span style="color:var(--ink-faint)">▾</span>
+    </button>
+    <div class="drop glass" role="menu">
+      <button role="menuitem" onclick="openProfile()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.8-4 3.6-6.5 7.5-6.5s6.7 2.5 7.5 6.5"/></svg></span>Meu perfil</button>
+      <button role="menuitem" onclick="openSettings()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M20.5 12h-2.6M6.1 12H3.5M17.7 6.3l-1.8 1.8M8.1 15.9l-1.8 1.8M17.7 17.7l-1.8-1.8M8.1 8.1 6.3 6.3"/></svg></span>Configurações</button>
+      <button role="menuitem" onclick="openHelp()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a2.8 2.8 0 1 1 4 2.6c-.9.5-1.7 1-1.7 2.1"/><circle cx="12" cy="17.2" r=".4" fill="currentColor" stroke="none"/></svg></span>Ajuda ou suporte</button>
+      <button role="menuitem" id="theme-menu-item" onclick="doToggleTheme()"><span class="ic" id="theme-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg></span><span id="theme-menu-label">Tema</span></button>
+      <div class="divider"></div>
+      <button role="menuitem" onclick="logout()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>Sair</button>
+    </div>
+  </div>
+</div>
+
+<div class="mesa-body">
+  <aside class="mesa-rail-left"><div id="party" class="party-list"></div><div id="mesa-extra" class="mesa-extra"></div></aside>
+  <main class="mesa-main">
+    <div id="msg" class="msg"></div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script type="module">
+import * as db from './lib/db.js?v=24';
+import { mountHelp, mountThemeToggle, openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme } from './lib/ui.js?v=3';
+import { mountYtPlayer } from './lib/ytplayer.js?v=3';
+
+mountHelp('mesa');
+mountThemeToggle();
+const $ = (id) => document.getElementById(id);
+const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>';
+const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>';
+function paintThemeMenuItem() {
+  const icon = $('theme-menu-icon'), label = $('theme-menu-label'); if (!icon || !label) return;
+  const light = getTheme() === 'light';
+  icon.innerHTML = light ? ICON_SUN : ICON_MOON;
+  label.textContent = light ? 'Tema: claro' : 'Tema: escuro';
+}
+paintThemeMenuItem();
+const esc = (s) => (s == null ? '' : String(s)).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+// ícones de linha (svgrepo-style, 24x24, stroke) reutilizados nesta página — sem emoji em nenhuma opção
+const ic = (paths, attrs = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${attrs}>${paths}</svg>`;
+// modal de confirmação estilizado (mesmo padrão visual do guia) — substitui confirm() nativo
+function confirmModal({ title, desc, confirmLabel = 'Confirmar', danger = true } = {}) {
+  return new Promise((resolve) => {
+    const trigger = document.activeElement;
+    const w = document.createElement('div');
+    w.className = 'ui-modal';
+    w.setAttribute('role', 'alertdialog');
+    w.setAttribute('aria-modal', 'true');
+    w.setAttribute('aria-labelledby', 'confirm-title');
+    w.innerHTML = `<div class="box guide">
+      <div class="ghead"><h3 id="confirm-title">${esc(title)}</h3><button class="x" aria-label="Fechar">×</button></div>
+      <p class="gintro">${esc(desc)}</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="btn auto" id="cm-cancel">Cancelar</button>
+        <button class="btn auto ${danger ? 'danger' : 'go'}" id="cm-ok">${esc(confirmLabel)}</button>
+      </div>
+    </div>`;
+    const finish = (result) => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
+    const onEsc = (e) => { if (e.key === 'Escape') finish(false); };
+    w.addEventListener('click', (e) => { if (e.target === w) finish(false); });
+    w.querySelector('.x').onclick = () => finish(false);
+    w.querySelector('#cm-cancel').onclick = () => finish(false);
+    w.querySelector('#cm-ok').onclick = () => finish(true);
+    document.addEventListener('keydown', onEsc);
+    document.body.appendChild(w);
+    w.querySelector('#cm-ok').focus();
+  });
+}
+const ICONS = {
+  pencil: ic('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+  x: ic('<path d="M6 6l12 12M18 6 6 18"/>', 'stroke-width="1.8"'),
+  check: ic('<path d="M5 12.5l4.5 4.5L19 7"/>', 'stroke-width="1.8"'),
+  dice: ic('<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="16" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1" fill="currentColor" stroke="none"/>'),
+  warning: ic('<path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4.2"/><circle cx="12" cy="17" r=".4" fill="currentColor" stroke="none"/>'),
+  cornerDownRight: ic('<path d="M6 4v8a4 4 0 0 0 4 4h9"/><path d="M15 12l4 4-4 4"/>'),
+  sparkle: ic('<path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="2.4"/>'),
+  image: ic('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5.5-5.5a2 2 0 0 0-2.8 0L4 19"/>'),
+  dna: ic('<path d="M6 3c0 6 12 12 12 18M18 3c0 6-12 12-12 18"/><path d="M7.5 7h9M7.5 17h9M6.5 12h11"/>'),
+  star: ic('<path d="M12 3.5l2.6 5.6 6 .7-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.8l6-.7Z"/>'),
+  bag: ic('<path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/>'),
+  lock: ic('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+  calc: ic('<rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M8 6.5h8"/><path d="M8 11h1.5M8 14.5h1.5M8 18h1.5M12.3 11h1.5M12.3 14.5h1.5M12.3 18h1.5M16.5 11v7"/>'),
+  chat: ic('<path d="M4 5h16v11H8l-4 4V5Z"/>'),
+  tree: ic('<path d="M12 3 6 12h3l-4 6h4v3h6v-3h4l-4-6h3L12 3Z"/>'),
+  externalLink: ic('<path d="M9 6H5.8A1.8 1.8 0 0 0 4 7.8v10.4A1.8 1.8 0 0 0 5.8 20h10.4A1.8 1.8 0 0 0 18 18.2V15"/><path d="M13.5 4H20v6.5"/><path d="M10.5 13.5 20 4"/>'),
+  dagger: ic('<path d="M12 2v14"/><path d="M8 6h8"/><path d="M12 16l-3 3 3 3 3-3-3-3Z"/>'),
+  shield: ic('<path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6l7-3Z"/>'),
+  heart: ic('<path d="M12 20.2 4.6 13c-2-2-2-5 0-6.8 1.9-1.8 4.7-1.6 6.4.4l1 1.2 1-1.2c1.7-2 4.5-2.2 6.4-.4 2 1.8 2 4.8 0 6.8L12 20.2Z"/>'),
+  hammer: ic('<path d="M15 4l5 5-2 2-5-5Z"/><path d="M12.5 6.5l5 5-2.5 2.5-5-5Z"/><path d="M3 21l7.5-7.5"/>'),
+  checklist: ic('<path d="M4.5 6.5l1.3 1.3L8 5.5"/><path d="M4.5 12.5l1.3 1.3 2.2-2.3"/><path d="M4.5 18.5l1.3 1.3 2.2-2.3"/><path d="M11.5 6.5h8M11.5 12.5h8M11.5 18.5h8"/>'),
+};
+const emptyState = (icon, title, desc, cta) => `<div class="empty-cta"><div class="ec-icon">${icon}</div>
+  <div class="ec-title">${title}</div><div class="ec-desc">${desc}</div>${cta || ''}</div>`;
+const campaignId = new URLSearchParams(location.search).get('id');
+
+let role = null, mesa = null, character = null, currentTab = null, sys = null, myId = null, _statMap = null, _unsub = null, _unsubChat = null;
+let myName = null, myEmail = null;
+let inOnboarding = false;
+
+function showMsg(t, kind) { const m = $('msg'); m.textContent = t; m.className = 'msg show ' + (kind || 'err'); setTimeout(() => { if (m.textContent === t) m.className = 'msg'; }, 4000); }
+
+function tabsFor() {
+  const hasSys = !!(mesa && mesa.system_id);
+  const icGroup = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.8 20c.5-3.2 3-5.5 6.2-5.5s5.7 2.3 6.2 5.5"/><path d="M16.2 6.2a3.2 3.2 0 0 1 0 6.2"/><path d="M18.5 14.6c2.3.6 4 2.6 4.4 5.2"/></svg></span>';
+  const icGear = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M20.5 12h-2.6M6.1 12H3.5M17.7 6.3l-1.8 1.8M8.1 15.9l-1.8 1.8M17.7 17.7l-1.8-1.8M8.1 8.1 6.3 6.3"/></svg></span>';
+  const icChart = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M12 20V4M20 20v-7"/></svg></span>';
+  const icTree = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 6 12h3l-4 6h4v3h6v-3h4l-4-6h3L12 3Z"/></svg></span>';
+  const icScroll = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h9a2 2 0 0 1 2 2v14l-3-2-3 2-3-2-3 2V6a3 3 0 0 1 3-3Z"/><path d="M9 8h6M9 12h6"/></svg></span>';
+  const icDna = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3c0 6 12 12 12 18M18 3c0 6-12 12-12 18"/><path d="M7.5 7h9M7.5 17h9M6.5 12h11"/></svg></span>';
+  const icBag = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/></svg></span>';
+  const icPencil = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>';
+  if (role === 'gm') return [['jogadores', icGroup + 'Jogadores'], ['atributos', (hasSys ? icGear : icChart) + (hasSys ? 'Sistema' : 'Atributos')], ['arvores', icTree + 'Árvores']];
+  return [['ficha', icScroll + 'Ficha'], ['biografia', icDna + 'Biografia'], ['inventario', icBag + 'Inventário'], ['anotacoes', icPencil + 'Anotações'], ['arvores', icTree + 'Árvores']];
+}
+
+(async () => {
+  if (!campaignId) { location.href = 'app.html'; return; }
+  const session = await db.requireSession();
+  if (!session) return;
+
+  const [profile, user] = await Promise.all([db.getMyProfile(), db.getUser()]);
+  myId = user?.id || null;
+  myEmail = user?.email || null;
+  myName = profile?.display_name || user?.email?.split('@')[0] || '—';
+  $('who').textContent = myName;
+  $('nav-av').textContent = myName.trim().charAt(0).toUpperCase() || '?';
+
+  try {
+    mesa = await db.getCampaign(campaignId);
+    role = await db.getMyRole(campaignId);
+  } catch (e) { $('content').innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; return; }
+
+  if (!mesa || !role) { // não é membro / mesa inexistente
+    document.querySelector('.mesa-main').innerHTML = '<div class="empty">Mesa não encontrada ou você não faz parte dela. <a href="app.html" style="color:var(--brass)">Voltar</a></div>';
+    return;
+  }
+
+  if (mesa.system_id) { try { sys = await db.getSystemBundle(mesa.system_id); } catch (_) { sys = null; } }
+
+  const sysName = sys?.system?.name;
+  $('mesa-name').innerHTML = esc(mesa.name) + '<small>' + (role === 'gm' ? 'MESTRE' : 'JOGADOR') + (sysName ? ' · SISTEMA: ' + esc(sysName).toUpperCase() : '') + '</small>';
+  paintMesaAvatar();
+
+  if (role === 'player') {
+    character = await db.ensureCharacter(campaignId);
+    if (!character.onboarding_done) {
+      inOnboarding = true;
+      $('mesa-menu').style.display = 'none';
+      renderCharSetup($('content'), true).catch((e) => { $('content').innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
+      return; // só entra na mesa de verdade depois de concluir a criação do personagem
+    }
+  }
+
+  enterMesa();
+})();
+
+function enterMesa() {
+  buildTabs();
+  renderParty();
+  openTab(tabsFor()[0][0]);
+  mountDice();
+  mountYtPlayer({ campaignId, role, db });
+}
+
+function buildTabs() {
+  $('tabs').innerHTML = tabsFor().map(([id, label]) =>
+    `<button role="menuitem" data-tab="${id}" onclick="selectTab('${id}')">${label}</button>`).join('');
+  const extra = $('mesa-extra');
+  if (extra) {
+    const icKey = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/></svg></span>';
+    const icLogout = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>';
+    const icBack = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>';
+    const act = role === 'gm'
+      ? `<button onclick="copyCode()">${icKey}Código ${esc(mesa.join_code)}</button>`
+      : `<button onclick="leaveMesa()">${icLogout}Sair desta mesa</button>`;
+    extra.innerHTML = act + `<a href="app.html">${icBack}Voltar à plataforma</a>`;
+  }
+}
+async function renderParty() {
+  const box = $('party'); if (!box) return;
+  let members = [];
+  try { members = await db.listMembers(campaignId); } catch (_) { box.innerHTML = ''; return; }
+  if (!members.length) { box.innerHTML = ''; return; }
+  const ord = { gm: 0, player: 1 };
+  members.sort((a, b) => (ord[a.role] ?? 9) - (ord[b.role] ?? 9));
+  box.innerHTML = `<div class="party-label">Grupo · ${members.length}</div>` + members.map((m) => {
+    const nm = m.profile?.display_name || '—';
+    const initial = (nm.trim().charAt(0) || '?').toUpperCase();
+    const me = m.user_id === myId;
+    return `<div class="party-row${me ? ' me' : ''}">
+      <div class="party-av">${esc(initial)}</div>
+      <div class="party-info"><div class="party-name">${esc(nm)}${me ? ' · você' : ''}</div>
+      <div class="party-role">${m.role === 'gm' ? 'Mestre' : 'Jogador'}</div></div>
+    </div>`;
+  }).join('');
+}
+window.selectTab = (id) => { closeMesaMenu(); openTab(id); };
+
+window.openTab = (name) => {
+  currentTab = name;
+  [...$('tabs').children].forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  const c = $('content');
+  c.innerHTML = '<div class="empty">Carregando…</div>';
+  const fn = { jogadores: renderJogadores, atributos: renderAtributos, arvores: renderArvores,
+               ficha: renderFicha, biografia: renderBiografia, inventario: renderInventario, anotacoes: renderAnotacoes }[name];
+  fn(c).catch((e) => { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
+};
+
+window.copyCode = () => { navigator.clipboard?.writeText(mesa.join_code); showMsg('Código copiado.', 'ok'); };
+window.openProfile = () => {
+  closeUserMenu();
+  openProfileModal({
+    email: myEmail,
+    displayName: myName,
+    onSave: async (name) => {
+      await db.updateDisplayName(name);
+      myName = name;
+      $('who').textContent = myName;
+      $('nav-av').textContent = myName.trim().charAt(0).toUpperCase() || '?';
+      showMsg('Nome atualizado.', 'ok');
+    },
+  });
+};
+window.openSettings = () => {
+  closeUserMenu();
+  openSettingsModal({
+    onChangePassword: async (pw) => {
+      await db.updatePassword(pw);
+      showMsg('Senha atualizada.', 'ok');
+    },
+  });
+};
+window.openHelp = () => { closeUserMenu(); openHelpGuide('mesa'); };
+window.doToggleTheme = () => { toggleTheme(); paintThemeMenuItem(); };
+window.logout = () => { db.signOut().then(() => { location.href = 'login.html'; }); };
+
+// menu combinado do topo: capa/hamburguer (esquerda, navegação da mesa) + conta (direita) — só um aberto por vez
+function closeMesaMenu() { $('mesa-menu')?.classList.remove('open'); $('mesa-menu-btn')?.setAttribute('aria-expanded', 'false'); }
+function closeUserMenu() { $('nav-user')?.classList.remove('open'); $('nav-user-btn')?.setAttribute('aria-expanded', 'false'); }
+window.toggleMesaMenu = () => {
+  const el = $('mesa-menu'); if (!el) return;
+  const open = el.classList.toggle('open');
+  $('mesa-menu-btn')?.setAttribute('aria-expanded', String(open));
+  if (open) { closeUserMenu(); el.querySelector('.drop [role="menuitem"]')?.focus(); }
+};
+window.toggleUserMenu = () => {
+  const el = $('nav-user'); if (!el) return;
+  const open = el.classList.toggle('open');
+  $('nav-user-btn')?.setAttribute('aria-expanded', String(open));
+  if (open) { closeMesaMenu(); el.querySelector('.drop [role="menuitem"]')?.focus(); }
+};
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#mesa-menu')) closeMesaMenu();
+  if (!e.target.closest('#nav-user')) closeUserMenu();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeMesaMenu(); closeUserMenu(); }
+});
+
+// Avatar da mesa no topo: foto se houver, senão a inicial do nome.
+function paintMesaAvatar() {
+  const el = $('mesa-av'); if (!el || !mesa) return;
+  el.style.display = '';
+  if (mesa.image_url) {
+    el.innerHTML = `<img src="${esc(mesa.image_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`;
+  } else {
+    el.textContent = (mesa.name || '?').trim().charAt(0).toUpperCase() || '?';
+  }
+}
+// Foto de perfil da mesa (só o Mestre altera — botões estão na aba Jogadores).
+window.onMesaImg = (input) => {
+  const file = input.files && input.files[0]; if (!file) return;
+  if (!file.type.startsWith('image/')) { showMsg('Selecione um arquivo de imagem.'); input.value = ''; return; }
+  if (file.size > 3 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 3 MB).'); input.value = ''; return; }
+  showMsg('Enviando foto…', 'ok');
+  db.uploadImage(file, 'campaigns')
+    .then((url) => db.updateCampaign(campaignId, { image_url: url }).then(() => {
+      mesa.image_url = url;
+      const prev = $('mesa-img-prev'); if (prev) { prev.src = url; prev.style.display = ''; }
+      const rm = $('mesa-img-rm'); if (rm) rm.style.display = '';
+      paintMesaAvatar(); showMsg('Foto da mesa atualizada.', 'ok');
+    }))
+    .catch((e) => showMsg(e.message));
+};
+window.removeMesaImg = () => {
+  db.updateCampaign(campaignId, { image_url: null }).then(() => {
+    mesa.image_url = null;
+    const prev = $('mesa-img-prev'); if (prev) { prev.removeAttribute('src'); prev.style.display = 'none'; }
+    const rm = $('mesa-img-rm'); if (rm) rm.style.display = 'none';
+    paintMesaAvatar(); showMsg('Foto da mesa removida.', 'ok');
+  }).catch((e) => showMsg(e.message));
+};
+window.leaveMesa = async () => {
+  const ok = await confirmModal({ title: 'Sair da mesa', desc: `Sua ficha em "${mesa.name}" será apagada. Não dá pra desfazer.`, confirmLabel: 'Sair' });
+  if (!ok) return;
+  db.leaveCampaign(campaignId).then(() => { location.href = 'app.html'; }).catch((e) => showMsg(e.message));
+};
+
+/* ============================ MESTRE ============================ */
+
+async function renderJogadores(c) {
+  const members = await db.listMembers(campaignId);
+  const players = members.filter((m) => m.role === 'player');
+  c.innerHTML = `
+    <div class="section-title">Convite</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 8px">
+      Compartilhe o código <b style="color:var(--brass);letter-spacing:.15em">${esc(mesa.join_code)}</b> — quem entrar com ele vira Jogador desta mesa.</p>
+
+    <div class="section-title">Jogadores (${players.length})</div>
+    <div class="list">${members.map((m) => `
+      <div class="list-row">
+        <div class="grow"><div class="nm">${esc(m.profile?.display_name || '—')}</div>
+        <div class="sub">${m.role === 'gm' ? 'Mestre (você)' : 'Jogador'}</div></div>
+        ${m.role === 'player' ? `
+          <button class="btn sm auto" onclick="viewPlayer('${m.user_id}', this.dataset.n)" data-n="${esc(m.profile?.display_name || 'Jogador')}">Ver ficha</button>
+          <button class="btn sm danger auto" onclick="removePlayer('${m.user_id}', this.dataset.n)" data-n="${esc(m.profile?.display_name || 'Jogador')}">Remover</button>` : ''}
+      </div>`).join('')}</div>
+    ${players.length ? '' : '<p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin:10px 2px">Nenhum jogador entrou ainda.</p>'}
+
+    <div class="section-title">Configurações da mesa</div>
+    <div class="fld row"><label>Nome da mesa</label>
+      <input value="${esc(mesa.name)}" onchange="renameMesa(this.value)"></div>
+    <div class="fld row"><label>Foto da mesa</label>
+      <div class="img-picker">
+        <img id="mesa-img-prev" class="img-thumb" alt="" ${mesa.image_url ? `src="${esc(mesa.image_url)}"` : 'style="display:none"'}>
+        <div class="img-actions">
+          <input type="file" id="mesa-img-file" accept="image/*" style="display:none" onchange="onMesaImg(this)">
+          <button type="button" class="btn auto sm" onclick="document.getElementById('mesa-img-file').click()">${mesa.image_url ? 'Trocar foto' : 'Escolher foto'}</button>
+          <button type="button" class="btn auto sm" id="mesa-img-rm" ${mesa.image_url ? '' : 'style="display:none"'} onclick="removeMesaImg()">Remover</button>
+        </div>
+      </div></div>
+    <button class="btn danger auto sm" onclick="deleteMesa()">Excluir mesa</button>`;
+}
+
+window.removePlayer = async (userId, name) => {
+  const ok = await confirmModal({ title: 'Remover jogador', desc: `A ficha de ${name} nesta mesa será apagada. Não dá pra desfazer.`, confirmLabel: 'Remover' });
+  if (!ok) return;
+  db.removeMember(campaignId, userId).then(() => { showMsg(`${name} removido(a).`, 'ok'); openTab('jogadores'); })
+    .catch((e) => showMsg(e.message));
+};
+window.renameMesa = (name) => {
+  const n = name.trim(); if (!n) return;
+  db.renameCampaign(campaignId, n).then(() => { mesa.name = n; $('mesa-name').firstChild.textContent = n; showMsg('Nome atualizado.', 'ok'); })
+    .catch((e) => showMsg(e.message));
+};
+window.deleteMesa = async () => {
+  const ok = await confirmModal({ title: 'Excluir mesa', desc: `Isso apaga árvores, fichas e tudo de "${mesa.name}". Não dá pra desfazer.`, confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteCampaign(campaignId).then(() => { location.href = 'app.html'; }).catch((e) => showMsg(e.message));
+};
+
+// Ficha de um jogador, somente leitura (visão do Mestre — sem anotações)
+let _gmViewUserId = null, _gmViewName = '';
+async function viewPlayer(userId, name) {
+  const c = $('content');
+  c.innerHTML = '<div class="empty">Carregando ficha…</div>';
+  _gmViewUserId = userId; _gmViewName = name;
+  try {
+    let sheet = await db.loadPlayerSheet(campaignId, userId);
+    let gmChanged = sheet.character
+      ? await resyncClassDefaults(sheet.character.id, sheet.character.char_class, sheet.character.subclass) : false;
+    if (sheet.character) { try { const r = await db.applyLevelRewards(sheet.character.id); if (r.stat_points || r.tree_points) gmChanged = true; } catch (_) {} }
+    if (gmChanged) sheet = await db.loadPlayerSheet(campaignId, userId); // busca de novo com os valores já atualizados
+    const { character, attributes, values, resources, proficiencies, inventory, systemId } = sheet;
+    _gmViewChar = character; _gmViewAttrs = attributes; _gmViewValues = { ...values }; _gmViewProficiencies = { ...(proficiencies || {}) }; _gmViewProfCtx = profCtxFrom(_gmViewProficiencies);
+    if (!character) { c.innerHTML = `<button class="btn auto sm" onclick="openTab('jogadores')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>Voltar aos jogadores</button>
+      <div class="empty" style="margin-top:14px">Este jogador ainda não montou a ficha.</div>`; return; }
+    try { _gmViewSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, userId)), equipBonusMap(inventory, attributes)); }
+    catch (_) { _gmViewSkillBonus = equipBonusMap(inventory, attributes); }
+    const trees = systemId ? await db.listSystemTrees(systemId).catch(() => []) : [];
+    const treeRows = await Promise.all(trees.map(async (t) => {
+      let pts = 0;
+      try { pts = await db.getTreePoints(t.id, userId); } catch (_) {}
+      return { tree: t, pts };
+    }));
+
+    const gmResBar = (a) => {
+      const max = evalStatIn(attributes, values, a, _gmViewSkillBonus, new Set(), _gmViewProfCtx) ?? 0;
+      let cur = resources?.[a.id]; if (cur == null || cur === '') cur = max; cur = Number(cur);
+      return `<div class="res-row" style="--res-color:${esc(a.color || '#35c6d4')}">
+        <div class="res-head">
+          <span class="res-label"><i class="res-dot"></i>${esc(a.name)}</span>
+          <span class="res-amt-line"><b>${cur}</b>&nbsp;/&nbsp;${max}</span>
+        </div>
+        <div class="res-bar-row"><div class="res-track">${resBarHtml(cur, max)}</div></div>
+      </div>`;
+    };
+    const primaries = attributes.filter((a) => a.is_resource);
+    const gmSkills = sys?.system?.skills_enabled ? attributes.filter((a) => a.is_skill) : [];
+    const secondary = attributes.filter((a) => !a.is_resource && !a.is_skill);
+    const hasBaseSec = secondary.some((a) => a.kind === 'base');
+
+    c.innerHTML = `
+      <button class="btn auto sm" onclick="openTab('jogadores')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>Voltar aos jogadores</button>
+      <div class="section-title" style="margin-top:18px">Ficha de ${esc(name)}</div>
+      <div class="char-card">
+        ${character.avatar_url ? `<img class="char-portrait" src="${esc(character.avatar_url)}" alt="">`
+          : `<div class="char-portrait ph">${esc((character.name || '?').trim().charAt(0).toUpperCase() || '?')}</div>`}
+        <div class="char-info"><h2>${esc(character.name) || 'Sem nome'}</h2>
+          <div class="char-meta">${[character.age && ('Idade: ' + esc(character.age)), character.gender && esc(character.gender),
+            character.char_class && (esc(character.char_class) + (character.subclass ? ' · ' + esc(character.subclass) : ''))].filter(Boolean).join(' &nbsp;·&nbsp; ') || '—'}</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+            <span class="badge" style="border-color:var(--brass);color:var(--brass)">Nível ${character.level || 1}</span>
+            <button class="plus" title="Tira 1 nível" onclick="gmAdjustLevel(-1)">−</button>
+            <button class="plus" title="Sobe 1 nível (concede os pontos configurados)" onclick="gmAdjustLevel(1)">+</button>
+          </div>
+        </div>
+      </div>
+      ${(() => {
+        const prose = (label, val) => val ? `<div class="fld"><label>${label}</label><p style="font-size:14px;color:var(--ink-dim);line-height:1.6;margin:0">${esc(val)}</p></div>` : '';
+        return prose('Bio', character.bio) + prose('Aparência física', character.appearance) + prose('Naturalidade / origem', character.origin)
+          + prose('Traços de personalidade', character.personality) + prose('Ideais e motivações', character.ideals)
+          + prose('Vínculos', character.bonds) + prose('Defeitos e medos', character.flaws);
+      })()}
+
+      <div class="status-hud">
+        ${primaries.length ? `<div class="hud-sec-label">Recursos<span class="ln"></span></div>
+          <div class="hud-bars">${primaries.map(gmResBar).join('')}</div>` : ''}
+        <div class="hud-sec-label">Status${secondary.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
+        <div class="stat-grid">
+          ${secondary.map((a) => gmStatRow(a)).join('')}
+          ${secondary.length ? '' : '<div class="empty" style="grid-column:1/-1">Sem status secundários.</div>'}
+        </div>
+        ${hasBaseSec ? `<div class="points-card" style="margin-top:14px">
+          <div class="hud-sec-label">Pontos de status do jogador<span class="ln"></span></div>
+          <div style="display:flex;align-items:center;gap:14px;margin-top:4px">
+            <button class="plus" title="Tirar 1 ponto" onclick="gmAdjustPoints(-1)">−</button>
+            <span class="points-value" id="gm-points-badge" style="margin:0">${character.stat_points || 0}</span>
+            <button class="plus" title="Dar 1 ponto" onclick="gmAdjustPoints(1)">+</button>
+          </div>
+        </div>` : ''}
+        ${gmSkills.length ? `<div class="hud-sec-label" style="margin-top:18px">Perícias<span class="ln"></span></div>
+        <div class="skill-grid">${gmSkills.map(gmSkillChip).join('')}</div>` : ''}
+        ${sys?.proficiencies?.length ? `<div class="hud-sec-label" style="margin-top:18px">Proficiências <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(clique pra conceder/revogar)</span><span class="ln"></span></div>
+        <div class="prof-groups">${profChipsHtml(_gmViewProficiencies, true)}</div>` : ''}
+      </div>
+
+      ${trees.length ? `
+      <div class="section-title">Pontos de árvore de habilidade</div>
+      <div class="list">${treeRows.map(({ tree, pts }) => `
+        <div class="list-row"><div class="grow"><div class="nm">${esc(tree.name)}</div></div>
+          <input type="number" min="0" id="gm-treepts-${tree.id}" value="${pts}" style="max-width:70px;background:var(--field);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-family:var(--mono);padding:7px">
+          <button class="btn sm auto" onclick="gmSetTreePoints('${tree.id}','${userId}')">Definir</button>
+        </div>`).join('')}</div>` : ''}
+
+      <div class="section-title">Mochila</div>
+      <div class="list">${inventory.length ? inventory.map((it) => `
+        <div class="list-row"><div class="grow"><div class="nm">${esc(it.name)}${it.equipped ? ' <span class="badge" style="border-color:var(--maq);color:var(--maq)">equipado</span>' : ''}</div>
+          ${it.description ? `<div class="sub">${esc(it.description)}</div>` : ''}
+          ${(it.modifiers || []).length ? `<div class="mods" style="margin-top:5px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : ''}</div>
+          <div class="sub">x${it.qty}</div></div>`).join('')
+        : '<div class="empty">Mochila vazia.</div>'}</div>
+      <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin:16px 2px 0">As anotações do jogador são privadas e não aparecem aqui.</p>`;
+  } catch (e) { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; }
+}
+window.viewPlayer = viewPlayer;
+
+function gmStatRow(a) {
+  if (a.kind === 'computed') {
+    const v = evalStatIn(_gmViewAttrs, _gmViewValues, a, _gmViewSkillBonus, new Set(), _gmViewProfCtx);
+    return `<div class="stat-tile computed" style="--stc:${esc(a.color || '#7ee6dc')}"><div class="stat-val calc">${v == null ? ICONS.warning : v}</div><div class="stat-name">${esc(a.name)}</div></div>`;
+  }
+  const val = _gmViewValues[a.id] ?? a.default_value ?? 0;
+  const bonus = _gmViewSkillBonus[a.id];
+  return `<div class="stat-tile" style="--stc:${esc(a.color || '#7ee6dc')}">
+    ${bonus ? `<span class="mod-badge" title="${esc(bonusTitle(bonus))}">+${bonus.total}</span>` : ''}
+    <div class="stat-val" id="gmval-${a.id}">${esc(val)}</div>
+    <div class="stat-name">${esc(a.name)}</div>
+    <div class="stat-ctl">
+      <button class="plus" title="Tira 1 e devolve o ponto pro jogador" onclick="gmAdjustStat('${a.id}', -1, true)">−</button>
+      <button class="plus" title="Sobe 1 direto (não gasta ponto)" onclick="gmAdjustStat('${a.id}', 1, false)">+</button>
+    </div>
+  </div>`;
+}
+function gmSkillChip(a) {
+  const v = evalStatIn(_gmViewAttrs, _gmViewValues, a, _gmViewSkillBonus, new Set(), _gmViewProfCtx);
+  return `<div class="skill-chip" style="--skc:${esc(a.color || '#7ee6dc')}">
+    <span class="skc-name">${esc(a.name)}</span>
+    <span class="skc-val">${v == null ? ICONS.warning : v}</span>
+  </div>`;
+}
+window.gmSetTreePoints = (treeId, userId) => {
+  const el = $('gm-treepts-' + treeId); if (!el) return;
+  const val = Math.max(0, parseInt(el.value) || 0);
+  db.setTreePoints(treeId, userId, val).then(() => showMsg('Pontos atualizados.')).catch((e) => showMsg(e.message));
+};
+window.gmAdjustPoints = (delta) => {
+  if (!_gmViewChar) return;
+  const next = Math.max(0, (_gmViewChar.stat_points || 0) + delta);
+  db.updateCharacter(_gmViewChar.id, { stat_points: next }).then(() => {
+    _gmViewChar.stat_points = next;
+    const b = $('gm-points-badge'); if (b) b.textContent = next;
+    showMsg('Pontos de status atualizados.', 'ok');
+  }).catch((e) => showMsg(e.message));
+};
+// subir de nível concede (via RPC) os pontos de status + de árvore configurados na Progressão de
+// nível do sistema — nunca retroage se o nível cair (só corrige o número, não tira pontos já dados).
+window.gmAdjustLevel = (delta) => {
+  if (!_gmViewChar) return;
+  const next = Math.max(1, (_gmViewChar.level || 1) + delta);
+  db.updateCharacter(_gmViewChar.id, { level: next }).then(async () => {
+    _gmViewChar.level = next;
+    let r = { stat_points: 0, tree_points: 0 };
+    if (delta > 0) { try { r = await db.applyLevelRewards(_gmViewChar.id); } catch (_) {} }
+    const parts = [];
+    if (r.stat_points) parts.push(`+${r.stat_points} ponto(s) de status`);
+    if (r.tree_points) parts.push(`+${r.tree_points} ponto(s) de árvore`);
+    showMsg(parts.length ? `Nível ${next}! ${parts.join(', ')}.` : `Nível atualizado para ${next}.`, 'ok');
+    viewPlayer(_gmViewUserId, _gmViewName);
+  }).catch((e) => showMsg(e.message));
+};
+window.gmAdjustStat = (statId, delta, giveBackPoint) => {
+  if (!_gmViewChar) return;
+  const stat = _gmViewAttrs.find((a) => a.id === statId); if (!stat) return;
+  const cur = Number(_gmViewValues[statId] ?? stat.default_value ?? 0) || 0;
+  const next = Math.max(0, cur + delta);
+  const ops = [db.setCharacterAttribute(_gmViewChar.id, statId, next)];
+  if (giveBackPoint) ops.push(db.updateCharacter(_gmViewChar.id, { stat_points: (_gmViewChar.stat_points || 0) + 1 }));
+  Promise.all(ops).then(() => {
+    _gmViewValues[statId] = next;
+    const el = $('gmval-' + statId); if (el) el.textContent = next;
+    if (giveBackPoint) {
+      _gmViewChar.stat_points = (_gmViewChar.stat_points || 0) + 1;
+      const b = $('gm-points-badge'); if (b) b.textContent = _gmViewChar.stat_points;
+    }
+    showMsg('Status ajustado.', 'ok');
+  }).catch((e) => showMsg(e.message));
+};
+window.gmToggleProficiency = (proficiencyId, granted) => {
+  if (!_gmViewChar) return;
+  db.gmSetProficiency(_gmViewChar.id, proficiencyId, granted).then(() => {
+    _gmViewProficiencies[proficiencyId] = granted;
+    viewPlayer(_gmViewUserId, _gmViewName);
+    showMsg(granted ? 'Proficiência concedida.' : 'Proficiência revogada.', 'ok');
+  }).catch((e) => showMsg(e.message));
+};
+
+async function renderAtributos(c) {
+  if (mesa.system_id) return renderSistema(c);
+  const attrs = await db.listAttributes(campaignId);
+  c.innerHTML = `
+    <div class="section-title">Atributos da mesa</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
+      Defina os status que toda ficha desta mesa terá (ex.: Vida, Vigor, Lógica). Os jogadores preenchem os valores.</p>
+    <div class="list" id="attr-list">${attrs.length ? attrs.map(attrRow).join('') : '<div class="empty">Nenhum atributo ainda.</div>'}</div>
+    <form class="inline-form" style="margin-top:14px" onsubmit="return addAttr(event)">
+      <input id="attr-name" placeholder="Novo atributo (ex.: Vida)" required maxlength="40">
+      <button class="btn go auto" type="submit">+ Adicionar</button>
+    </form>`;
+}
+function attrRow(a) {
+  return `<div class="list-row" data-id="${a.id}">
+    <div class="grow"><input class="nm" style="background:transparent;border:0;color:var(--ink);font-family:var(--serif);font-size:15px;width:100%"
+        value="${esc(a.name)}" onchange="renameAttr('${a.id}', this.value)">
+      <div class="sub">tipo: ${a.data_type === 'text' ? 'texto' : 'número'}</div></div>
+    <button class="btn sm danger auto" onclick="delAttr('${a.id}')">Excluir</button>
+  </div>`;
+}
+window.addAttr = (ev) => { ev.preventDefault(); const n = $('attr-name').value.trim(); if (!n) return false;
+  db.createAttribute(campaignId, { name: n, sort_order: Date.now() % 100000 }).then(() => openTab('atributos'))
+    .catch((e) => showMsg(e.message)); return false; };
+window.renameAttr = (id, v) => { db.updateAttribute(id, { name: v.trim() }).catch((e) => showMsg(e.message)); };
+window.delAttr = (id) => { db.deleteAttribute(id).then(() => openTab('atributos')).catch((e) => showMsg(e.message)); };
+
+// Visão do sistema usado pela mesa (Mestre): status, classes, árvores e itens — vindos do sistema.
+async function renderSistema(c) {
+  const b = sys || (mesa.system_id ? await db.getSystemBundle(mesa.system_id) : null);
+  if (!b || !b.system) { c.innerHTML = '<div class="empty">Esta mesa não tem um sistema, ou ele foi removido.</div>'; return; }
+  const roots = b.classes.filter((x) => !x.parent_id);
+  const subs = (pid) => b.classes.filter((x) => x.parent_id === pid);
+  c.innerHTML = `
+    <div class="section-title">Sistema da campanha: ${esc(b.system.name)}</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 12px">
+      Tudo abaixo vem deste sistema. Para editar, use <b>Sistemas</b> na tela inicial.</p>
+
+    <div class="section-title">Status (${b.stats.filter((s) => !s.is_skill).length})</div>
+    <div class="list">${b.stats.filter((s) => !s.is_skill).length ? b.stats.filter((s) => !s.is_skill).map((s) => `
+      <div class="list-row"><div class="grow"><div class="nm">${esc(s.name)}${s.formula_key ? ` <span style="color:var(--maq);font-family:var(--mono);font-size:11px">(${esc(s.formula_key)})</span>` : ''}</div>
+        <div class="sub">${s.kind === 'computed' ? 'calculado: ' + esc(s.formula || '') : 'base' + (s.default_value ? ' · padrão ' + esc(s.default_value) : '')}</div></div></div>`).join('') : '<div class="empty">Sem status.</div>'}</div>
+
+    <div class="section-title">Perícias (${b.stats.filter((s) => s.is_skill).length})</div>
+    <div class="list">${b.stats.filter((s) => s.is_skill).length ? b.stats.filter((s) => s.is_skill).map((s) => `
+      <div class="list-row"><div class="grow"><div class="nm"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${esc(s.color || '#7ee6dc')};margin-right:7px;vertical-align:middle"></i>${esc(s.name)}${s.formula_key ? ` <span style="color:var(--maq);font-family:var(--mono);font-size:11px">(${esc(s.formula_key)})</span>` : ''}</div>
+        <div class="sub">calculado: ${esc(s.formula || '')}</div></div></div>`).join('') : '<div class="empty">Sem perícias.</div>'}</div>
+
+    <div class="section-title">Proficiências (${(b.proficiencies || []).length})</div>
+    <div class="list">${(b.proficiencies || []).length ? b.proficiencies.map((p) => `
+      <div class="list-row"><div class="grow"><div class="nm">${esc(p.name)}</div>
+        ${p.category ? `<div class="sub">${esc(p.category)}</div>` : ''}</div></div>`).join('') : '<div class="empty">Sem proficiências.</div>'}</div>
+
+    <div class="section-title">Classes e subclasses</div>
+    <div class="list">${roots.length ? roots.map((cl) => `
+      <div class="list-row" style="flex-direction:column;align-items:stretch;gap:4px">
+        <div class="nm">${esc(cl.name)}</div>
+        ${subs(cl.id).map((s) => `<div class="sub" style="margin-left:14px"><span class="ic">${ICONS.cornerDownRight}</span>${esc(s.name)}</div>`).join('')}</div>`).join('') : '<div class="empty">Sem classes.</div>'}</div>
+
+    <div class="section-title">Progressão de nível</div>
+    <div class="list">
+      <div class="list-row"><div class="grow"><div class="nm">Padrão por nível</div></div>
+        <div class="sub">${[b.system.level_stat_points_default ? `+${b.system.level_stat_points_default} pontos de status` : ''].concat(
+          b.trees.filter((t) => t.level_points_default).map((t) => `+${t.level_points_default} pontos de árvore (${esc(t.name)})`)).filter(Boolean).join(' · ') || 'nenhum — pontos precisam ser dados na mão'}</div></div>
+      ${(() => {
+        const lvlNums = [...new Set([...(b.levels || []).map((l) => l.level), ...(b.levelTrees || []).map((l) => l.level)])].sort((a, x) => a - x);
+        if (!lvlNums.length) return '';
+        return lvlNums.map((n) => {
+          const lv = (b.levels || []).find((l) => l.level === n);
+          const treeGrants = (b.levelTrees || []).filter((l) => l.level === n);
+          const parts = [(lv && lv.stat_points != null) ? `${lv.stat_points} pontos de status` : ''].concat(
+            treeGrants.map((g) => `${g.points} pontos de árvore (${esc((b.trees.find((t) => t.id === g.tree_id) || {}).name || '?')})`));
+          return `<div class="list-row"><div class="grow"><div class="nm">Exceção — nível ${n}</div></div>
+            <div class="sub">${parts.filter(Boolean).join(' · ') || 'sem substituição'}</div></div>`;
+        }).join('');
+      })()}
+    </div>
+
+    <div class="section-title">Árvores de habilidade (${b.trees.length})</div>
+    <div class="grid">${b.trees.length ? b.trees.map((t) => `
+      <div class="card-tile glass" style="cursor:default"><h3>${esc(t.name)}</h3>
+        <a class="btn sm auto" style="margin-top:6px;text-decoration:none" href="arvore.html?t=${Date.now()}&tree=${t.id}&system=${mesa.system_id}"><span class="ic">${ICONS.externalLink}</span>Abrir/editar</a></div>`).join('') : '<div class="empty">Sem árvores.</div>'}</div>
+
+    <div class="section-title">Itens (${b.items.length})</div>
+    <div class="list">${b.items.length ? b.items.map((it) => `
+      <div class="list-row"><div class="grow"><div class="nm">${esc(it.name)}</div>
+        <div class="sub">${[it.category, it.rarity].filter(Boolean).map(esc).join(' · ')}${(it.modifiers && it.modifiers.length) ? ' · ' + it.modifiers.map((m) => esc(m.name + ' ' + m.value)).join(', ') : ''}</div></div></div>`).join('') : '<div class="empty">Sem itens.</div>'}</div>`;
+}
+
+/* ============================ ÁRVORES (ambos) ============================ */
+
+async function renderArvores(c) {
+  const gm = role === 'gm';
+  if (mesa.system_id) {
+    const b = sys || await db.getSystemBundle(mesa.system_id);
+    const trees = b?.trees || [];
+    c.innerHTML = `
+      <div class="section-title">Árvores do sistema (${trees.length})</div>
+      <div class="grid">${trees.length ? trees.map((t) => `
+        <div class="card-tile glass" style="cursor:default"><h3>${esc(t.name)}</h3>
+          <a class="btn sm auto" style="margin-top:6px;text-decoration:none" href="arvore.html?t=${Date.now()}&tree=${t.id}&system=${mesa.system_id}"><span class="ic">${ICONS.externalLink}</span>${gm ? 'Abrir/editar' : 'Ver árvore'}</a></div>`).join('') : '<div class="empty">Este sistema não tem árvores.</div>'}</div>
+      <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:18px 2px 0">
+        As árvores vêm do sistema da mesa. ${gm ? 'Você edita direto no editor.' : 'Jogar/desbloquear as esferas com pontos entra numa próxima fase.'}</p>`;
+    return;
+  }
+  const trees = await db.listTrees(campaignId);
+  c.innerHTML = `
+    <div class="section-title">Árvores de Esferas</div>
+    ${trees.length ? `<div class="grid">${trees.map((t) => `
+      <div class="card-tile glass" style="cursor:default">
+        <h3>${esc(t.name)}</h3>
+        <div class="meta">${t.default_points} pontos padrão</div>
+        <button class="btn sm auto" style="margin-top:6px" onclick="openTree('${t.id}')">${gm ? 'Editar' : 'Jogar'}</button>
+      </div>`).join('')}</div>` : '<div class="empty">Nenhuma árvore nesta mesa ainda.</div>'}
+    ${gm ? `<form class="inline-form" style="margin-top:16px" onsubmit="return addTree(event)">
+        <input id="tree-name" placeholder="Nova árvore (ex.: Caminho da Máquina)" required maxlength="60">
+        <button class="btn go auto" type="submit">+ Criar árvore</button>
+      </form>` : ''}
+    <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:18px 2px 0">
+      Obs.: a edição/jogo da árvore conectada ao banco entra na próxima fase. Por enquanto, criar a árvore já salva no Supabase.</p>`;
+}
+window.addTree = (ev) => { ev.preventDefault(); const n = $('tree-name').value.trim(); if (!n) return false;
+  db.createTree(campaignId, n).then(() => openTab('arvores')).catch((e) => showMsg(e.message)); return false; };
+window.openTree = () => showMsg('A árvore conectada ao banco vem na próxima fase.', 'ok');
+
+/* ============================ JOGADOR ============================ */
+
+let _fichaAttrs = [], _fichaValues = {}, _fichaResources = {}, _fichaProficiencies = {}, _fichaProfCtx = null;
+let _fichaInventory = [], _fichaFormulas = [], _builderTerms = [];
+let _fichaSkillBonus = {}; // {attribute_id: {total, sources:[{name,amount}]}} — bônus de esferas desbloqueadas
+let _gmViewChar = null, _gmViewAttrs = [], _gmViewValues = {}, _gmViewSkillBonus = {}, _gmViewProficiencies = {}, _gmViewProfCtx = null; // ficha do jogador que o Mestre está vendo/editando
+// agrupa o catálogo de proficiências do sistema por categoria, preservando a ordem (sort_order já veio do banco)
+function groupProfsForFicha(catalog) {
+  const map = new Map();
+  (catalog || []).forEach((p) => { const cat = p.category || 'Geral'; if (!map.has(cat)) map.set(cat, []); map.get(cat).push(p); });
+  return [...map.entries()];
+}
+// mesma heurística de ícone/cor por categoria usada no construtor de sistema (sistema.html) —
+// categoria continua sendo texto livre, então isso é só um "melhor palpite" visual por palavra-
+// chave, com fallback de ícone genérico + cor gerada por hash do próprio texto da categoria.
+function profCategoryIcon(cat) {
+  const s = (cat || '').toLowerCase();
+  if (/armadura|armor|escudo|shield/.test(s)) return ICONS.shield;
+  if (/arma\b|armas|weapon|espada|arco|machado|lança|adaga/.test(s)) return ICONS.dagger;
+  if (/idioma|língua|lingua|language/.test(s)) return ICONS.chat;
+  if (/ofício|oficio|ferramenta|tool|craft|artesanato/.test(s)) return ICONS.hammer;
+  if (/medicina|cura|heal|medic|primeiros socorros/.test(s)) return ICONS.heart;
+  if (/perícia|pericia|skill|saving|resistência|resistencia/.test(s)) return ICONS.star;
+  return ICONS.checklist;
+}
+function profCategoryColor(cat) {
+  if (!cat) return '#8a95a1';
+  let h = 0; for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) >>> 0;
+  return `hsl(${h % 360} 58% 58%)`;
+}
+function profChipsHtml(grantedMap, editable) {
+  const catalog = sys?.proficiencies || [];
+  if (!catalog.length) return '';
+  return groupProfsForFicha(catalog).map(([cat, list]) => `
+    <div class="prof-group" style="--pcc:${profCategoryColor(cat)}">
+      <div class="prof-cat"><span class="ic">${profCategoryIcon(cat)}</span>${esc(cat)}</div>
+      <div class="prof-chips">${list.map((p) => {
+        const on = !!grantedMap[p.id];
+        return editable
+          ? `<button type="button" class="prof-chip ${on ? 'on' : ''}" onclick="gmToggleProficiency('${p.id}', ${!on})">${esc(p.name)}</button>`
+          : `<span class="prof-chip ${on ? 'on' : ''}">${esc(p.name)}</span>`;
+      }).join('')}</div>
+    </div>`).join('');
+}
+// classe/subclasse vivem na descrição do personagem (ao lado da foto), não mais numa seção própria
+// acima dos Atributos — só existem pra aplicar os "Status base" do sistema (não são história do
+// personagem), mas exibi-las junto do nome/foto é mais compacto e permite colorir pela cor que o
+// Mestre definiu pra cada classe lá no sistema. Só podem ser escolhidas uma vez: depois de definidas
+// viram uma etiqueta colorida travada (trocar de classe no meio da campanha bagunçaria os status
+// base já aplicados, então a trava é proposital).
+// subclasses não têm cor própria — sempre puxam a cor da classe-mãe (definida no sistema)
+function classColor(name) { return (sys?.classes || []).find((x) => !x.parent_id && x.name === name)?.color; }
+function classSubclassChips(ch) {
+  const chip = (label, color) => {
+    const c = color || 'var(--ink-dim)';
+    return `<span class="char-tag class-tag" style="border-color:${c};color:${c};background:color-mix(in srgb, ${c} 16%, transparent)">${esc(label)}</span>`;
+  };
+  let classHtml, subHtml = '';
+  if (ch.char_class) {
+    classHtml = chip(ch.char_class, classColor(ch.char_class));
+    if (ch.subclass) subHtml = chip(ch.subclass, classColor(ch.char_class));
+  } else if (sys) {
+    const roots = sys.classes.filter((x) => !x.parent_id);
+    classHtml = `<select class="class-pick-inline" title="Só pode ser escolhida uma vez" onchange="pickClass(this.value)"><option value="">Escolher classe…</option>${roots.map((cl) => `<option>${esc(cl.name)}</option>`).join('')}</select>`;
+  } else {
+    classHtml = `<input class="class-pick-inline" placeholder="Classe" title="Só pode ser escolhida uma vez" onchange="onClassTextChange('char_class', this.value)">`;
+  }
+  if (ch.char_class && !ch.subclass) {
+    if (sys) {
+      const cl = sys.classes.find((x) => !x.parent_id && x.name === ch.char_class);
+      const subOpts = cl ? sys.classes.filter((x) => x.parent_id === cl.id) : [];
+      if (subOpts.length) subHtml = `<select class="class-pick-inline" title="Só pode ser escolhida uma vez" onchange="pickSubclass(this.value)"><option value="">Escolher subclasse…</option>${subOpts.map((s) => `<option>${esc(s.name)}</option>`).join('')}</select>`;
+    } else {
+      subHtml = `<input class="class-pick-inline" placeholder="Subclasse" title="Só pode ser escolhida uma vez" onchange="onClassTextChange('subclass', this.value)">`;
+    }
+  }
+  return classHtml + subHtml;
+}
+async function renderFicha(c) {
+  let sheet = await db.loadSheet(campaignId);
+  // se o Mestre mudou os "Status base" da classe/subclasse depois que o jogador escolheu, isso
+  // traz a mudança pra ficha agora — sem nunca sobrescrever um status que o jogador já customizou
+  let changed = await resyncClassDefaults(sheet.character.id, sheet.character.char_class, sheet.character.subclass);
+  // pega pontos de nível pendentes (idempotente — só concede o que ainda não foi dado, é seguro
+  // chamar toda vez que a ficha abre, mesmo sem ter mudado de nível desde a última visita)
+  try { const r = await db.applyLevelRewards(sheet.character.id); if (r.stat_points || r.tree_points) changed = true; } catch (_) {}
+  if (changed) sheet = await db.loadSheet(campaignId);
+  const { character: ch, attributes, values, resources, proficiencies, systemId } = sheet;
+  character = ch; _fichaAttrs = attributes; _fichaValues = { ...values }; _fichaResources = { ...(resources || {}) }; _fichaProficiencies = proficiencies || {}; _fichaProfCtx = profCtxFrom(_fichaProficiencies);
+  const [inv, formulas] = await Promise.all([db.listInventory(ch.id), db.listCharacterFormulas(ch.id)]);
+  _fichaInventory = inv; _fichaFormulas = formulas;
+  try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, ch.user_id)), equipBonusMap(inv, attributes)); }
+  catch (_) { _fichaSkillBonus = equipBonusMap(inv, attributes); }
+
+  const primaries = attributes.filter((a) => a.is_resource);
+  const skills = sys?.system?.skills_enabled ? attributes.filter((a) => a.is_skill) : [];
+  const secondaries = attributes.filter((a) => !a.is_resource && !a.is_skill);
+  const hasBaseSecondary = secondaries.some((a) => a.kind === 'base');
+
+  const tags = ['Nível ' + (ch.level || 1), ch.age ? 'Idade: ' + esc(ch.age) : '', ch.gender ? esc(ch.gender) : ''].filter(Boolean);
+  const tagsHtml = tags.map((t) => `<span class="char-tag">${t}</span>`).join('') + classSubclassChips(ch);
+  const coverSrc = ch.cover_url || ch.avatar_url;
+  const focalY = ch.cover_focal_y != null ? Number(ch.cover_focal_y) : 50;
+
+  c.innerHTML = `
+    <div class="char-bio">
+      ${coverSrc ? `<div class="char-cover">
+        <img class="char-cover-img" id="char-cover-img" src="${esc(coverSrc)}" alt="" data-focal="${focalY}"
+          style="object-position:center ${focalY}%" title="Arraste para reposicionar a foto">
+        <div class="char-cover-scrim"></div>
+        <div class="char-cover-toolbar">
+          <button class="btn sm auto overlay cover-replace-btn" onclick="pickCoverFile()"><span class="ic">${ICONS.image}</span>Trocar capa</button>
+          <button class="btn sm auto overlay cover-edit-toggle" onclick="toggleCoverEdit(this)"><span class="ic">${ICONS.pencil}</span>Editar capa</button>
+        </div>
+        <div class="char-cover-spacer"></div>
+        <div class="char-cover-info">
+          <div class="char-portrait-wrap">
+            ${ch.avatar_url ? `<img class="char-portrait" src="${esc(ch.avatar_url)}" alt="">`
+              : `<div class="char-portrait ph">${esc((ch.name || '?').trim().charAt(0).toUpperCase() || '?')}</div>`}
+            <button class="portrait-edit-btn" title="Trocar foto de perfil" onclick="pickAvatarQuickFile()"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+          </div>
+          <div class="char-info">
+            <h2>${esc(ch.name) || 'Sem nome'}</h2>
+            <div class="char-tags">${tagsHtml}</div>
+          </div>
+          <button class="btn sm auto overlay" onclick="openTab('biografia')"><span class="ic">${ICONS.pencil}</span>Editar biografia</button>
+        </div>
+        <input type="file" id="cover-file" accept="image/*" style="display:none" onchange="onCoverFile(this)">
+        <input type="file" id="avatar-quick-file" accept="image/*" style="display:none" onchange="onAvatarQuickFile(this)">
+      </div>` : `
+      <div class="char-bio-row">
+        <div class="char-portrait ph">${esc((ch.name || '?').trim().charAt(0).toUpperCase() || '?')}</div>
+        <div class="char-info">
+          <h2>${esc(ch.name) || 'Sem nome'}</h2>
+          <div class="char-tags">${tagsHtml}</div>
+        </div>
+        <button class="btn sm auto" onclick="openTab('biografia')"><span class="ic">${ICONS.pencil}</span>Editar biografia</button>
+      </div>`}
+    </div>
+
+    <div class="ficha-head">
+      <span class="section-title">Atributos</span>
+      <span class="ficha-hint">role dados a qualquer momento pelo painel de rolagens no canto inferior direito</span>
+    </div>
+
+    <div class="status-hud">
+      ${primaries.length ? `
+        <div class="hud-sec-label">Recursos<span class="ln"></span></div>
+        <div class="hud-bars">${primaries.map(resourceRow).join('')}</div>` : ''}
+
+      <div class="hud-sec-label">Status${secondaries.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
+      <div class="stat-grid" id="sec-stat-grid">
+        ${secondaries.map((a) => a.kind === 'computed'
+          ? `<div class="stat-tile computed" style="--stc:${esc(a.color || '#7ee6dc')}"><div class="stat-val calc" id="comp-${a.id}">—</div><div class="stat-name">${esc(a.name)}</div></div>`
+          : secStatRow(a)).join('')}
+        ${secondaries.length ? '' : '<div class="empty">Sem status.</div>'}
+      </div>
+      ${hasBaseSecondary ? `<div class="points-bar">
+        <span class="pb-label">Pontos de status</span>
+        <span class="pb-value" id="stat-points-badge">${(ch.stat_points || 0)}</span>
+        <span class="pb-hint">disponíveis para distribuir nos status acima</span>
+        <button class="btn go auto sm" id="stat-save-btn" style="display:none" onclick="commitStatPoints()"><span class="spin"></span>Salvar status</button>
+      </div>` : ''}
+      ${skills.length ? `<div class="hud-sec-label" style="margin-top:18px">Perícias<span class="ln"></span></div>
+      <div class="skill-grid">${skills.map(skillChip).join('')}</div>` : ''}
+      ${sys?.proficiencies?.length ? `<div class="hud-sec-label" style="margin-top:18px">Proficiências<span class="ln"></span></div>
+      <div class="prof-groups">${profChipsHtml(_fichaProficiencies, false)}</div>` : ''}
+    </div>
+
+    <div class="section-title"><span class="ic">${ICONS.calc}</span>Guia rápido</div>
+    <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:0 0 12px">
+      Monte suas próprias fórmulas combinando itens do inventário e status da ficha — ex.: dano de uma arma + sua Força.</p>
+    <div id="formula-list">${_fichaFormulas.length ? _fichaFormulas.map(formulaRow).join('') : '<div class="empty">Nenhuma fórmula ainda.</div>'}</div>
+    <div id="formula-builder"></div>
+    <button class="btn auto sm" style="margin-top:8px" onclick="openFormulaBuilder()">+ Nova fórmula</button>`;
+  recalcComputed();
+  wireCoverDrag();
+}
+
+// arrastar a foto de capa pra escolher qual parte fica visível (salva o foco vertical em % no solto)
+function wireCoverDrag() {
+  const img = $('char-cover-img'); if (!img) return;
+  const box = img.closest('.char-cover'); if (!box) return;
+  let dragging = false, startY = 0, startFocal = 50, boxHeight = 1;
+  const onMove = (e) => {
+    if (!dragging) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const next = Math.max(0, Math.min(100, startFocal - ((y - startY) / boxHeight) * 100));
+    img.style.objectPosition = `center ${next.toFixed(1)}%`;
+    img.dataset.focal = next;
+  };
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    img.classList.remove('dragging');
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    const finalFocal = Number(img.dataset.focal);
+    if (!Number.isNaN(finalFocal) && character) {
+      db.updateCharacter(character.id, { cover_focal_y: finalFocal })
+        .then((updated) => { character = { ...character, ...updated }; showMsg('Posição da capa salva.', 'ok'); })
+        .catch((e) => showMsg(e.message));
+    }
+  };
+  img.addEventListener('pointerdown', (e) => {
+    if (!box.classList.contains('editing')) return; // reposicionar só é permitido depois de "Editar capa"
+    dragging = true;
+    startY = e.clientY;
+    startFocal = Number(img.dataset.focal) || 50;
+    boxHeight = box.getBoundingClientRect().height || 1;
+    img.classList.add('dragging');
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    e.preventDefault();
+  });
+}
+// "Editar capa" alterna o modo de edição: só nesse modo a capa fica arrastável e o botão de trocar aparece
+window.toggleCoverEdit = (btn) => {
+  const box = btn.closest('.char-cover'); if (!box) return;
+  const editing = box.classList.toggle('editing');
+  btn.innerHTML = editing ? `<span class="ic">${ICONS.check}</span>Concluir` : `<span class="ic">${ICONS.pencil}</span>Editar capa`;
+  btn.title = editing ? 'Concluir edição da capa' : 'Editar capa';
+};
+window.pickCoverFile = () => { const el = $('cover-file'); if (el) el.click(); };
+window.pickAvatarQuickFile = () => { const el = $('avatar-quick-file'); if (el) el.click(); };
+window.onCoverFile = (input) => {
+  const file = input.files && input.files[0]; if (!file) return;
+  if (!file.type.startsWith('image/')) { showMsg('Selecione uma imagem.'); input.value = ''; return; }
+  if (file.size > 3 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 3 MB).'); input.value = ''; return; }
+  db.uploadImage(file, 'characters')
+    .then((url) => db.updateCharacter(character.id, { cover_url: url, cover_focal_y: 50 }))
+    .then((updated) => { character = { ...character, ...updated }; input.value = ''; openTab('ficha'); })
+    .catch((e) => showMsg(e.message));
+};
+window.onAvatarQuickFile = (input) => {
+  const file = input.files && input.files[0]; if (!file) return;
+  if (!file.type.startsWith('image/')) { showMsg('Selecione uma imagem.'); input.value = ''; return; }
+  if (file.size > 3 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 3 MB).'); input.value = ''; return; }
+  db.uploadImage(file, 'characters').then((url) => {
+    const gallery = [...(character.gallery || []), url];
+    return db.updateCharacter(character.id, { avatar_url: url, gallery });
+  }).then((updated) => { character = { ...character, ...updated }; input.value = ''; openTab('ficha'); })
+    .catch((e) => showMsg(e.message));
+};
+
+/* -------- guia rápido: fórmulas pessoais (item do inventário + status) -------- */
+function evalFormulaTermIn(attrs, values, t, profCtx) {
+  if (t.type === 'stat') {
+    const stat = attrs.find((a) => a.id === t.statId);
+    return stat ? (evalStatIn(attrs, values, stat, _fichaSkillBonus, new Set(), profCtx) ?? 0) : 0;
+  }
+  return Number(t.value) || 0; // item (valor no momento em que foi adicionado) e número fixo
+}
+function evalFormulaIn(attrs, values, f, profCtx) { return (f.terms || []).reduce((sum, t) => sum + (t.sign || 1) * evalFormulaTermIn(attrs, values, t, profCtx), 0); }
+function evalFormulaTerm(t) { return evalFormulaTermIn(_fichaAttrs, _fichaValues, t, _fichaProfCtx); }
+function evalFormula(f) { return evalFormulaIn(_fichaAttrs, _fichaValues, f, _fichaProfCtx); }
+function formulaRow(f) {
+  const total = Math.round(evalFormula(f) * 100) / 100;
+  const breakdown = (f.terms || []).map((t, i) => (i === 0 ? (t.sign < 0 ? '−' : '') : (t.sign < 0 ? ' − ' : ' + ')) + (t.label || '?')).join('');
+  return `<div class="formula-row"><div class="fn"><b>${esc(f.name)}</b><span class="fbreak">${esc(breakdown)}</span></div>
+    <div class="fresult">${total}</div>
+    <button class="btn sm danger auto" onclick="delFormula('${f.id}')"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>`;
+}
+window.delFormula = (id) => { db.deleteCharacterFormula(id).then(() => openTab('ficha')).catch((e) => showMsg(e.message)); };
+
+window.openFormulaBuilder = () => { _builderTerms = [{ sign: 1, type: 'stat' }]; renderFormulaBuilder(); };
+window.closeFormulaBuilder = () => { const b = $('formula-builder'); if (b) b.innerHTML = ''; _builderTerms = []; };
+function renderFormulaBuilder() {
+  const box = $('formula-builder'); if (!box) return;
+  box.innerHTML = `<div class="surface" style="margin-top:10px">
+    <div class="fld"><label>Nome da fórmula</label><input id="fb-name" placeholder="Ex.: Dano da Espada" maxlength="60"></div>
+    <div id="fb-terms">${_builderTerms.map((t, i) => termRow(t, i)).join('')}</div>
+    <button type="button" class="btn auto sm" onclick="addBuilderTerm()">+ Termo</button>
+    <div class="full actions" style="margin-top:12px">
+      <button class="btn" onclick="closeFormulaBuilder()">Cancelar</button>
+      <button class="btn go" onclick="saveFormulaBuilder()">Salvar fórmula</button>
+    </div>
+  </div>`;
+}
+function termRow(t, i) {
+  const signSel = i > 0 ? `<select class="fterm-sign" onchange="setTermField(${i},'sign',parseInt(this.value))">
+    <option value="1" ${t.sign === 1 ? 'selected' : ''}>+</option><option value="-1" ${t.sign === -1 ? 'selected' : ''}>−</option></select>` : '<span class="fterm-sign"></span>';
+  const typeSel = `<select onchange="setTermType(${i}, this.value)">
+    <option value="stat" ${t.type === 'stat' ? 'selected' : ''}>Status</option>
+    <option value="item" ${t.type === 'item' ? 'selected' : ''}>Item do inventário</option>
+    <option value="number" ${t.type === 'number' ? 'selected' : ''}>Número fixo</option></select>`;
+  let refSel;
+  if (t.type === 'stat') {
+    refSel = `<select onchange="setTermField(${i},'statId',this.value)">
+      <option value="">— escolha —</option>
+      ${_fichaAttrs.map((a) => `<option value="${a.id}" ${t.statId === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
+  } else if (t.type === 'item') {
+    refSel = `<select onchange="setTermItem(${i}, this.value)">
+      <option value="">— escolha —</option>
+      ${_fichaInventory.map((it) => `<option value="${it.id}" ${t.itemId === it.id ? 'selected' : ''}>${esc(it.name)}</option>`).join('')}</select>
+      ${termItemModSelect(t, i)}`;
+  } else {
+    refSel = `<input class="fnum" type="number" step="0.1" value="${t.value ?? ''}" onchange="setTermField(${i},'value',parseFloat(this.value)||0)">`;
+  }
+  return `<div class="fterm-row">${signSel}${typeSel}${refSel}
+    ${_builderTerms.length > 1 ? `<button type="button" class="btn sm danger auto" onclick="rmBuilderTerm(${i})"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>` : ''}</div>`;
+}
+function termItemModSelect(t, i) {
+  const item = _fichaInventory.find((it) => it.id === t.itemId);
+  const mods = (item && item.modifiers) || [];
+  if (!item) return '';
+  if (!mods.length) return '<span style="font-family:var(--mono);font-size:10px;color:var(--ink-faint)">(sem modificadores)</span>';
+  return `<select onchange="setTermItemMod(${i}, this.value)">
+    <option value="">— modificador —</option>
+    ${mods.map((m) => `<option value="${esc(m.name)}" ${t.modName === m.name ? 'selected' : ''}>${esc(m.name)} (${esc(m.value)})</option>`).join('')}</select>`;
+}
+window.addBuilderTerm = () => { _builderTerms.push({ sign: 1, type: 'stat' }); renderFormulaBuilder(); };
+window.rmBuilderTerm = (i) => { _builderTerms.splice(i, 1); renderFormulaBuilder(); };
+window.setTermField = (i, key, val) => { _builderTerms[i][key] = val; };
+window.setTermType = (i, type) => { _builderTerms[i] = { sign: _builderTerms[i].sign, type }; renderFormulaBuilder(); };
+window.setTermItem = (i, itemId) => { _builderTerms[i].itemId = itemId; _builderTerms[i].modName = null; _builderTerms[i].value = 0; renderFormulaBuilder(); };
+window.setTermItemMod = (i, modName) => {
+  const t = _builderTerms[i]; t.modName = modName;
+  const item = _fichaInventory.find((it) => it.id === t.itemId);
+  const mod = item && (item.modifiers || []).find((m) => m.name === modName);
+  t.value = mod ? (parseFloat(String(mod.value).replace(',', '.')) || 0) : 0;
+};
+window.saveFormulaBuilder = () => {
+  const name = $('fb-name').value.trim(); if (!name) { showMsg('Dê um nome à fórmula.'); return; }
+  const terms = _builderTerms.map((t) => {
+    if (t.type === 'stat') {
+      const stat = _fichaAttrs.find((a) => a.id === t.statId);
+      return stat ? { type: 'stat', sign: t.sign || 1, statId: t.statId, label: stat.name } : null;
+    }
+    if (t.type === 'item') {
+      const item = _fichaInventory.find((it) => it.id === t.itemId);
+      return item ? { type: 'item', sign: t.sign || 1, value: t.value || 0, label: `${item.name}${t.modName ? ' (' + t.modName + ')' : ''}` } : null;
+    }
+    return { type: 'number', sign: t.sign || 1, value: t.value || 0, label: String(t.value || 0) };
+  }).filter(Boolean);
+  if (!terms.length) { showMsg('Adicione pelo menos um termo válido.'); return; }
+  db.addCharacterFormula(character.id, name, terms).then(() => { closeFormulaBuilder(); openTab('ficha'); }).catch((e) => showMsg(e.message));
+};
+/* status secundários: rascunho local — só grava no banco quando clica em "Salvar status" */
+let _pendingDelta = {}; // statId -> quantos pontos foram alocados no rascunho (ainda não salvos)
+function pendingSum() { return Object.values(_pendingDelta).reduce((s, v) => s + v, 0); }
+function pointsLeft() { return (character.stat_points || 0) - pendingSum(); }
+function secStatRow(a) {
+  const base = Number(_fichaValues[a.id] ?? a.default_value ?? 0) || 0;
+  const pend = _pendingDelta[a.id] || 0;
+  const canSpend = pointsLeft() > 0;
+  const bonus = _fichaSkillBonus[a.id];
+  return `<div class="stat-tile" style="--stc:${esc(a.color || '#7ee6dc')}">
+    <span class="mod-badge" id="secbonus-${a.id}" style="${bonus ? '' : 'display:none;'}" title="${bonus ? esc(bonusTitle(bonus)) : ''}">${bonus ? `+${bonus.total}` : ''}</span>
+    <div class="stat-val" id="secval-${a.id}">${base + pend + (bonus ? bonus.total : 0)}</div>
+    <div class="stat-name">${esc(a.name)}</div>
+    <div class="stat-ctl">
+      <button class="plus" id="secminus-${a.id}" title="Tirar do rascunho" onclick="removeDraftPoint('${a.id}')" ${pend > 0 ? '' : 'disabled'}>−</button>
+      <button class="plus" id="secbtn-${a.id}" title="Adicionar (não salva ainda)" onclick="addDraftPoint('${a.id}')" ${canSpend ? '' : 'disabled'}>+</button>
+    </div>
+  </div>`;
+}
+// perícia: sempre calculada (nunca editável direto), por isso a caixinha só tem cor + nome + valor
+// — id="comp-<id>" segue a mesma convenção dos status calculados, pra recalcComputed() já atualizar sozinho.
+function skillChip(a) {
+  return `<div class="skill-chip" style="--skc:${esc(a.color || '#7ee6dc')}">
+    <span class="skc-name">${esc(a.name)}</span>
+    <span class="skc-val" id="comp-${a.id}">—</span>
+  </div>`;
+}
+function refreshSecRow(statId) {
+  const base = Number(_fichaValues[statId] ?? (_fichaAttrs.find((a) => a.id === statId)?.default_value) ?? 0) || 0;
+  const pend = _pendingDelta[statId] || 0;
+  const bonus = _fichaSkillBonus[statId];
+  const vEl = $('secval-' + statId);
+  if (vEl) {
+    // pillar I (§2.4): um bump discreto tier-1 — confirma o clique antes mesmo do Salvar aparecer,
+    // sem promover um ponto de status (rotina) a evento tier-2
+    const newText = String(base + pend + (bonus ? bonus.total : 0));
+    if (vEl.textContent !== newText) {
+      vEl.textContent = newText;
+      vEl.classList.remove('bump'); void vEl.offsetWidth; vEl.classList.add('bump');
+    }
+  }
+  const bEl = $('secbonus-' + statId); if (bEl) { bEl.style.display = bonus ? '' : 'none'; bEl.textContent = bonus ? `+${bonus.total}` : ''; bEl.title = bonus ? bonusTitle(bonus) : ''; }
+  const minusEl = $('secminus-' + statId); if (minusEl) minusEl.disabled = pend <= 0;
+  const left = pointsLeft();
+  document.querySelectorAll('[id^="secbtn-"]').forEach((b) => { b.disabled = left <= 0; });
+  const badge = $('stat-points-badge'); if (badge) badge.textContent = left;
+  const saveBtn = $('stat-save-btn'); if (saveBtn) saveBtn.style.display = pendingSum() > 0 ? '' : 'none';
+}
+window.addDraftPoint = (statId) => {
+  if (pointsLeft() <= 0) return;
+  _pendingDelta[statId] = (_pendingDelta[statId] || 0) + 1;
+  refreshSecRow(statId);
+};
+window.removeDraftPoint = (statId) => {
+  if (!_pendingDelta[statId]) return;
+  _pendingDelta[statId] -= 1;
+  if (_pendingDelta[statId] <= 0) delete _pendingDelta[statId];
+  refreshSecRow(statId);
+};
+window.commitStatPoints = async () => {
+  const entries = Object.entries(_pendingDelta).filter(([, n]) => n > 0);
+  if (!entries.length) return;
+  const btn = $('stat-save-btn'); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+  try {
+    for (const [statId, n] of entries) {
+      for (let i = 0; i < n; i++) await db.spendStatPoint(character.id, statId);
+    }
+    _pendingDelta = {};
+    showMsg('Status salvos!', 'ok');
+    openTab('ficha'); // recarrega fresco do banco
+  } catch (e) {
+    showMsg(e.message);
+    openTab('ficha'); // ressincroniza com o servidor mesmo em erro parcial
+  }
+};
+
+/* ============================ BIOGRAFIA / CRIAÇÃO DO PERSONAGEM ============================ */
+async function renderCharSetup(c, onboarding) {
+  character = character || await db.ensureCharacter(campaignId);
+  c.innerHTML = identitySection(character, onboarding);
+}
+async function renderBiografia(c) {
+  character = character || await db.ensureCharacter(campaignId);
+  c.innerHTML = identitySection(character, false);
+}
+
+function identitySection(ch, onboarding) {
+  const f = (label, key, val, ph, id) => `<div class="fld row"><label>${label}</label>
+      <input ${id ? `id="${id}"` : ''} value="${esc(val)}" placeholder="${ph || ''}" oninput="onIdentityFieldChange('${key}', this.value)"></div>`;
+  const ta = (label, key, val, ph) => `<div class="fld"><label>${label}</label>
+      <textarea style="width:100%;min-height:52px;background:var(--field);border:1px solid var(--line2);border-radius:10px;color:var(--ink);font-family:var(--serif);font-size:14px;padding:10px 12px;line-height:1.5" oninput="onIdentityFieldChange('${key}', this.value)" placeholder="${ph || ''}">${esc(val)}</textarea></div>`;
+
+  const ageField = `<div class="fld row"><label>Idade</label>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="${esc(ch.age)}" placeholder="Ex.: 27" oninput="onAgeInput(this)"></div>`;
+  const genderField = `<div class="fld row"><label>Sexo</label>
+      <select style="flex:1" onchange="onIdentityFieldChange('gender', this.value)">
+        <option value="" ${!ch.gender ? 'selected' : ''}>— não informado —</option>
+        <option value="Masculino" ${ch.gender === 'Masculino' ? 'selected' : ''}>Masculino</option>
+        <option value="Feminino" ${ch.gender === 'Feminino' ? 'selected' : ''}>Feminino</option>
+      </select></div>`;
+
+  const gallery = Array.isArray(ch.gallery) ? ch.gallery : [];
+  const loreFiles = Array.isArray(ch.lore_files) ? ch.lore_files : [];
+
+  return `
+    ${onboarding ? `<div class="onboard">
+      <div class="ohead"><h3><span class="ic">${ICONS.dna}</span>Crie seu personagem</h3></div>
+      <p style="font-family:var(--serif);font-size:13.5px;color:var(--ink-dim);margin:8px 2px 0;line-height:1.6">
+        Antes de ver sua ficha, conte quem é o seu personagem. Dá pra editar tudo isso depois na aba Biografia.</p>
+    </div>` : ''}
+
+    <div class="section-title">Identidade</div>
+    ${f('Nome', 'name', ch.name, 'Nome do personagem', 'ident-name')}
+    ${ageField}
+    ${genderField}
+
+    <div class="section-title">Fotos do personagem</div>
+    <div class="char-gallery" id="char-gallery">${gallery.length ? gallery.map((url, i) => galleryThumb(url, i, ch.avatar_url)).join('') : '<div class="empty" style="border:0">Nenhuma foto ainda.</div>'}</div>
+    <input type="file" id="gal-file" accept="image/*" style="display:none" onchange="onGalleryFile(this)">
+    <button type="button" class="btn auto sm" onclick="document.getElementById('gal-file').click()">+ Adicionar foto</button>
+
+    <div class="section-title" style="margin-top:22px">Personalidade</div>
+    ${ta('Traços de personalidade', 'personality', ch.personality, 'Como o personagem age, fala, reage sob pressão...')}
+    ${ta('Ideais e motivações', 'ideals', ch.ideals, 'O que move o personagem a agir')}
+    ${ta('Vínculos', 'bonds', ch.bonds, 'Pessoas, lugares ou causas importantes pra ele')}
+    ${ta('Defeitos e medos', 'flaws', ch.flaws, 'Fraquezas, medos, vícios...')}
+
+    <div class="section-title" style="margin-top:22px">Aparência e origem</div>
+    ${ta('Aparência física', 'appearance', ch.appearance, 'Altura, porte, marcas, jeito de se vestir...')}
+    ${f('Naturalidade / origem', 'origin', ch.origin, 'De onde o personagem veio')}
+
+    <div class="section-title" style="margin-top:22px">Bio / descrição breve</div>
+    <div class="fld"><textarea style="width:100%;min-height:70px;background:var(--field);border:1px solid var(--line2);border-radius:10px;color:var(--ink);font-family:var(--serif);font-size:14px;padding:10px 12px;line-height:1.5" oninput="onIdentityFieldChange('bio', this.value)" placeholder="Quem é o seu personagem...">${esc(ch.bio)}</textarea></div>
+
+    <div class="section-title">Arquivos de lore <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(opcional — imagem, PDF ou texto)</span></div>
+    <div class="list" id="lore-list">${loreFiles.length ? loreFiles.map((lf, i) => loreRow(lf, i)).join('') : '<div class="empty">Nenhum arquivo ainda.</div>'}</div>
+    <input type="file" id="lore-file" accept="image/*,application/pdf,text/plain" style="display:none" onchange="onLoreFile(this)">
+    <button type="button" class="btn auto sm" onclick="document.getElementById('lore-file').click()">+ Adicionar arquivo</button>
+
+    ${onboarding ? `<div class="full actions" style="margin-top:24px;display:flex;justify-content:flex-end">
+      <button class="btn go auto" onclick="finishOnboarding()"><span class="spin"></span>Concluir e ir para a ficha</button>
+    </div>` : `<div class="full actions" style="margin-top:24px;display:flex;justify-content:flex-end">
+      <button class="btn go" id="identity-save-btn" style="display:none" onclick="saveIdentity()"><span class="spin"></span>Salvar alterações</button>
+    </div>`}`;
+}
+function galleryThumb(url, i, avatarUrl) {
+  const isMain = url === avatarUrl;
+  return `<div class="gal-thumb ${isMain ? 'main' : ''}">
+    <img src="${esc(url)}" alt="">
+    ${isMain ? `<span class="gal-badge">${ICONS.star}Principal</span>` : ''}
+    <div class="gal-thumb-actions">
+      ${isMain ? '' : `<button class="gal-act" title="Definir como foto principal" onclick="setMainPhoto(${i})">${ICONS.star}</button>`}
+      <button class="gal-act danger" title="Remover foto" onclick="rmGalleryPhoto(${i})">${ICONS.x}</button>
+    </div>
+  </div>`;
+}
+function loreRow(lf, i) {
+  return `<div class="list-row"><a class="grow nm" href="${esc(lf.url)}" target="_blank" rel="noopener" style="color:var(--maq);text-decoration:none">${esc(lf.name)}</a>
+    <button class="btn sm danger auto" onclick="rmLoreFile(${i})"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>`;
+}
+function rerenderIdentity() {
+  if (inOnboarding) { renderCharSetup($('content'), true); return; }
+  if (currentTab === 'biografia') renderBiografia($('content'));
+}
+window.onGalleryFile = (input) => {
+  const file = input.files && input.files[0]; if (!file) return;
+  if (!file.type.startsWith('image/')) { showMsg('Selecione uma imagem.'); input.value = ''; return; }
+  if (file.size > 3 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 3 MB).'); input.value = ''; return; }
+  db.uploadImage(file, 'characters').then((url) => {
+    const gallery = [...(character.gallery || []), url];
+    const patch = { gallery };
+    if (!character.avatar_url) patch.avatar_url = url; // primeira foto vira a principal
+    return db.updateCharacter(character.id, patch);
+  }).then((updated) => { character = { ...character, ...updated }; input.value = ''; rerenderIdentity(); })
+    .catch((e) => showMsg(e.message));
+};
+window.setMainPhoto = (i) => {
+  const url = (character.gallery || [])[i]; if (!url) return;
+  db.updateCharacter(character.id, { avatar_url: url })
+    .then((updated) => { character = { ...character, ...updated }; rerenderIdentity(); })
+    .catch((e) => showMsg(e.message));
+};
+window.rmGalleryPhoto = (i) => {
+  const gallery = [...(character.gallery || [])];
+  const [removed] = gallery.splice(i, 1);
+  const patch = { gallery };
+  if (character.avatar_url === removed) patch.avatar_url = gallery[0] || null;
+  db.updateCharacter(character.id, patch)
+    .then((updated) => { character = { ...character, ...updated }; rerenderIdentity(); })
+    .catch((e) => showMsg(e.message));
+};
+window.onLoreFile = (input) => {
+  const file = input.files && input.files[0]; if (!file) return;
+  db.uploadLoreFile(file, 'characters')
+    .then((entry) => db.updateCharacter(character.id, { lore_files: [...(character.lore_files || []), entry] }))
+    .then((updated) => { character = { ...character, ...updated }; input.value = ''; rerenderIdentity(); })
+    .catch((e) => showMsg(e.message));
+};
+window.rmLoreFile = (i) => {
+  const lore_files = [...(character.lore_files || [])];
+  lore_files.splice(i, 1);
+  db.updateCharacter(character.id, { lore_files })
+    .then((updated) => { character = { ...character, ...updated }; rerenderIdentity(); })
+    .catch((e) => showMsg(e.message));
+};
+window.finishOnboarding = async () => {
+  const name = (character.name || '').trim();
+  if (!name) { showMsg('Preencha ao menos o nome do personagem.'); $('ident-name')?.focus(); return; }
+  const patch = { name, age: character.age || '', gender: character.gender || '',
+    char_class: character.char_class || '', subclass: character.subclass || '', bio: character.bio || '', onboarding_done: true };
+  db.updateCharacter(character.id, patch).then(async (updated) => {
+    character = { ...character, ...updated };
+    if (character.char_class) { try { await resyncClassDefaults(character.id, character.char_class, character.subclass); } catch (_) {} }
+    inOnboarding = false;
+    $('mesa-menu').style.display = '';
+    enterMesa();
+  }).catch((e) => showMsg(e.message));
+};
+/* recursos: máx = valor (base) ou fórmula (calc); atual = character_resources */
+function resMax(a) { return evalStat(a) ?? 0; } // evalStat já soma bônus de esfera pra base e computado
+// barra única (não mais segmentada em pips) — largura proporcional a atual/máximo
+function resBarHtml(cur, max) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
+  return `<div class="res-fill" style="width:${pct}%"></div>`;
+}
+function resourceRow(a) {
+  const max = resMax(a);
+  let cur = _fichaResources[a.id]; if (cur == null || cur === '') cur = max; cur = Number(cur);
+  return `<div class="res-row" style="--res-color:${esc(a.color || '#7ee6dc')}">
+    <div class="res-head">
+      <span class="res-label"><i class="res-dot"></i>${esc(a.name)}</span>
+      <span class="res-amt-line"><b id="rescur-${a.id}">${cur}</b>&nbsp;/&nbsp;<span id="resmax-${a.id}">${max}</span></span>
+    </div>
+    <div class="res-bar-row">
+      <div class="res-track" id="restrack-${a.id}">${resBarHtml(cur, max)}</div>
+      <div class="res-step">
+        <button class="res-btn dmg" title="Sofrer dano" onclick="resDelta('${a.id}', -1)">−</button>
+        <button class="res-btn heal" title="Curar" onclick="resDelta('${a.id}', 1)">+</button>
+      </div>
+    </div></div>`;
+}
+function refreshRes(id) {
+  const a = _fichaAttrs.find((x) => x.id === id); if (!a) return;
+  const max = resMax(a);
+  let cur = _fichaResources[id]; if (cur == null || cur === '') cur = max; cur = Number(cur);
+  const cb = $('rescur-' + id); if (cb) cb.textContent = cur;
+  const mb = $('resmax-' + id); if (mb) mb.textContent = max;
+  const track = $('restrack-' + id); if (!track) return;
+  const fill = track.querySelector('.res-fill'); if (!fill) return;
+  const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
+  const prevPct = parseFloat(fill.style.width) || 0;
+  fill.style.width = pct + '%';
+  if (Math.round(pct) === Math.round(prevPct)) return;
+  // pillar III (§4.4): dano/cura ainda dá um flash visual — não varre mais segmento por segmento
+  // (não existem mais pips), mas a barra inteira pisca pra confirmar a mudança
+  const healing = pct > prevPct;
+  fill.classList.remove('res-fill-heal', 'res-fill-dmg'); void fill.offsetWidth;
+  const cls = healing ? 'res-fill-heal' : 'res-fill-dmg';
+  fill.classList.add(cls);
+  fill.addEventListener('animationend', () => fill.classList.remove(cls), { once: true });
+}
+window.resDelta = (id, delta) => {
+  const a = _fichaAttrs.find((x) => x.id === id); const max = resMax(a);
+  let cur = _fichaResources[id]; if (cur == null) cur = max;
+  cur = Math.max(0, Math.min(max, Number(cur) + delta)); _fichaResources[id] = cur; refreshRes(id);
+  db.setCharacterResource(character.id, id, cur).catch((e) => showMsg(e.message));
+};
+
+/* avaliador de status calculados — parametrizado (usado na ficha própria e na visão do Mestre).
+   `bonuses` é um mapa {attribute_id: soma} com os bônus vindos de esferas de habilidade
+   desbloqueadas — soma em cima do valor bruto SÓ na avaliação (nunca no `values`/base
+   editável, senão salvar o status ponto-a-ponto corromperia o valor base do personagem). */
+// profCtx = { catalog, granted } — opcional. Quando presente, um token de fórmula que não bate
+// com nenhum status também é procurado nas Proficiências (pelo "nome na fórmula"): vira 1 se o
+// personagem tem, 0 se não tem. É assim que "Medicina = SAB + (PROF_MEDICINA ? PROF : 0)" funciona
+// sem precisar de um caminho de avaliação separado — sem profCtx, comportamento é o de sempre.
+function evalStatIn(attrs, values, a, bonuses = {}, seen = new Set(), profCtx = null) {
+  if (a.kind !== 'computed') {
+    const n = Number(values[a.id] ?? a.default_value ?? '');
+    const b = bonuses[a.id]; // {total, sources} vindo de bonusMapFrom() — não é um número puro
+    return (isNaN(n) ? 0 : n) + (b ? Number(b.total) || 0 : 0);
+  }
+  if (seen.has(a.id)) return null; const s2 = new Set(seen); s2.add(a.id);
+  const byKey = (key) => attrs.find((x) => (x.formula_key || '').trim() === (key || '').trim());
+  const profByKey = (key) => (profCtx?.catalog || []).find((p) => (p.formula_key || '').trim() === (key || '').trim());
+  const tokens = (a.formula || '').match(/[A-Za-zÀ-ú_][A-Za-zÀ-ú0-9_]*|\d+\.?\d*|[+\-*/()]/g) || [];
+  try {
+    const expr = tokens.map((t) => {
+      if (/^[\d.]/.test(t) || /^[+\-*/()]$/.test(t)) return t;
+      const ref = byKey(t);
+      if (ref) { const v = evalStatIn(attrs, values, ref, bonuses, s2, profCtx); return '(' + (v == null ? 0 : v) + ')'; }
+      const pf = profByKey(t);
+      if (pf) return '(' + (profCtx.granted[pf.id] ? 1 : 0) + ')';
+      return '(0)';
+    }).join(' ');
+    if (!/^[\d+\-*/().\s]*$/.test(expr)) return null;
+    const r = Function('"use strict";return (' + expr + ')')();
+    return isFinite(r) ? Math.round(r * 100) / 100 : null;
+  } catch (_) { return null; }
+}
+function profCtxFrom(grantedMap) { return { catalog: sys?.proficiencies || [], granted: grantedMap || {} }; }
+function evalStat(a, seen = new Set()) { return evalStatIn(_fichaAttrs, _fichaValues, a, _fichaSkillBonus, seen, _fichaProfCtx); }
+// soma, por atributo, o total dos bônus de esferas + a lista de fontes (pra anotar "+1 (Esfera: X)")
+function bonusMapFrom(list) {
+  const map = {};
+  (list || []).forEach((b) => { const e = map[b.stat_id] || { total: 0, sources: [] };
+    e.total += b.amount; e.sources.push({ name: b.source_name, amount: b.amount }); map[b.stat_id] = e; });
+  return map;
+}
+// bônus dos itens EQUIPADOS — modifiers do item usam {name, value} (o mesmo apelido/"nome na
+// fórmula" do datalist "stat-keys" no editor de item), então resolve pro stat_id certo aqui antes
+// de somar no mesmo formato de bonusMapFrom (pra poder mesclar com o bônus de esferas de habilidade).
+function equipBonusMap(items, attrs) {
+  const map = {};
+  (items || []).filter((it) => it.equipped).forEach((it) => {
+    (it.modifiers || []).forEach((m) => {
+      const key = (m.name || '').trim(); const amount = Number(m.value);
+      if (!key || !amount) return;
+      const stat = attrs.find((a) => (a.formula_key || '').trim() === key || a.name === key);
+      if (!stat) return;
+      const e = map[stat.id] || { total: 0, sources: [] };
+      e.total += amount; e.sources.push({ name: it.name, amount }); map[stat.id] = e;
+    });
+  });
+  return map;
+}
+function mergeBonusMaps(a, b) {
+  const map = {};
+  [a, b].forEach((src) => Object.entries(src || {}).forEach(([id, e]) => {
+    const cur = map[id] || { total: 0, sources: [] };
+    cur.total += e.total; cur.sources = cur.sources.concat(e.sources); map[id] = cur;
+  }));
+  return map;
+}
+function bonusTitle(entry) { return entry ? entry.sources.map((s) => `${s.name}: +${s.amount}`).join(', ') : ''; }
+window.recalcComputed = () => {
+  _fichaAttrs.forEach((a) => { if (a.kind !== 'computed') { const el = $('attr-' + a.id); if (el) _fichaValues[a.id] = el.value; } });
+  _fichaAttrs.forEach((a) => { if (a.kind === 'computed' && !a.is_resource) { const el = $('comp-' + a.id); if (el) { const v = evalStat(a); el.innerHTML = v == null ? `<span class="ic">${ICONS.warning}</span>${a.is_skill ? '' : 'fórmula'}` : (a.is_skill ? String(v) : '= ' + v); } } });
+  _fichaAttrs.forEach((a) => { if (a.is_resource) refreshRes(a.id); });
+  _fichaAttrs.forEach((a) => { if (a.kind !== 'computed' && !a.is_resource) refreshSecRow(a.id); });
+};
+// preenche/ressincroniza os "Status base" da classe e (se houver) da subclasse via RPC
+// (apply_class_defaults) — uma escrita direta em character_attributes é bloqueada pela RLS pra
+// status base não-recurso (só dá pra mudar via spend_stat_point), então isso precisa passar por
+// uma função validada no servidor, não por setCharacterAttribute cru. a RPC só reescreve status
+// que ainda estão marcados como "veio da classe" (nunca um que o jogador já customizou), então
+// dá pra chamar de novo sempre que a ficha é aberta — se o Mestre editou os valores padrão
+// depois, isso é o que faz a mudança aparecer sem precisar reescolher a classe/subclasse.
+// devolve true se algo mudou (útil pra saber se vale a pena recarregar a ficha).
+async function resyncClassDefaults(characterId, className, subName) {
+  if (!sys || !className) return false;
+  let changed = false;
+  const cl = sys.classes.find((x) => !x.parent_id && x.name === className);
+  if (cl) {
+    try { if (await db.applyClassDefaults(characterId, cl.id)) changed = true; } catch (_) {}
+    try { if (await db.applyClassProficiencies(characterId, cl.id)) changed = true; } catch (_) {}
+  }
+  if (cl && subName) {
+    const sub = sys.classes.find((x) => x.parent_id === cl.id && x.name === subName);
+    if (sub) {
+      try { if (await db.applyClassDefaults(characterId, sub.id)) changed = true; } catch (_) {}
+      try { if (await db.applyClassProficiencies(characterId, sub.id)) changed = true; } catch (_) {}
+    }
+  }
+  return changed;
+}
+// classe/subclasse vivem na aba Ficha (não mais na Biografia — são ligadas ao sistema/status,
+// não à história do personagem), e por isso gravam direto ao trocar, sem passar pelo botão
+// "Salvar alterações" da identidade (esse botão só existe na Biografia).
+window.pickClass = (className) => {
+  character.char_class = className; character.subclass = '';
+  db.updateCharacter(character.id, { char_class: className, subclass: '' }).then(async (updated) => {
+    character = { ...character, ...updated };
+    if (className) { try { await resyncClassDefaults(character.id, className, ''); } catch (_) {} }
+    if (currentTab === 'ficha') openTab('ficha');
+  }).catch((e) => showMsg(e.message));
+};
+window.pickSubclass = (subName) => {
+  character.subclass = subName;
+  db.updateCharacter(character.id, { subclass: subName }).then(async (updated) => {
+    character = { ...character, ...updated };
+    if (character.char_class) { try { await resyncClassDefaults(character.id, character.char_class, subName); } catch (_) {} }
+    if (currentTab === 'ficha') openTab('ficha');
+  }).catch((e) => showMsg(e.message));
+};
+// classe/subclasse sem sistema vinculado (inputs de texto livre): grava ao sair do campo (blur/onchange)
+window.onClassTextChange = (key, value) => {
+  character[key] = value;
+  db.updateCharacter(character.id, { [key]: value }).then((updated) => { character = { ...character, ...updated }; })
+    .catch((e) => showMsg(e.message));
+};
+window.onAgeInput = (input) => {
+  const digits = input.value.replace(/\D/g, '');
+  if (digits !== input.value) input.value = digits;
+  character.age = digits; markIdentityDirty();
+};
+window.onIdentityFieldChange = (key, value) => { character[key] = value; markIdentityDirty(); };
+function markIdentityDirty() { const b = $('identity-save-btn'); if (b) b.style.display = ''; }
+window.saveIdentity = () => {
+  if (!character) return;
+  const btn = $('identity-save-btn'); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+  const patch = { name: (character.name || '').trim(), age: character.age || '', gender: character.gender || '', bio: character.bio || '',
+    personality: character.personality || '', ideals: character.ideals || '', bonds: character.bonds || '', flaws: character.flaws || '',
+    appearance: character.appearance || '', origin: character.origin || '' };
+  db.updateCharacter(character.id, patch).then((updated) => {
+    character = { ...character, ...updated };
+    if (btn) btn.style.display = 'none';
+    showMsg('Salvo.', 'ok');
+  }).catch((e) => showMsg(e.message))
+    .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
+};
+
+async function renderInventario(c) {
+  character = character || await db.ensureCharacter(campaignId);
+  const items = await db.listInventory(character.id);
+  const sysItems = (sys && sys.items) || [];
+  c.innerHTML = `
+    <div class="section-title">Mochila</div>
+    <div class="list" id="inv-list">${items.length ? items.map(invRow).join('') : emptyState(ICONS.bag, 'Mochila vazia',
+      'Adicione itens no campo abaixo' + (sysItems.length ? ', ou puxe itens prontos do sistema da mesa (já vêm com os modificadores).' : '.'))}</div>
+    <form class="inline-form" style="margin-top:14px" onsubmit="return addInv(event)">
+      <input id="inv-name" placeholder="Item" required maxlength="60">
+      <input id="inv-qty" type="number" min="1" value="1" style="max-width:80px">
+      <button class="btn go auto" type="submit">+ Adicionar</button>
+    </form>
+    ${sysItems.length ? `
+    <div class="section-title" style="margin-top:18px">Adicionar item do sistema <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(já traz os modificadores)</span></div>
+    <div class="inline-form">
+      <select id="inv-sys-item" class="fld-input">${sysItems.map((it) => `<option value="${it.id}">${esc(it.name)}${(it.modifiers && it.modifiers.length) ? ' — ' + it.modifiers.map((m) => esc(m.name + ' ' + m.value)).join(', ') : ''}</option>`).join('')}</select>
+      <button class="btn auto" onclick="addInvFromSystem()">+ Adicionar</button>
+    </div>` : ''}`;
+}
+let _invDrafts = {};
+function invDraft(id) { return _invDrafts[id] || (_invDrafts[id] = {}); }
+function invRow(it) {
+  const mods = (it.modifiers && it.modifiers.length) ? `<div class="mods" style="margin-top:5px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : '';
+  const canEquip = it.modifiers && it.modifiers.length; // sem modificador não tem o que aplicar — não faz sentido "equipar"
+  return `<div class="list-row" data-id="${it.id}">
+    <div class="grow"><div class="nm">${esc(it.name)}${it.equipped ? ' <span class="badge" style="border-color:var(--maq);color:var(--maq)">equipado</span>' : ''}</div>
+      <input class="sub" style="background:transparent;border:0;color:var(--ink-faint);font-family:var(--mono);font-size:11px;width:100%;margin-top:3px"
+        placeholder="descrição..." value="${esc(it.description)}" oninput="onInvFieldChange('${it.id}','description',this.value)">
+      ${mods}</div>
+    ${canEquip ? `<button class="btn sm auto" style="${it.equipped ? 'border-color:var(--maq);color:var(--maq)' : ''}" onclick="toggleEquip('${it.id}', ${!it.equipped})" title="Equipado aplica os modificadores automaticamente nos Status">${it.equipped ? 'Desequipar' : 'Equipar'}</button>` : ''}
+    <input type="number" min="0" value="${it.qty}" style="max-width:70px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);padding:7px"
+      oninput="onInvFieldChange('${it.id}','qty',this.value)">
+    <button class="btn sm go" id="inv-save-${it.id}" style="display:none" onclick="saveInvRow('${it.id}')"><span class="spin"></span>Salvar</button>
+    <button class="btn sm danger auto" onclick="delItem('${it.id}')"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>`;
+}
+window.toggleEquip = (id, equipped) => {
+  db.updateItem(id, { equipped }).then(() => openTab('inventario')).catch((e) => showMsg(e.message));
+};
+window.addInv = (ev) => { ev.preventDefault(); const n = $('inv-name').value.trim(); if (!n) return false;
+  const qty = parseInt($('inv-qty').value) || 1;
+  db.addItem(character.id, { name: n, qty }).then(() => openTab('inventario')).catch((e) => showMsg(e.message)); return false; };
+window.addInvFromSystem = () => {
+  const id = $('inv-sys-item')?.value; if (!id) return;
+  db.addInventoryItemFromSystem(character.id, id).then(() => openTab('inventario')).catch((e) => showMsg(e.message));
+};
+window.onInvFieldChange = (id, key, value) => {
+  invDraft(id)[key] = value;
+  const b = $('inv-save-' + id); if (b) b.style.display = '';
+};
+window.saveInvRow = (id) => {
+  const draft = _invDrafts[id]; if (!draft) return;
+  const btn = $('inv-save-' + id); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+  const patch = {};
+  if (draft.description !== undefined) patch.description = draft.description;
+  if (draft.qty !== undefined) patch.qty = parseInt(draft.qty) || 0;
+  db.updateItem(id, patch).then(() => { delete _invDrafts[id]; if (btn) btn.style.display = 'none'; showMsg('Salvo.', 'ok'); })
+    .catch((e) => showMsg(e.message))
+    .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
+};
+window.delItem = (id) => { db.deleteItem(id).then(() => openTab('inventario')).catch((e) => showMsg(e.message)); };
+
+async function renderAnotacoes(c) {
+  character = character || await db.ensureCharacter(campaignId);
+  const notes = await db.listNotes(character.id);
+  c.innerHTML = `
+    <div class="section-title">Anotações <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(privadas — o Mestre não vê)</span></div>
+    <button class="btn auto sm" onclick="addNote()">+ Nova anotação</button>
+    <div class="list" id="note-list" style="margin-top:14px">${notes.length ? notes.map(noteRow).join('') : emptyState(ICONS.pencil, 'Nenhuma anotação ainda',
+      'Um caderno só seu — segredos, planos, pistas. O Mestre nunca vê o que você escreve aqui.',
+      '<button class="btn go auto sm" onclick="addNote()">+ Criar primeira anotação</button>')}</div>`;
+}
+let _noteDrafts = {};
+function noteDraft(id) { return _noteDrafts[id] || (_noteDrafts[id] = {}); }
+function noteRow(n) {
+  return `<div class="list-row" data-id="${n.id}" style="flex-direction:column;align-items:stretch;gap:8px">
+    <div style="display:flex;gap:8px;align-items:center">
+      <input style="flex:1;background:transparent;border:0;color:var(--bone);font-family:var(--disp);font-size:15px"
+        placeholder="Título" value="${esc(n.title)}" oninput="onNoteFieldChange('${n.id}','title',this.value)">
+      <button class="btn sm go" id="note-save-${n.id}" style="display:none" onclick="saveNoteRow('${n.id}')"><span class="spin"></span>Salvar</button>
+      <button class="btn sm danger auto" onclick="delNote('${n.id}')">Excluir</button>
+    </div>
+    <textarea style="width:100%;min-height:70px;background:var(--field-2);border:1px solid var(--line);border-radius:10px;color:var(--ink-dim);font-family:var(--serif);font-size:14px;padding:10px 12px;line-height:1.55"
+      placeholder="Escreva..." oninput="onNoteFieldChange('${n.id}','body',this.value)">${esc(n.body)}</textarea>
+  </div>`;
+}
+window.addNote = () => { db.addNote(character.id, { title: '', body: '' }).then(() => openTab('anotacoes')).catch((e) => showMsg(e.message)); };
+window.onNoteFieldChange = (id, key, value) => {
+  noteDraft(id)[key] = value;
+  const b = $('note-save-' + id); if (b) b.style.display = '';
+};
+window.saveNoteRow = (id) => {
+  const draft = _noteDrafts[id]; if (!draft) return;
+  const btn = $('note-save-' + id); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+  db.updateNote(id, draft).then(() => { delete _noteDrafts[id]; if (btn) btn.style.display = 'none'; showMsg('Salvo.', 'ok'); })
+    .catch((e) => showMsg(e.message))
+    .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
+};
+window.delNote = (id) => { db.deleteNote(id).then(() => openTab('anotacoes')).catch((e) => showMsg(e.message)); };
+
+/* ============================ ROLADOR DE DADOS + CHAT ============================ */
+async function mountDice() {
+  const fab = document.createElement('button');
+  fab.className = 'dice-fab'; fab.innerHTML = `<span class="ic">${ICONS.dice}</span>Dados`;
+  fab.onclick = toggleDice;
+  const panel = document.createElement('div');
+  panel.className = 'dice-panel'; panel.id = 'dice-panel';
+  const diceOpts = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'];
+  panel.innerHTML = `
+    <div class="dh"><b><span class="ic" id="dice-panel-icon">${ICONS.dice}</span><span id="dice-panel-label">Rolagens</span></b><button class="x" onclick="closeDice()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="dice-builder">
+      <input type="number" id="dice-qty" min="1" max="20" value="1" class="dice-qty" title="Quantidade de dados">
+      <select id="dice-die">${diceOpts.map((d) => `<option ${d === 'd20' ? 'selected' : ''}>${d}</option>`).join('')}</select>
+      ${role === 'player' ? `
+        <select id="dice-mod-type" onchange="onDiceModTypeChange()">
+          <option value="">+ nada</option>
+          <option value="stat">+ Status</option>
+          <option value="formula">+ Fórmula do Guia Rápido</option>
+        </select>
+        <select id="dice-mod-ref" style="display:none"></select>` : ''}
+      <button class="btn go sm" type="button" onclick="rollBuilder()"><span class="ic">${ICONS.dice}</span>Rolar</button>
+    </div>
+    <div class="rail-tabs" id="rail-tabs">
+      <button type="button" class="on" data-rt="rolls" onclick="selectRailTab('rolls')">Rolagens</button>
+      <button type="button" data-rt="chat" onclick="selectRailTab('chat')">Conversa</button>
+    </div>
+    <div class="dice-log" id="dice-log"><div class="empty" style="border:0">Sem rolagens ainda.</div></div>
+    <div class="chat-log" id="chat-log" style="display:none"><div class="empty" style="border:0">Sem mensagens ainda.</div></div>
+    <form class="chat-input-row" id="chat-form" onsubmit="return sendChatMsg(event)">
+      <input id="chat-input" placeholder="Mensagem para a mesa…" maxlength="600" autocomplete="off">
+      <button type="submit" aria-label="Enviar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg></button>
+    </form>`;
+  document.body.appendChild(fab); document.body.appendChild(panel);
+  try { renderRolls(await db.listRolls(campaignId)); } catch (_) {}
+  try { renderChat(await db.listMessages(campaignId)); } catch (_) {}
+  _unsub = db.subscribeRolls(campaignId, addRollToLog);
+  _unsubChat = db.subscribeMessages(campaignId, addMsgToLog);
+  loadStatMap();
+}
+window.toggleDice = () => { const p = $('dice-panel'); const open = !p.classList.contains('open'); p.classList.toggle('open'); if (open) loadStatMap(); };
+window.closeDice = () => $('dice-panel').classList.remove('open');
+window.selectRailTab = (tab) => {
+  const isRolls = tab === 'rolls';
+  document.querySelectorAll('#rail-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.rt === tab));
+  $('dice-log').style.display = isRolls ? '' : 'none';
+  $('chat-log').style.display = isRolls ? 'none' : '';
+  const icon = $('dice-panel-icon'), label = $('dice-panel-label');
+  if (icon) icon.innerHTML = isRolls ? ICONS.dice : ICONS.chat;
+  if (label) label.textContent = isRolls ? 'Rolagens' : 'Conversa';
+};
+addEventListener('beforeunload', () => { if (_unsub) _unsub(); if (_unsubChat) _unsubChat(); });
+
+// mapa dos status do jogador (pra rolar 1d20+FORCA etc.) + listas pro montador interativo
+let _diceStats = [], _diceFormulas = [];
+async function loadStatMap() {
+  if (role !== 'player' || !mesa.system_id) { _statMap = {}; _diceStats = []; _diceFormulas = []; return; }
+  try {
+    const sheet = await db.loadSheet(campaignId);
+    const { attributes, values, character: ch, proficiencies } = sheet;
+    const inv = await db.listInventory(ch.id).catch(() => []);
+    try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, ch.user_id)), equipBonusMap(inv, attributes)); }
+    catch (_) { _fichaSkillBonus = equipBonusMap(inv, attributes); }
+    const profCtx = profCtxFrom(proficiencies);
+    const map = {}; attributes.forEach((a) => { if (a.formula_key) map[a.formula_key.trim()] = evalStatIn(attributes, values, a, _fichaSkillBonus, new Set(), profCtx) ?? 0; });
+    _statMap = map;
+    _diceStats = attributes.filter((a) => a.formula_key).map((a) => ({ name: a.name, key: a.formula_key.trim(), value: map[a.formula_key.trim()] }));
+    const formulas = await db.listCharacterFormulas(ch.id);
+    _diceFormulas = formulas.map((f) => ({ id: f.id, name: f.name, total: Math.round(evalFormulaIn(attributes, values, f, profCtx) * 100) / 100 }));
+  } catch (_) { _statMap = {}; _diceStats = []; _diceFormulas = []; }
+}
+window.onDiceModTypeChange = () => {
+  const type = $('dice-mod-type').value;
+  const sel = $('dice-mod-ref');
+  if (!type) { sel.style.display = 'none'; sel.innerHTML = ''; return; }
+  sel.style.display = '';
+  sel.innerHTML = type === 'stat'
+    ? (_diceStats.map((s) => `<option value="${esc(s.key)}">${esc(s.name)} (${s.value})</option>`).join('') || '<option value="">— sem status —</option>')
+    : (_diceFormulas.map((f) => `<option value="${f.id}">${esc(f.name)} (${f.total})</option>`).join('') || '<option value="">— sem fórmulas —</option>');
+};
+window.rollBuilder = () => {
+  const qty = Math.min(20, Math.max(1, parseInt($('dice-qty').value) || 1));
+  const die = $('dice-die').value;
+  const modType = $('dice-mod-type')?.value || '';
+  const modRef = $('dice-mod-ref')?.value;
+  let formula = qty + die, label = null;
+  if (modType === 'stat' && modRef) {
+    formula += '+' + modRef;
+    const s = _diceStats.find((x) => x.key === modRef); label = s ? s.name : null;
+  } else if (modType === 'formula' && modRef) {
+    const f = _diceFormulas.find((x) => x.id === modRef);
+    if (f) { formula += '+' + f.total; label = f.name; }
+  }
+  doRoll(formula, label);
+};
+
+function rollFormula(input, statMap) {
+  const f = (input || '').trim(); if (!f) throw new Error('Digite uma fórmula (ex.: 1d20+3).');
+  const re = /([+\-]?)\s*(\d*d\d+|\d+\.?\d*|[A-Za-zÀ-ú_][A-Za-zÀ-ú0-9_]*)/gi;
+  let m, total = 0, parts = [], count = 0;
+  while ((m = re.exec(f))) {
+    count++; const sign = m[1] === '-' ? -1 : 1; const term = m[2];
+    const dm = /^(\d*)d(\d+)$/i.exec(term);
+    if (dm) {
+      const n = Math.min(Math.max(parseInt(dm[1] || '1'), 1), 100), faces = parseInt(dm[2]);
+      if (faces < 1) throw new Error('Dado inválido: ' + term);
+      const rolls = []; for (let i = 0; i < n; i++) rolls.push(1 + Math.floor(Math.random() * faces));
+      total += sign * rolls.reduce((a, b) => a + b, 0);
+      parts.push({ sign, text: `${n}d${faces}[${rolls.join(', ')}]` });
+    } else if (/^[A-Za-zÀ-ú_]/.test(term)) {
+      const v = Number(statMap[term.trim()]); if (isNaN(v)) throw new Error(`"${term}" não é um status seu`);
+      total += sign * v; parts.push({ sign, text: `${term}(${v})` });
+    } else { const v = Number(term); total += sign * v; parts.push({ sign, text: `${v}` }); }
+  }
+  if (!count) throw new Error('Fórmula inválida.');
+  const detail = parts.map((p, i) => (i === 0 ? (p.sign < 0 ? '−' : '') : (p.sign < 0 ? ' − ' : ' + ')) + p.text).join('');
+  return { total: Math.round(total * 100) / 100, detail };
+}
+function doRoll(f, label) {
+  try { const { total, detail } = rollFormula(f, _statMap || {});
+    const finalDetail = label ? `${detail} (${label})` : detail;
+    // no bloco da rolagem quem aparece é o personagem, não a conta — o Mestre não tem
+    // personagem nesta mesa, então continua caindo no nome de perfil (fallback do addRoll)
+    const rollerName = (role === 'player' && character && character.name) ? character.name : undefined;
+    db.addRoll(campaignId, { formula: f, detail: finalDetail, total, is_private: false, rollerName }).then(addRollToLog).catch((e) => showMsg(e.message));
+  } catch (e) { showMsg(e.message); }
+}
+
+// pillar III (§4.3): heurística visual pra nat-max/nat-min — lê os grupos de dado embutidos no
+// `detail` (ex.: "1d20[20]") sem precisar de coluna nova no banco; não afeta o total, só a ênfase
+function rollExtremity(detail) {
+  const re = /(\d+)d(\d+)\[([\d,\s]+)\]/g;
+  let m, sawDie = false, allMax = true, allMin = true;
+  while ((m = re.exec(detail || ''))) {
+    const faces = parseInt(m[2]);
+    m[3].split(',').forEach((s) => { const v = parseInt(s.trim()); sawDie = true; if (v !== faces) allMax = false; if (v !== 1) allMin = false; });
+  }
+  if (!sawDie) return null;
+  if (allMax) return 'max';
+  if (allMin) return 'min';
+  return null;
+}
+function rollEl(r, justLanded) {
+  const mine = r.user_id === myId;
+  const when = new Date(r.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const extremity = rollExtremity(r.detail);
+  const critClass = extremity === 'max' ? ' crit-max' : extremity === 'min' ? ' crit-min' : '';
+  const critLabel = extremity === 'max' ? 'Crítico natural' : extremity === 'min' ? 'Falha crítica' : '';
+  const critTagHtml = critLabel ? `<span class="crit-tag ${extremity}">${critLabel}</span>` : '';
+  const div = document.createElement('div');
+  // .mine (§3.2) é persistente; .landing (§4.3) é um tier-2 único aplicado só quando a rolagem
+  // acabou de chegar — renderRolls (carga inicial do log) não passa justLanded de propósito
+  div.className = 'roll' + (mine ? ' mine' : '') + (r.is_private ? ' secret' : '') + (justLanded ? ' landing' : '');
+  div.setAttribute('data-id', r.id);
+  div.innerHTML = `<div class="rtop"><span class="who">${esc(r.roller_name || '—')}${r.is_private ? ` <span class="ic">${ICONS.lock}</span>` : ''}</span><span class="ftxt">${esc(r.formula)} · ${when}</span></div>
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span class="tot${critClass}">${r.total ?? '—'}</span>${critTagHtml}<span class="det">${esc(r.detail || '')}</span></div>`;
+  if (justLanded) div.addEventListener('animationend', () => div.classList.remove('landing'), { once: true });
+  return div;
+}
+function renderRolls(rolls) {
+  const log = $('dice-log'); if (!log) return; log.innerHTML = '';
+  if (!rolls.length) { log.innerHTML = '<div class="empty" style="border:0">Sem rolagens ainda.</div>'; return; }
+  rolls.forEach((r) => log.appendChild(rollEl(r)));   // desc + column-reverse => mais recente embaixo
+}
+function addRollToLog(r) {
+  const log = $('dice-log'); if (!log) return;
+  if (log.querySelector(`[data-id="${r.id}"]`)) return;   // evita duplicar (realtime + eco local)
+  const empty = log.querySelector('.empty'); if (empty) empty.remove();
+  log.insertBefore(rollEl(r, true), log.firstChild);
+}
+
+/* ============================ CHAT DA MESA (aba "Conversa" ao lado das rolagens) ============================ */
+window.sendChatMsg = (ev) => {
+  ev.preventDefault();
+  const input = $('chat-input'); const text = input.value.trim();
+  if (!text) return false;
+  input.value = '';
+  db.addMessage(campaignId, text).then(addMsgToLog).then(() => selectRailTab('chat')).catch((e) => showMsg(e.message));
+  return false;
+};
+function msgEl(m, justLanded) {
+  const mine = m.user_id === myId;
+  const when = new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (mine ? ' mine' : '') + (justLanded ? ' landing' : '');
+  div.setAttribute('data-id', m.id);
+  div.innerHTML = `<div class="ctop"><span class="who">${esc(m.sender_name || '—')}</span><span class="cwhen">${when}</span></div>
+    <div class="cbody">${esc(m.body)}</div>`;
+  if (justLanded) div.addEventListener('animationend', () => div.classList.remove('landing'), { once: true });
+  return div;
+}
+function renderChat(msgs) {
+  const log = $('chat-log'); if (!log) return; log.innerHTML = '';
+  if (!msgs.length) { log.innerHTML = '<div class="empty" style="border:0">Sem mensagens ainda.</div>'; return; }
+  msgs.forEach((m) => log.appendChild(msgEl(m)));   // desc + column-reverse => mais recente embaixo
+}
+function addMsgToLog(m) {
+  const log = $('chat-log'); if (!log) return;
+  if (log.querySelector(`[data-id="${m.id}"]`)) return;   // evita duplicar (realtime + eco local)
+  const empty = log.querySelector('.empty'); if (empty) empty.remove();
+  log.insertBefore(msgEl(m, true), log.firstChild);
+}
+
+</script>
+</body>
+</html>

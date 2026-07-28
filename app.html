@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("vt_theme")||"dark"}catch(e){}</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vitality · Plataforma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/theme.css?v=9">
+</head>
+<body class="home-page"> 
+<div id="fallback" class="solid"></div>
+
+<!-- Barra superior -->
+<header class="nav">
+  <div class="brand"><span class="mark">◈</span> VITALITY<small>VTT · MESA VIRTUAL</small></div>
+  <div class="spacer"></div>
+  <div class="nav-user" id="nav-user">
+    <button type="button" class="chip" id="nav-user-btn" aria-haspopup="menu" aria-expanded="false" onclick="toggleUserMenu()">
+      <span class="av" id="nav-av">?</span><b id="nav-name">…</b><span style="color:var(--ink-faint)">▾</span>
+    </button>
+    <div class="drop glass" role="menu">
+      <button role="menuitem" onclick="openProfile()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.8-4 3.6-6.5 7.5-6.5s6.7 2.5 7.5 6.5"/></svg></span>Meu perfil</button>
+      <button role="menuitem" onclick="openSettings()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M20.5 12h-2.6M6.1 12H3.5M17.7 6.3l-1.8 1.8M8.1 15.9l-1.8 1.8M17.7 17.7l-1.8-1.8M8.1 8.1 6.3 6.3"/></svg></span>Configurações</button>
+      <button role="menuitem" onclick="openHelp()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a2.8 2.8 0 1 1 4 2.6c-.9.5-1.7 1-1.7 2.1"/><circle cx="12" cy="17.2" r=".4" fill="currentColor" stroke="none"/></svg></span>Ajuda ou suporte</button>
+      <button role="menuitem" id="theme-menu-item" onclick="doToggleTheme()"><span class="ic" id="theme-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg></span><span id="theme-menu-label">Tema</span></button>
+      <div class="divider"></div>
+      <button role="menuitem" onclick="doLogout()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>Sair</button>
+    </div>
+  </div>
+</header>
+
+<main class="home" id="home" style="visibility:hidden">
+  <div class="home-head">
+    <h1 id="greet">Bem-vindo</h1>
+    <p>Crie uma mesa, entre na de um Mestre pelo código, ou monte sua biblioteca de itens. Dúvidas? Clique no <b style="color:var(--brass)">?</b> no canto da tela.</p>
+  </div>
+
+  <div id="onboard"></div>
+
+  <nav class="home-tabs">
+    <button data-sec="mesas" class="on" onclick="showSec('mesas')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" transform="rotate(45 12 12)"/><circle cx="12" cy="9.2" r="1" fill="currentColor" stroke="none"/><circle cx="9.2" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="14.8" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="14.8" r="1" fill="currentColor" stroke="none"/></svg></span>Mesas</button>
+    <button data-sec="sistemas" onclick="showSec('sistemas')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M20.5 12h-2.6M6.1 12H3.5M17.7 6.3l-1.8 1.8M8.1 15.9l-1.8 1.8M17.7 17.7l-1.8-1.8M8.1 8.1 6.3 6.3"/></svg></span>Sistemas</button>
+    <button data-sec="itens" onclick="showSec('itens')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/></svg></span>Itens</button>
+  </nav>
+
+  <div id="msg" class="msg" role="status" aria-live="polite"></div>
+
+  <!-- ===================== MESAS ===================== -->
+  <section id="sec-mesas">
+    <div class="action-row">
+      <div class="action-card">
+        <h4>Criar mesa</h4>
+        <p>Escolha o sistema que a mesa vai usar — ela puxa os status, classes, árvores e itens dele. Você vira o Mestre e recebe um código de convite.</p>
+        <form onsubmit="return doCreate(event)">
+          <div class="fld"><label>Sistema da campanha</label><select id="new-system" class="fld-input"></select></div>
+          <div class="inline-form">
+            <input id="new-name" placeholder="Nome da mesa" required maxlength="60">
+            <button class="btn go auto" type="submit"><span class="spin"></span>Criar</button>
+          </div>
+        </form>
+      </div>
+      <div class="action-card">
+        <h4>Entrar em mesa</h4>
+        <p>Recebeu um código de um Mestre? Entre como Jogador.</p>
+        <form class="inline-form" onsubmit="return doJoin(event)">
+          <input id="join-code" placeholder="Código (ex.: A1B2C3)" required maxlength="12" style="text-transform:uppercase">
+          <button class="btn auto" type="submit"><span class="spin"></span>Entrar</button>
+        </form>
+      </div>
+    </div>
+    <div class="section-title">Minhas mesas</div>
+    <div id="mesas"><div class="empty">Carregando…</div></div>
+  </section>
+
+  <!-- ===================== SISTEMAS ===================== -->
+  <section id="sec-sistemas" style="display:none">
+    <div class="seg glass sys-subtabs" role="tablist">
+      <button role="tab" data-sub="loja" class="on" aria-selected="true" onclick="showSysSub('loja')">Loja</button>
+      <button role="tab" data-sub="favoritos" aria-selected="false" onclick="showSysSub('favoritos')">Favoritos</button>
+      <button role="tab" data-sub="criar" aria-selected="false" onclick="showSysSub('criar')">Criar</button>
+    </div>
+
+    <!-- ---------- LOJA (sistemas publicados por outros criadores) ---------- -->
+    <div id="sys-loja">
+      <div class="section-title">Sistemas publicados por outros criadores</div>
+      <div id="store-systems" class="grid"><div class="empty">Carregando…</div></div>
+    </div>
+
+    <!-- ---------- FAVORITOS ---------- -->
+    <div id="sys-favoritos" style="display:none">
+      <div class="section-title">Sistemas favoritados</div>
+      <div id="fav-systems" class="grid"><div class="empty">Carregando…</div></div>
+    </div>
+
+    <!-- ---------- CRIAR (sistemas do próprio usuário) ---------- -->
+    <div id="sys-criar" style="display:none">
+      <div class="action-row">
+        <div class="action-card" style="flex:1">
+          <h4>Criar sistema de RPG</h4>
+          <p>Monte seu próprio sistema: status, fórmulas, classes, subclasses, árvores e itens — pra usar nas suas mesas.</p>
+          <form class="inline-form" onsubmit="return doCreateSystem(event)">
+            <input id="sys-name" placeholder="Nome do sistema (ex.: Meu Sistema de RPG)" required maxlength="60">
+            <button class="btn go auto" type="submit"><span class="spin"></span>Criar e abrir</button>
+          </form>
+        </div>
+      </div>
+      <div class="section-title">Meus sistemas</div>
+      <div id="systems" class="grid"><div class="empty">Carregando…</div></div>
+    </div>
+  </section>
+
+  <!-- ===================== ITENS ===================== -->
+  <section id="sec-itens" style="display:none">
+    <div class="seg glass item-subtabs" role="tablist">
+      <button role="tab" data-sub="loja" class="on" aria-selected="true" onclick="showItemSub('loja')">Loja</button>
+      <button role="tab" data-sub="favoritos" aria-selected="false" onclick="showItemSub('favoritos')">Favoritos</button>
+      <button role="tab" data-sub="criar" aria-selected="false" onclick="showItemSub('criar')">Criar</button>
+    </div>
+
+    <!-- ---------- LOJA (itens de outros criadores) ---------- -->
+    <div id="itens-loja">
+      <div class="toolbar">
+        <div class="search-field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-5.2-5.2"/></svg>
+          <input id="store-q" placeholder="Buscar na loja por nome ou descrição..." oninput="paintStore()">
+        </div>
+        <select id="store-cat-f" class="fld-input" onchange="paintStore()"></select>
+      </div>
+      <div id="store-items" class="item-grid"><div class="empty">Carregando…</div></div>
+    </div>
+
+    <!-- ---------- FAVORITOS ---------- -->
+    <div id="itens-favoritos" style="display:none">
+      <div class="toolbar">
+        <div class="search-field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-5.2-5.2"/></svg>
+          <input id="fav-q" placeholder="Buscar nos favoritos..." oninput="paintFavorites()">
+        </div>
+        <select id="fav-cat-f" class="fld-input" onchange="paintFavorites()"></select>
+      </div>
+      <div id="fav-items" class="item-grid"><div class="empty">Carregando…</div></div>
+    </div>
+
+    <!-- ---------- CRIAR (biblioteca do próprio usuário) ---------- -->
+    <div id="itens-criar" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="section-title" style="margin:0">Sua biblioteca de itens</div>
+        <button class="btn go auto sm" onclick="openItemForm()">+ Criar item</button>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-5.2-5.2"/></svg>
+          <input id="item-q" placeholder="Buscar item por nome ou descrição..." oninput="paintItems()">
+        </div>
+        <select id="item-cat-f" class="fld-input" onchange="paintItems()"></select>
+      </div>
+
+      <div id="item-editor" class="surface" style="display:none;margin-bottom:20px">
+        <h4 style="font-family:var(--disp);font-size:17px;color:var(--bone);margin:0 0 16px" id="item-editor-title">Novo item</h4>
+        <form id="item-form" class="item-form" onsubmit="return saveItem(event)">
+          <div class="fld"><label>Nome</label><input id="it-name" required maxlength="80" placeholder="Ex.: Lâmina de Escarlate"></div>
+          <div class="fld"><label>Categoria</label><select id="it-cat" class="fld-input" onchange="updateItemCategoryFields()"></select></div>
+          <div class="fld"><label>Raridade</label><select id="it-rar" class="fld-input"></select></div>
+
+          <div class="fld" id="it-damage-fld" style="display:none">
+            <label>Dano <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(fórmula, ex.: 1d8+2)</span></label>
+            <input id="it-damage" placeholder="Ex.: 1d8+2" aria-describedby="it-damage-err">
+            <div class="fld-err" id="it-damage-err"></div>
+          </div>
+          <div class="fld" id="it-protection-fld" style="display:none">
+            <label>Proteção</label>
+            <input id="it-protection" type="number" min="0" step="1" placeholder="Ex.: 5" aria-describedby="it-protection-err">
+            <div class="fld-err" id="it-protection-err"></div>
+          </div>
+
+          <div class="fld full"><label>Descrição</label>
+            <textarea id="it-desc" placeholder="O que o item é, o que faz, sua história..."
+              style="width:100%;min-height:84px;background:var(--field);border:1px solid var(--line2);border-radius:10px;color:var(--ink);font-family:var(--serif);font-size:14px;padding:11px 12px;line-height:1.55"></textarea></div>
+          <div class="fld full"><label>Imagem do item <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — PNG/JPG/WebP, até 3 MB)</span></label>
+            <div class="img-picker">
+              <img id="it-img-prev" class="img-thumb" alt="" style="display:none">
+              <div class="img-actions">
+                <input type="file" id="it-img-file" accept="image/*" style="display:none" onchange="onItemImg(this)">
+                <button type="button" class="btn auto sm" onclick="document.getElementById('it-img-file').click()">Escolher imagem</button>
+                <button type="button" class="btn auto sm" id="it-img-rm" style="display:none" onclick="clearItemImg()">Remover</button>
+              </div>
+            </div></div>
+          <div class="fld full"><label>Modificadores de status <span id="it-mods-hint" style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(o que o item adiciona — opcional)</span></label>
+            <div id="mod-list"></div>
+            <button type="button" class="btn auto sm" id="it-mods-add" onclick="addModRow()">+ Adicionar modificador</button>
+            <div class="fld-err" id="it-mods-err"></div>
+          </div>
+          <div class="fld full">
+            <label class="check-row" for="it-published">
+              <input type="checkbox" id="it-published">
+              <span>Publicar na loja — outros usuários podem ver e adicionar este item aos próprios sistemas</span>
+            </label>
+          </div>
+          <div class="full actions">
+            <button type="button" class="btn" onclick="closeItemForm()">Cancelar</button>
+            <button type="submit" class="btn go"><span class="spin"></span>Salvar item</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="items" class="item-grid"><div class="empty">Carregando…</div></div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import * as db from './lib/db.js?v=24';
+import { mountHelp, mountThemeToggle, openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme } from './lib/ui.js?v=3';
+
+mountHelp('home');
+mountThemeToggle();
+const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>';
+const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>';
+function paintThemeMenuItem() {
+  const icon = document.getElementById('theme-menu-icon'), label = document.getElementById('theme-menu-label');
+  if (!icon || !label) return;
+  const light = getTheme() === 'light';
+  icon.innerHTML = light ? ICON_SUN : ICON_MOON;
+  label.textContent = light ? 'Tema: claro' : 'Tema: escuro';
+}
+paintThemeMenuItem();
+const $ = (id) => document.getElementById(id);
+const esc = (s) => (s == null ? '' : String(s)).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const emptyState = (icon, title, desc, cta) => `<div class="empty-cta"><div class="ec-icon">${icon}</div>
+  <div class="ec-title">${title}</div><div class="ec-desc">${desc}</div>${cta || ''}</div>`;
+
+// ícones geométricos (linha do wordmark ◈) — substituem emoji em estados vazios/onboarding
+const ICON = {
+  dice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" transform="rotate(45 12 12)"/><circle cx="12" cy="9.2" r="1" fill="currentColor" stroke="none"/><circle cx="9.2" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="14.8" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="14.8" r="1" fill="currentColor" stroke="none"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M20.5 12h-2.6M6.1 12H3.5M17.7 6.3l-1.8 1.8M8.1 15.9l-1.8 1.8M17.7 17.7l-1.8-1.8M8.1 8.1 6.3 6.3"/></svg>',
+  pouch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/></svg>',
+  spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4.5M12 16.5V21M3 12h4.5M16.5 12H21M6.3 6.3l2.4 2.4M15.3 15.3l2.4 2.4M17.7 6.3l-2.4 2.4M8.7 15.3l-2.4 2.4"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-5.2-5.2"/></svg>',
+};
+
+// mapeia erros crus do backend pra mensagens em PT; a causa exata vai só pro console
+function friendlyError(e) {
+  const raw = (e && e.message) || '';
+  if (raw) console.error('[erro]', raw);
+  const map = [
+    [/duplicate key|already exists/i, 'já existe um registro com esse nome.'],
+    [/join_code|invalid.*code|c[oó]digo.*inv[aá]lid/i, 'código inválido ou expirado.'],
+    [/permission denied|not authorized|rls/i, 'você não tem permissão para fazer isso.'],
+    [/network|fetch failed|failed to fetch/i, 'sem conexão com o servidor — verifique sua internet.'],
+    [/jwt|session|not authenticated/i, 'sua sessão expirou — recarregue a página.'],
+  ];
+  for (const [re, msg] of map) if (re.test(raw)) return msg;
+  return 'algo deu errado — tente de novo em instantes.';
+}
+
+// modal de confirmação estilizado (mesmo padrão visual do guia) — substitui confirm() nativo
+function confirmModal({ title, desc, confirmLabel = 'Confirmar', danger = true } = {}) {
+  return new Promise((resolve) => {
+    const trigger = document.activeElement;
+    const w = document.createElement('div');
+    w.className = 'ui-modal';
+    w.setAttribute('role', 'alertdialog');
+    w.setAttribute('aria-modal', 'true');
+    w.setAttribute('aria-labelledby', 'confirm-title');
+    w.innerHTML = `<div class="box guide">
+      <div class="ghead"><h3 id="confirm-title">${esc(title)}</h3><button class="x" aria-label="Fechar">×</button></div>
+      <p class="gintro">${esc(desc)}</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="btn auto" id="cm-cancel">Cancelar</button>
+        <button class="btn auto ${danger ? 'danger' : 'go'}" id="cm-ok">${esc(confirmLabel)}</button>
+      </div>
+    </div>`;
+    const finish = (result) => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
+    const onEsc = (e) => { if (e.key === 'Escape') finish(false); };
+    w.addEventListener('click', (e) => { if (e.target === w) finish(false); });
+    w.querySelector('.x').onclick = () => finish(false);
+    w.querySelector('#cm-cancel').onclick = () => finish(false);
+    w.querySelector('#cm-ok').onclick = () => finish(true);
+    document.addEventListener('keydown', onEsc);
+    document.body.appendChild(w);
+    w.querySelector('#cm-ok').focus();
+  });
+}
+
+const CATEGORIES = ['Arma', 'Armadura', 'Escudo', 'Ferramenta', 'Consumível', 'Acessório', 'Artefato', 'Material', 'Outro'];
+const RARITIES = ['Comum', 'Incomum', 'Raro', 'Épico', 'Lendário', 'Único'];
+let profileName = '';
+let myEmail = null;
+let editingItemId = null;
+let itemImageUrl = null;   // URL já salva (edição) ou definida por upload
+let itemImageFile = null;  // arquivo novo escolhido, ainda não enviado
+let myUserId = null;
+let _favIds = new Set();      // ids favoritados pelo usuário atual
+const _itemById = new Map();  // cache de todo item já visto (loja/favoritos/criar), pra abrir o modal de detalhe por id
+
+function showMsg(t, kind) { const m = $('msg'); m.textContent = t; m.className = 'msg show ' + (kind || 'err'); setTimeout(() => { if (m.textContent === t) m.className = 'msg'; }, 4000); }
+function busy(form, on) { const b = form.querySelector('button[type=submit]'); if (b) { b.classList.toggle('loading', on); b.disabled = on; } }
+function cacheItems(list) { (list || []).forEach((it) => _itemById.set(it.id, it)); return list; }
+
+/* ---------- boot: sessão ---------- */
+(async () => {
+  // popula selects
+  $('it-cat').innerHTML = CATEGORIES.map((c) => `<option>${c}</option>`).join('');
+  $('it-rar').innerHTML = RARITIES.map((r) => `<option>${r}</option>`).join('');
+  const catOptions = '<option value="">Todas as categorias</option>' + CATEGORIES.map((c) => `<option>${c}</option>`).join('');
+  $('item-cat-f').innerHTML = catOptions;
+  $('store-cat-f').innerHTML = catOptions;
+  $('fav-cat-f').innerHTML = catOptions;
+
+  const session = await db.requireSession();
+  if (!session) return;
+  await startHome();
+})();
+
+async function startHome() {
+  const [profile, user] = await Promise.all([db.getMyProfile(), db.getUser()]);
+  profileName = profile?.display_name || 'Aventureiro';
+  myUserId = user?.id || null;
+  myEmail = user?.email || null;
+  $('nav-name').textContent = profileName;
+  $('nav-av').textContent = profileName.charAt(0).toUpperCase();
+  $('greet').textContent = 'Bem-vindo, ' + profileName;
+  $('home').style.visibility = 'visible';
+  renderMesas();
+  renderSystems();
+  try { _favIds = await db.listFavoriteItemIds(); } catch (e) { console.error('[favoritos]', e); }
+  renderItems();
+  renderStore();
+  renderFavorites();
+  try { _favSysIds = await db.listFavoriteSystemIds(); } catch (e) { console.error('[favoritos]', e); }
+  renderStoreSystems();
+  renderFavSystems();
+}
+
+/* ---------- nav / nome ---------- */
+function closeUserMenu() { $('nav-user').classList.remove('open'); $('nav-user-btn')?.setAttribute('aria-expanded', 'false'); }
+window.toggleUserMenu = () => {
+  const open = $('nav-user').classList.toggle('open');
+  $('nav-user-btn')?.setAttribute('aria-expanded', String(open));
+  if (open) $('nav-user').querySelector('.drop button')?.focus();
+};
+document.addEventListener('click', (e) => { if (!e.target.closest('#nav-user')) closeUserMenu(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('nav-user').classList.contains('open')) { closeUserMenu(); $('nav-user-btn')?.focus(); } });
+window.openProfile = () => {
+  closeUserMenu();
+  openProfileModal({
+    email: myEmail,
+    displayName: profileName,
+    onSave: async (name) => {
+      try { await db.updateDisplayName(name); } catch (e) { throw new Error(friendlyError(e)); }
+      profileName = name;
+      $('nav-name').textContent = profileName; $('nav-av').textContent = profileName.charAt(0).toUpperCase();
+      $('greet').textContent = 'Bem-vindo, ' + profileName;
+      showMsg('Nome atualizado.', 'ok');
+    },
+  });
+};
+window.openSettings = () => {
+  closeUserMenu();
+  openSettingsModal({
+    onChangePassword: async (pw) => {
+      try { await db.updatePassword(pw); } catch (e) { throw new Error(friendlyError(e)); }
+      showMsg('Senha atualizada.', 'ok');
+    },
+  });
+};
+window.openHelp = () => { closeUserMenu(); openHelpGuide('home'); };
+window.doToggleTheme = () => { toggleTheme(); paintThemeMenuItem(); };
+window.doLogout = async () => {
+  closeUserMenu();
+  await db.signOut();
+  location.href = 'login.html';
+};
+
+/* ---------- seções ---------- */
+window.showSec = (sec) => {
+  document.querySelectorAll('.home-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.sec === sec));
+  $('sec-mesas').style.display = sec === 'mesas' ? '' : 'none';
+  $('sec-sistemas').style.display = sec === 'sistemas' ? '' : 'none';
+  $('sec-itens').style.display = sec === 'itens' ? '' : 'none';
+};
+window.showItemSub = (sub) => {
+  document.querySelectorAll('.item-subtabs button').forEach((b) => {
+    const on = b.dataset.sub === sub;
+    b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on));
+  });
+  $('itens-loja').style.display = sub === 'loja' ? '' : 'none';
+  $('itens-favoritos').style.display = sub === 'favoritos' ? '' : 'none';
+  $('itens-criar').style.display = sub === 'criar' ? '' : 'none';
+};
+
+/* ---------- sistemas ---------- */
+let _favSysIds = new Set();
+const _systemById = new Map();
+function cacheSystems(list) { (list || []).forEach((s) => _systemById.set(s.id, s)); return list; }
+
+window.showSysSub = (sub) => {
+  document.querySelectorAll('.sys-subtabs button').forEach((b) => {
+    const on = b.dataset.sub === sub;
+    b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on));
+  });
+  $('sys-loja').style.display = sub === 'loja' ? '' : 'none';
+  $('sys-favoritos').style.display = sub === 'favoritos' ? '' : 'none';
+  $('sys-criar').style.display = sub === 'criar' ? '' : 'none';
+};
+
+async function renderSystems() {
+  const box = $('systems');
+  try {
+    const systems = cacheSystems(await db.listSystems());
+    _sysCount = systems.length; renderOnboard();
+    fillSystemPicker(systems);   // alimenta o seletor de sistema do "Criar mesa"
+    if (!systems.length) { box.className = ''; box.innerHTML = emptyState(ICON.gear, 'Nenhum sistema ainda',
+      'O sistema é o coração do seu RPG: status, fórmulas, classes, árvores e itens. Crie o primeiro no campo acima ↑'); return; }
+    box.className = 'grid';
+    box.innerHTML = systems.map((s) => `
+      <a class="card-tile" href="sistema.html?id=${s.id}">
+        <h3>${esc(s.name)}</h3>
+        <div class="meta">${s.is_published ? 'Publicado na loja · ' : ''}Abrir construtor →</div>
+      </a>`).join('');
+  } catch (e) { box.className = ''; box.innerHTML = '<div class="empty">Erro: ' + esc(friendlyError(e)) + '</div>'; }
+}
+window.doCreateSystem = (ev) => { ev.preventDefault(); const name = $('sys-name').value.trim(); if (!name) return false; busy(ev.target, true);
+  db.createSystem(name).then((s) => { location.href = 'sistema.html?id=' + s.id; }).catch((e) => { showMsg('Não deu pra criar o sistema: ' + friendlyError(e)); busy(ev.target, false); }); return false; };
+
+/* ---------- card de sistema (Loja/Favoritos — não navega, abre modal de detalhe) ---------- */
+function systemCardHtml(s) {
+  const isFav = _favSysIds.has(s.id);
+  return `
+    <div class="card-tile" onclick='openSystemDetail("${s.id}")' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(s.name)}">
+      <button class="poster-fav ${isFav ? 'on' : ''}" style="position:absolute;top:10px;right:10px" onclick='event.stopPropagation();toggleFavoriteSystem("${s.id}")' aria-label="${isFav ? 'Remover dos favoritos' : 'Favoritar'}" aria-pressed="${isFav}">${HEART_ICON}</button>
+      <h3 style="padding-right:26px">${esc(s.name)}</h3>
+      ${s.description ? `<p class="meta" style="white-space:normal;-webkit-line-clamp:3;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;margin:2px 0">${esc(s.description)}</p>` : ''}
+      <div class="meta">por ${esc(s.creator_name || '—')}</div>
+    </div>`;
+}
+async function renderStoreSystems() {
+  const box = $('store-systems');
+  try {
+    const systems = cacheSystems(await db.listStoreSystems());
+    if (!systems.length) { box.className = ''; box.innerHTML = emptyState(ICON.gear, 'A loja ainda está vazia',
+      'Quando outros criadores publicarem sistemas, eles aparecem aqui pra você explorar.'); return; }
+    box.className = 'grid';
+    box.innerHTML = systems.map(systemCardHtml).join('');
+  } catch (e) { box.className = ''; box.innerHTML = '<div class="empty">Erro: ' + esc(friendlyError(e)) + '</div>'; }
+}
+async function renderFavSystems() {
+  const box = $('fav-systems');
+  try {
+    const systems = cacheSystems(await db.listFavoriteSystems());
+    if (!systems.length) { box.className = ''; box.innerHTML = emptyState(HEART_ICON, 'Nenhum sistema favoritado',
+      'Clique no coração de um sistema na loja pra guardá-lo aqui.'); return; }
+    box.className = 'grid';
+    box.innerHTML = systems.map(systemCardHtml).join('');
+  } catch (e) { box.className = ''; box.innerHTML = '<div class="empty">Erro: ' + esc(friendlyError(e)) + '</div>'; }
+}
+window.toggleFavoriteSystem = async (id) => {
+  const wasFav = _favSysIds.has(id);
+  try {
+    if (wasFav) { await db.removeFavoriteSystem(id); _favSysIds.delete(id); }
+    else { await db.addFavoriteSystem(id); _favSysIds.add(id); }
+  } catch (e) { showMsg('Não foi possível favoritar: ' + friendlyError(e)); return; }
+  renderStoreSystems(); renderFavSystems();
+};
+window.openSystemDetail = (id) => {
+  const s = _systemById.get(id);
+  if (!s) return;
+  const isOwner = !!myUserId && s.owner_id === myUserId;
+  const isFav = _favSysIds.has(id);
+  const trigger = document.activeElement;
+  const w = document.createElement('div');
+  w.className = 'ui-modal';
+  w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'sdet-title');
+  w.innerHTML = `<div class="box guide item-detail">
+    <div class="ghead"><h3 id="sdet-title">${esc(s.name)}</h3><button class="x" aria-label="Fechar">×</button></div>
+    <div class="idet-badges">${isOwner ? `<span class="badge ${s.is_published ? 'mod' : 'cat'}">${s.is_published ? 'Publicado na loja' : 'Privado'}</span>` : ''}</div>
+    ${s.description ? `<p class="gintro">${esc(s.description)}</p>` : `<p class="gintro" style="color:var(--ink-faint)">Sem descrição.</p>`}
+    <div class="idet-creator">Criado por ${esc(s.creator_name || '—')}</div>
+    <div class="idet-actions">
+      <button class="btn auto ${isFav ? 'on' : ''}" id="sdet-fav">${isFav ? HEART_ICON + ' Remover dos favoritos' : HEART_ICON + ' Favoritar'}</button>
+      ${isOwner ? `<a class="btn go auto" href="sistema.html?id=${s.id}">Abrir no construtor</a>` : ''}
+    </div>
+  </div>`;
+  const close = () => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); };
+  const onEsc = (e) => { if (e.key === 'Escape') close(); };
+  w.addEventListener('click', (e) => { if (e.target === w) close(); });
+  w.querySelector('.x').onclick = close;
+  w.querySelector('#sdet-fav').onclick = () => { toggleFavoriteSystem(id); close(); };
+  document.addEventListener('keydown', onEsc);
+  document.body.appendChild(w);
+  w.querySelector('.x').focus();
+};
+
+/* ---------- mesas ---------- */
+let _mesaCount = null, _sysCount = null;
+function renderOnboard() {
+  const box = $('onboard');
+  if (!box || _mesaCount === null || _sysCount === null) return;
+  if (localStorage.getItem('vt_onboard_hide') === '1' || (_sysCount > 0 && _mesaCount > 0)) { box.innerHTML = ''; return; }
+  const step = (n, done, title, desc, action) => `
+    <div class="ostep ${done ? 'done' : ''}"><div class="n">${done ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' : n}</div>
+      <div><b>${title}</b><p>${desc}</p>${(!done && action) ? action : ''}</div></div>`;
+  box.innerHTML = `<div class="onboard">
+    <div class="ohead"><h3><span class="ic" style="vertical-align:-2px">${ICON.spark}</span>Primeiros passos</h3><button class="x" title="Dispensar" onclick="hideOnboard()">×</button></div>
+    <div class="steps">
+      ${step(1, _sysCount > 0, 'Crie seu sistema', 'Status, fórmulas, classes, árvores e itens do seu RPG.',
+        `<button class="btn sm auto" onclick="showSec('sistemas')">Ir para Sistemas</button>`)}
+      ${step(2, _mesaCount > 0, 'Crie uma mesa', 'Escolha o sistema, dê um nome e ganhe um código de convite.',
+        `<button class="btn sm auto" onclick="showSec('mesas');document.getElementById('new-name').focus()">Criar mesa</button>`)}
+      ${step(3, false, 'Convide os jogadores', 'Compartilhe o código da mesa — cada um entra como Jogador e monta a ficha.', '')}
+    </div></div>`;
+}
+window.hideOnboard = () => { localStorage.setItem('vt_onboard_hide', '1'); $('onboard').innerHTML = ''; };
+
+async function renderMesas() {
+  const box = $('mesas');
+  try {
+    const mesas = await db.listMyCampaigns();
+    _mesaCount = mesas.length; renderOnboard();
+    if (!mesas.length) { box.className = ''; box.innerHTML = emptyState(ICON.dice, 'Nenhuma mesa ainda',
+      'Crie a sua no card acima escolhendo um sistema, ou entre na mesa de um Mestre com o código de convite.'); return; }
+    box.className = 'grid';
+    box.innerHTML = mesas.map((m) => `
+      <a class="card-tile" href="mesa.html?id=${m.id}">
+        <div class="tile-head">
+          ${m.image_url
+            ? `<img class="mesa-av" src="${esc(m.image_url)}" alt="">`
+            : `<span class="mesa-av">${esc((m.name || '?').trim().charAt(0).toUpperCase() || '?')}</span>`}
+          <div class="grow" style="min-width:0">
+            <span class="role ${m.role}">${m.role === 'gm' ? 'Mestre' : 'Jogador'}</span>
+            <h3 style="margin:6px 0 0">${esc(m.name)}</h3>
+          </div>
+        </div>
+        <div class="meta">${m.role === 'gm' ? 'Código: ' + esc(m.join_code) : 'Entrar na mesa →'}</div>
+      </a>`).join('');
+  } catch (e) { box.className = ''; box.innerHTML = '<div class="empty">Erro: ' + esc(friendlyError(e)) + '</div>'; }
+}
+window.doCreate = (ev) => { ev.preventDefault(); const name = $('new-name').value.trim(); const systemId = $('new-system').value;
+  if (!name) return false;
+  if (!systemId) { showMsg('Crie um sistema primeiro (aba Sistemas) para usar na mesa.'); showSec('sistemas'); return false; }
+  busy(ev.target, true);
+  db.createCampaign(name, systemId).then((c) => { location.href = 'mesa.html?id=' + c.id; }).catch((e) => { showMsg('Não deu pra criar a mesa: ' + friendlyError(e)); busy(ev.target, false); }); return false; };
+function fillSystemPicker(systems) {
+  const sel = $('new-system'); if (!sel) return;
+  if (!systems.length) { sel.innerHTML = '<option value="">— nenhum sistema ainda —</option>'; sel.disabled = true; return; }
+  sel.disabled = false;
+  sel.innerHTML = systems.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+}
+window.doJoin = (ev) => { ev.preventDefault(); const code = $('join-code').value.trim().toUpperCase(); if (!code) return false; busy(ev.target, true);
+  db.joinCampaignByCode(code).then((c) => { location.href = 'mesa.html?id=' + c.id; }).catch((e) => { showMsg('Não deu pra entrar na mesa: ' + friendlyError(e)); busy(ev.target, false); }); return false; };
+
+/* ---------- itens ---------- */
+function addModRow(name = '', value = '') {
+  const row = document.createElement('div');
+  row.className = 'mod-row';
+  row.innerHTML = `<input class="mn" placeholder="Status (ex.: Vida)" value="${esc(name)}">
+    <input class="mv" placeholder="+/-" value="${esc(value)}">
+    <button type="button" onclick="this.parentElement.remove()"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>`;
+  $('mod-list').appendChild(row);
+}
+window.addModRow = () => addModRow();
+
+// mostra/esconde os campos obrigatórios da categoria escolhida (Arma / Armadura·Escudo / Acessório·Artefato)
+window.updateItemCategoryFields = () => {
+  const cat = $('it-cat').value;
+  const isWeapon = cat === 'Arma';
+  const isProtective = cat === 'Armadura' || cat === 'Escudo';
+  const needsModifier = cat === 'Acessório' || cat === 'Artefato';
+  $('it-damage-fld').style.display = isWeapon ? '' : 'none';
+  $('it-protection-fld').style.display = isProtective ? '' : 'none';
+  $('it-mods-hint').textContent = needsModifier
+    ? '(obrigatório nesta categoria — adicione pelo menos 1)'
+    : '(o que o item adiciona — opcional)';
+  if (!isWeapon) { $('it-damage').value = ''; }
+  if (!isProtective) { $('it-protection').value = ''; }
+};
+function setItemFieldError(fieldId, errId, msg) {
+  const el = $(fieldId);
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'SELECT')) { el.classList.add('invalid'); el.setAttribute('aria-invalid', 'true'); }
+  const err = $(errId);
+  if (err) { err.textContent = msg; err.classList.add('show'); }
+}
+function clearItemFieldErrors() {
+  $('item-form').querySelectorAll('.invalid').forEach((el) => { el.classList.remove('invalid'); el.removeAttribute('aria-invalid'); });
+  $('item-form').querySelectorAll('.fld-err.show').forEach((el) => el.classList.remove('show'));
+}
+
+function setItemImgPreview(url) {
+  const img = $('it-img-prev'); const rm = $('it-img-rm');
+  if (url) { img.src = url; img.style.display = ''; rm.style.display = ''; }
+  else { img.removeAttribute('src'); img.style.display = 'none'; rm.style.display = 'none'; }
+}
+window.onItemImg = (input) => {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showMsg('Selecione um arquivo de imagem.'); input.value = ''; return; }
+  if (file.size > 3 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 3 MB).'); input.value = ''; return; }
+  itemImageFile = file;
+  setItemImgPreview(URL.createObjectURL(file));
+};
+window.clearItemImg = () => { itemImageFile = null; itemImageUrl = null; $('it-img-file').value = ''; setItemImgPreview(null); };
+
+window.openItemForm = (item = null) => {
+  editingItemId = item?.id || null;
+  $('item-editor-title').textContent = item ? 'Editar item' : 'Novo item';
+  $('it-name').value = item?.name || '';
+  $('it-cat').value = item?.category || 'Outro';
+  $('it-rar').value = item?.rarity || 'Comum';
+  $('it-desc').value = item?.description || '';
+  $('it-damage').value = item?.weapon_damage || '';
+  $('it-protection').value = item?.protection ?? '';
+  $('it-published').checked = !!item?.is_published;
+  itemImageUrl = item?.image_url || null; itemImageFile = null;
+  $('it-img-file').value = ''; setItemImgPreview(itemImageUrl);
+  $('mod-list').innerHTML = '';
+  (item?.modifiers || []).forEach((m) => addModRow(m.name, m.value));
+  clearItemFieldErrors();
+  updateItemCategoryFields();
+  $('item-editor').style.display = '';
+  $('it-name').focus();
+};
+window.closeItemForm = () => { $('item-editor').style.display = 'none'; editingItemId = null; itemImageFile = null; itemImageUrl = null; };
+
+window.saveItem = (ev) => {
+  ev.preventDefault();
+  clearItemFieldErrors();
+  const modifiers = [...document.querySelectorAll('#mod-list .mod-row')]
+    .map((r) => ({ name: r.querySelector('.mn').value.trim(), value: r.querySelector('.mv').value.trim() }))
+    .filter((m) => m.name);
+  const name = $('it-name').value.trim();
+  if (!name) return false;
+  const category = $('it-cat').value;
+  const weaponDamage = $('it-damage').value.trim();
+  const protectionRaw = $('it-protection').value;
+  let firstInvalid = null;
+  if (category === 'Arma') {
+    if (!weaponDamage) { setItemFieldError('it-damage', 'it-damage-err', 'Informe o dano (ex.: 1d8+2).'); firstInvalid = firstInvalid || 'it-damage'; }
+  } else if (category === 'Armadura' || category === 'Escudo') {
+    if (protectionRaw === '') { setItemFieldError('it-protection', 'it-protection-err', 'Informe o valor de proteção.'); firstInvalid = firstInvalid || 'it-protection'; }
+  } else if (category === 'Acessório' || category === 'Artefato') {
+    if (!modifiers.length) { $('it-mods-err').textContent = 'Adicione pelo menos 1 modificador pra esta categoria.'; $('it-mods-err').classList.add('show'); firstInvalid = firstInvalid || 'it-mods-add'; }
+  }
+  if (firstInvalid) { $(firstInvalid).focus(); return false; }
+  busy(ev.target, true);
+  (async () => {
+    try {
+      if (itemImageFile) itemImageUrl = await db.uploadImage(itemImageFile, 'items');
+      const payload = {
+        name,
+        category,
+        rarity: $('it-rar').value,
+        description: $('it-desc').value.trim(),
+        modifiers,
+        weapon_damage: category === 'Arma' ? weaponDamage : null,
+        protection: (category === 'Armadura' || category === 'Escudo') ? Number(protectionRaw) : null,
+        image_url: itemImageUrl,
+        is_published: $('it-published').checked,
+      };
+      await (editingItemId ? db.updateItem2(editingItemId, payload) : db.createItem(payload));
+      busy(ev.target, false); closeItemForm(); renderItems(); showMsg('Item salvo.', 'ok');
+    } catch (e) { busy(ev.target, false); showMsg('Não foi possível salvar o item: ' + friendlyError(e)); }
+  })();
+  return false;
+};
+
+/* ---------- card de item (pôster) — usado em Loja / Favoritos / Criar ---------- */
+const HEART_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.8-9.8-9.3C.6 7.7 2.3 4.5 5.6 4a4.9 4.9 0 0 1 6.4 2 4.9 4.9 0 0 1 6.4-2c3.3.5 5 3.7 3.4 7.2C19.5 15.7 12 20.5 12 20.5Z" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+function itemCardHtml(it) {
+  const isFav = _favIds.has(it.id);
+  const isMine = !!myUserId && it.owner_id === myUserId;
+  const rarityKey = 'r-' + esc((it.rarity || 'comum').toLowerCase());
+  const initial = esc((it.name || '?').trim().charAt(0).toUpperCase() || '?');
+  const bgStyle = it.image_url ? ` style="background-image:url('${esc(it.image_url)}')"` : '';
+  return `
+    <div class="poster-card ${it.image_url ? '' : 'ph ' + rarityKey}"${bgStyle} onclick='openItemDetail("${it.id}")' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(it.name)}">
+      ${!it.image_url ? `<span class="poster-initial">${initial}</span>` : ''}
+      ${isMine ? `<span class="poster-pub ${it.is_published ? 'on' : ''}">${it.is_published ? 'Publicado' : 'Privado'}</span>` : ''}
+      <button class="poster-fav ${isFav ? 'on' : ''}" onclick='event.stopPropagation();toggleFavorite("${it.id}")' aria-label="${isFav ? 'Remover dos favoritos' : 'Favoritar'}" aria-pressed="${isFav}">${HEART_ICON}</button>
+      ${it.description ? `<div class="poster-hover"><p>${esc(it.description.slice(0, 90))}${it.description.length > 90 ? '…' : ''}</p></div>` : ''}
+      <div class="poster-scrim">
+        <div class="poster-badges">${it.rarity ? `<span class="badge ${rarityKey}">${esc(it.rarity)}</span>` : ''}</div>
+        <h4 class="poster-name">${esc(it.name)}</h4>
+        <div class="poster-meta">${esc(it.creator_name || '—')}</div>
+      </div>
+    </div>`;
+}
+function filterItems(items, qId, catId) {
+  const q = ($(qId)?.value || '').trim().toLowerCase();
+  const cat = $(catId)?.value || '';
+  return items.filter((it) =>
+    (!q || (it.name || '').toLowerCase().includes(q) || (it.description || '').toLowerCase().includes(q)) &&
+    (!cat || it.category === cat));
+}
+
+/* ---------- Criar (biblioteca própria) ---------- */
+async function renderItems() {
+  const box = $('items');
+  try {
+    window._myItems = cacheItems(await db.listItems());
+    paintItems();
+  } catch (e) { box.className = ''; box.innerHTML = '<div class="empty">Erro: ' + esc(friendlyError(e)) + '</div>'; }
+}
+window.paintItems = () => {
+  const box = $('items');
+  const items = window._myItems || [];
+  if (!items.length) { box.className = ''; box.innerHTML = emptyState(ICON.pouch, 'Sua biblioteca está vazia',
+    'Crie itens reutilizáveis com modificadores de status, imagem e raridade — depois é só copiar pras suas mesas.',
+    '<button class="btn go auto sm" onclick="openItemForm()">+ Criar meu primeiro item</button>'); return; }
+  const filtered = filterItems(items, 'item-q', 'item-cat-f');
+  if (!filtered.length) { box.className = ''; box.innerHTML = emptyState(ICON.search, 'Nada encontrado',
+    'Nenhum item corresponde à busca ou ao filtro. Tente outro termo ou limpe o filtro.'); return; }
+  box.className = 'item-grid';
+  box.innerHTML = filtered.map(itemCardHtml).join('');
+};
+
+/* ---------- Loja (itens de outros criadores) ---------- */
+async function renderStore() {
+  const box = $('store-items');
+  try {
+    window._storeItems = cacheItems(await db.listStoreItems());
+    paintStore();
+  } catch (e) { box.className = ''; box.innerHTML = '<div class="empty">Erro: ' + esc(friendlyError(e)) + '</div>'; }
+}
+window.paintStore = () => {
+  const box = $('store-items');
+  const items = window._storeItems || [];
+  if (!items.length) { box.className = ''; box.innerHTML = emptyState(ICON.dice, 'A loja ainda está vazia',
+    'Quando outros criadores publicarem itens na própria biblioteca, eles aparecem aqui pra você explorar e adicionar aos seus sistemas.'); return; }
+  const filtered = filterItems(items, 'store-q', 'store-cat-f');
+  if (!filtered.length) { box.className = ''; box.innerHTML = emptyState(ICON.search, 'Nada encontrado',
+    'Nenhum item corresponde à busca ou ao filtro. Tente outro termo ou limpe o filtro.'); return; }
+  box.className = 'item-grid';
+  box.innerHTML = filtered.map(itemCardHtml).join('');
+};
+
+/* ---------- Favoritos ---------- */
+async function renderFavorites() {
+  const box = $('fav-items');
+  try {
+    window._favItems = cacheItems(await db.listFavoriteItems());
+    paintFavorites();
+  } catch (e) { box.className = ''; box.innerHTML = '<div class="empty">Erro: ' + esc(friendlyError(e)) + '</div>'; }
+}
+window.paintFavorites = () => {
+  const box = $('fav-items');
+  const items = window._favItems || [];
+  if (!items.length) { box.className = ''; box.innerHTML = emptyState(HEART_ICON, 'Nenhum favorito ainda',
+    'Clique no coração de um item, na sua biblioteca ou na loja, pra guardá-lo aqui.'); return; }
+  const filtered = filterItems(items, 'fav-q', 'fav-cat-f');
+  if (!filtered.length) { box.className = ''; box.innerHTML = emptyState(ICON.search, 'Nada encontrado',
+    'Nenhum item corresponde à busca ou ao filtro. Tente outro termo ou limpe o filtro.'); return; }
+  box.className = 'item-grid';
+  box.innerHTML = filtered.map(itemCardHtml).join('');
+};
+
+/* ---------- favoritar ---------- */
+window.toggleFavorite = async (id) => {
+  const wasFav = _favIds.has(id);
+  try {
+    if (wasFav) { await db.removeFavorite(id); _favIds.delete(id); }
+    else { await db.addFavorite(id); _favIds.add(id); }
+  } catch (e) { showMsg('Não foi possível favoritar: ' + friendlyError(e)); return; }
+  paintItems(); paintStore();
+  renderFavorites();
+  syncDetailFavButton(id);
+};
+
+/* ---------- modal de detalhe (permissões: dono edita, visitante adiciona a um sistema) ---------- */
+function syncDetailFavButton(id) {
+  const btn = document.querySelector(`.ui-modal[data-item-id="${id}"] #idet-fav`);
+  if (!btn) return;
+  const isFav = _favIds.has(id);
+  btn.classList.toggle('on', isFav);
+  btn.innerHTML = (isFav ? HEART_ICON + ' Remover dos favoritos' : HEART_ICON + ' Favoritar');
+}
+window.openItemDetail = async (id) => {
+  const it = _itemById.get(id);
+  if (!it) return;
+  const isOwner = !!myUserId && it.owner_id === myUserId;
+  const isFav = _favIds.has(id);
+  const trigger = document.activeElement;
+  const w = document.createElement('div');
+  w.className = 'ui-modal';
+  w.dataset.itemId = id;
+  w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'idet-title');
+  w.innerHTML = `<div class="box guide item-detail">
+    <div class="ghead"><h3 id="idet-title">${esc(it.name)}</h3><button class="x" aria-label="Fechar">×</button></div>
+    ${it.image_url ? `<img class="idet-img" src="${esc(it.image_url)}" alt="">` : ''}
+    <div class="idet-badges">
+      ${it.rarity ? `<span class="badge r-${esc((it.rarity || '').toLowerCase())}">${esc(it.rarity)}</span>` : ''}
+      ${it.category ? `<span class="badge cat">${esc(it.category)}</span>` : ''}
+      ${it.weapon_damage ? `<span class="badge mod">Dano ${esc(it.weapon_damage)}</span>` : ''}
+      ${(it.protection != null && it.protection !== '') ? `<span class="badge mod">Proteção ${esc(String(it.protection))}</span>` : ''}
+      ${isOwner ? `<span class="badge ${it.is_published ? 'mod' : 'cat'}">${it.is_published ? 'Publicado na loja' : 'Privado'}</span>` : ''}
+    </div>
+    ${it.description ? `<p class="gintro">${esc(it.description)}</p>` : ''}
+    ${(it.modifiers && it.modifiers.length) ? `<div class="mods" style="margin-bottom:12px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : ''}
+    <div class="idet-creator">Criado por ${esc(it.creator_name || '—')}</div>
+    <div class="idet-actions">
+      <button class="btn auto ${isFav ? 'on' : ''}" id="idet-fav">${isFav ? HEART_ICON + ' Remover dos favoritos' : HEART_ICON + ' Favoritar'}</button>
+      ${isOwner
+        ? `<button class="btn auto" id="idet-edit">Editar</button><button class="btn danger auto" id="idet-del">Excluir</button>`
+        : `<select id="idet-sys-pick" class="fld-input" style="max-width:200px"><option value="">Carregando sistemas…</option></select><button class="btn go auto" id="idet-add-sys">+ Adicionar a um sistema</button>`}
+    </div>
+  </div>`;
+  const close = () => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); };
+  const onEsc = (e) => { if (e.key === 'Escape') close(); };
+  w.addEventListener('click', (e) => { if (e.target === w) close(); });
+  w.querySelector('.x').onclick = close;
+  w.querySelector('#idet-fav').onclick = () => toggleFavorite(id);
+  if (isOwner) {
+    w.querySelector('#idet-edit').onclick = () => { close(); showItemSub('criar'); openItemForm(it); };
+    w.querySelector('#idet-del').onclick = () => { close(); delItem(id); };
+  } else {
+    const sel = w.querySelector('#idet-sys-pick');
+    db.listSystems().then((systems) => {
+      if (!systems.length) { sel.innerHTML = '<option value="">— crie um sistema primeiro —</option>'; sel.disabled = true; return; }
+      sel.innerHTML = systems.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    }).catch(() => { sel.innerHTML = '<option value="">Erro ao carregar sistemas</option>'; });
+    w.querySelector('#idet-add-sys').onclick = async (ev) => {
+      const systemId = sel.value;
+      if (!systemId) { showMsg('Escolha um sistema.'); return; }
+      const btn = ev.currentTarget; btn.disabled = true;
+      try {
+        await db.addSystemItemFromLibrary(systemId, id);
+        showMsg('Item adicionado ao sistema.', 'ok');
+        close();
+      } catch (e) { showMsg('Não foi possível adicionar: ' + friendlyError(e)); btn.disabled = false; }
+    };
+  }
+  document.addEventListener('keydown', onEsc);
+  document.body.appendChild(w);
+  w.querySelector('.x').focus();
+};
+
+window.editItem = (id) => { const it = _itemById.get(id); if (it) { showItemSub('criar'); openItemForm(it); } };
+window.delItem = async (id) => {
+  const it = _itemById.get(id);
+  const ok = await confirmModal({
+    title: 'Excluir item',
+    desc: `Isto remove "${it?.name || 'este item'}" da sua biblioteca. Cópias já adicionadas em mesas ou sistemas não são afetadas. Esta ação não pode ser desfeita.`,
+    confirmLabel: 'Excluir',
+    danger: true,
+  });
+  if (!ok) return;
+  db.deleteItem2(id).then(() => { renderItems(); showMsg('Item excluído.', 'ok'); }).catch((e) => showMsg('Não foi possível excluir: ' + friendlyError(e)));
+};
+</script>
+</body>
+</html>

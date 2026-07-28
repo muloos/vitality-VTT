@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("vt_theme")||"dark"}catch(e){}</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vitality · Construtor de Sistema</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/theme.css?v=9">
+</head>
+<body>
+<div id="fallback" class="solid"></div>
+
+<div class="topbar">
+  <a class="iconbtn" href="app.html" title="Voltar" style="text-decoration:none"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></a>
+  <a class="topbar-brand" href="app.html"><span class="mark">◈</span>VITALITY</a>
+  <div class="title" id="sys-name" style="font-size:14px">…</div>
+  <div class="spacer"></div>
+  <div class="user-chip"><span id="who">…</span></div>
+</div>
+
+<div class="page">
+  <nav class="home-tabs" id="tabs"></nav>
+  <div id="msg" class="msg"></div>
+  <div id="content"></div>
+</div>
+
+<script type="module">
+import * as db from './lib/db.js?v=24';
+import { mountHelp, mountThemeToggle } from './lib/ui.js?v=3';
+
+mountHelp('sistema');
+mountThemeToggle();
+const $ = (id) => document.getElementById(id);
+const esc = (s) => (s == null ? '' : String(s)).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const emptyState = (icon, title, desc, cta) => `<div class="empty-cta"><div class="ec-icon">${icon}</div>
+  <div class="ec-title">${title}</div><div class="ec-desc">${desc}</div>${cta || ''}</div>`;
+// ícones de linha (svgrepo-style, 24x24, stroke) — sem emoji em nenhuma opção
+const ic = (paths, attrs = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${attrs}>${paths}</svg>`;
+// modal de confirmação estilizado (mesmo padrão visual do guia) — substitui confirm() nativo
+function confirmModal({ title, desc, confirmLabel = 'Confirmar', danger = true } = {}) {
+  return new Promise((resolve) => {
+    const trigger = document.activeElement;
+    const w = document.createElement('div');
+    w.className = 'ui-modal';
+    w.setAttribute('role', 'alertdialog');
+    w.setAttribute('aria-modal', 'true');
+    w.setAttribute('aria-labelledby', 'confirm-title');
+    w.innerHTML = `<div class="box guide">
+      <div class="ghead"><h3 id="confirm-title">${esc(title)}</h3><button class="x" aria-label="Fechar">×</button></div>
+      <p class="gintro">${esc(desc)}</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="btn auto" id="cm-cancel">Cancelar</button>
+        <button class="btn auto ${danger ? 'danger' : 'go'}" id="cm-ok">${esc(confirmLabel)}</button>
+      </div>
+    </div>`;
+    const finish = (result) => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
+    const onEsc = (e) => { if (e.key === 'Escape') finish(false); };
+    w.addEventListener('click', (e) => { if (e.target === w) finish(false); });
+    w.querySelector('.x').onclick = () => finish(false);
+    w.querySelector('#cm-cancel').onclick = () => finish(false);
+    w.querySelector('#cm-ok').onclick = () => finish(true);
+    document.addEventListener('keydown', onEsc);
+    document.body.appendChild(w);
+    w.querySelector('#cm-ok').focus();
+  });
+}
+// seletor de cor próprio — um color picker de verdade (quadrado de saturação/brilho + barra de
+// matiz arrastáveis + hex + atalhos de paleta), substitui <input type="color"> nativo do navegador.
+// openColorPicker(botãoGatilho, corAtual, (novaCor)=>...) — chama onPick a cada mudança (igual o
+// oninput do color picker nativo), pro chamador poder ter preview ao vivo se quiser.
+const COLOR_PRESETS = ['#f2585e','#fb923c','#f5b93d','#eab308','#84cc16','#22c55e','#3ecf7e','#10b981',
+  '#14b8a6','#35c6d4','#18b5c6','#0ea5e9','#3b82f6','#6366f1','#8b5cf6','#a855f7',
+  '#d946ef','#ec4899','#e9edf1','#93a0ab','#5c6771','#7ee6dc'];
+function hexToHsv(hex) {
+  hex = (hex || '#7ee6dc').replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+  const r = parseInt(hex.slice(0, 2), 16) / 255 || 0, g = parseInt(hex.slice(2, 4), 16) / 255 || 0, b = parseInt(hex.slice(4, 6), 16) / 255 || 0;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return { h, s: max === 0 ? 0 : d / max, v: max };
+}
+function hsvToHex(h, s, v) {
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+  let r, g, b;
+  if (h < 60) [r, g, b] = [c, x, 0]; else if (h < 120) [r, g, b] = [x, c, 0]; else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c]; else if (h < 300) [r, g, b] = [x, 0, c]; else [r, g, b] = [c, 0, x];
+  const toHex = (n) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+  return '#' + toHex(r) + toHex(g) + toHex(b);
+}
+let _colorPop = null;
+function closeColorPicker() {
+  if (!_colorPop) return;
+  _colorPop.remove(); _colorPop = null;
+  document.removeEventListener('mousedown', _cpOutside, true);
+  document.removeEventListener('keydown', _cpEsc);
+}
+function _cpOutside(e) { if (_colorPop && !_colorPop.contains(e.target)) closeColorPicker(); }
+function _cpEsc(e) { if (e.key === 'Escape') closeColorPicker(); }
+window.openColorPicker = (trigger, current, onPick) => {
+  closeColorPicker();
+  const state = hexToHsv(current);
+  const pop = document.createElement('div');
+  pop.className = 'color-pop';
+  pop.innerHTML = `
+    <div class="cp-sv" id="cp-sv"><div class="cp-sv-cursor" id="cp-sv-cursor"></div></div>
+    <div class="cp-hue" id="cp-hue"><div class="cp-hue-cursor" id="cp-hue-cursor"></div></div>
+    <div class="cp-bottom">
+      <span class="cp-preview" id="cp-preview"></span>
+      <input type="text" class="cp-hex" id="cp-hex" maxlength="7">
+    </div>
+    <div class="cp-grid">${COLOR_PRESETS.map((c) => `<button type="button" class="cp-swatch" style="--sw:${c}" data-c="${c}" title="${c}"></button>`).join('')}</div>`;
+  document.body.appendChild(pop);
+
+  const svEl = pop.querySelector('#cp-sv'), svCur = pop.querySelector('#cp-sv-cursor');
+  const hueEl = pop.querySelector('#cp-hue'), hueCur = pop.querySelector('#cp-hue-cursor');
+  const preview = pop.querySelector('#cp-preview'), hexInput = pop.querySelector('#cp-hex');
+
+  function render() {
+    svEl.style.setProperty('--h', state.h);
+    svCur.style.left = (state.s * svEl.clientWidth) + 'px';
+    svCur.style.top = ((1 - state.v) * svEl.clientHeight) + 'px';
+    hueCur.style.left = (state.h / 360 * hueEl.clientWidth) + 'px';
+    const hex = hsvToHex(state.h, state.s, state.v);
+    preview.style.setProperty('--sw', hex);
+    hexInput.value = hex;
+    trigger.style.setProperty('--sw', hex);
+    onPick(hex);
+  }
+  function dragSV(e) {
+    const r = svEl.getBoundingClientRect();
+    state.s = Math.min(Math.max(0, e.clientX - r.left), r.width) / r.width;
+    state.v = 1 - Math.min(Math.max(0, e.clientY - r.top), r.height) / r.height;
+    render();
+  }
+  function dragHue(e) {
+    const r = hueEl.getBoundingClientRect();
+    state.h = Math.min(Math.max(0, e.clientX - r.left), r.width) / r.width * 360;
+    render();
+  }
+  svEl.addEventListener('pointerdown', (e) => {
+    svEl.setPointerCapture(e.pointerId); dragSV(e);
+    const mv = (ev) => dragSV(ev), up = () => { svEl.removeEventListener('pointermove', mv); svEl.removeEventListener('pointerup', up); };
+    svEl.addEventListener('pointermove', mv); svEl.addEventListener('pointerup', up);
+  });
+  hueEl.addEventListener('pointerdown', (e) => {
+    hueEl.setPointerCapture(e.pointerId); dragHue(e);
+    const mv = (ev) => dragHue(ev), up = () => { hueEl.removeEventListener('pointermove', mv); hueEl.removeEventListener('pointerup', up); };
+    hueEl.addEventListener('pointermove', mv); hueEl.addEventListener('pointerup', up);
+  });
+  pop.querySelectorAll('.cp-swatch').forEach((b) => {
+    b.onclick = () => { const hsv = hexToHsv(b.dataset.c); state.h = hsv.h; state.s = hsv.s; state.v = hsv.v; render(); };
+  });
+  hexInput.addEventListener('change', () => {
+    const v = hexInput.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) { const hsv = hexToHsv(v); state.h = hsv.h; state.s = hsv.s; state.v = hsv.v; render(); }
+  });
+
+  const r = trigger.getBoundingClientRect();
+  let left = r.left, top = r.bottom + 6;
+  if (left + pop.offsetWidth > window.innerWidth - 8) left = window.innerWidth - pop.offsetWidth - 8;
+  if (top + pop.offsetHeight > window.innerHeight - 8) top = r.top - pop.offsetHeight - 6;
+  pop.style.left = Math.max(8, left) + 'px';
+  pop.style.top = Math.max(8, top) + 'px';
+  _colorPop = pop;
+  render();
+  setTimeout(() => {
+    document.addEventListener('mousedown', _cpOutside, true);
+    document.addEventListener('keydown', _cpEsc);
+  }, 0);
+};
+const ICONS = {
+  gear: ic('<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M20.5 12h-2.6M6.1 12H3.5M17.7 6.3l-1.8 1.8M8.1 15.9l-1.8 1.8M17.7 17.7l-1.8-1.8M8.1 8.1 6.3 6.3"/>'),
+  bolt: ic('<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>'),
+  shield: ic('<path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6l7-3Z"/>'),
+  tree: ic('<path d="M12 3 6 12h3l-4 6h4v3h6v-3h4l-4-6h3L12 3Z"/>'),
+  bag: ic('<path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/>'),
+  dagger: ic('<path d="M12 2v14"/><path d="M8 6h8"/><path d="M12 16l-3 3 3 3 3-3-3-3Z"/>'),
+  heart: ic('<path d="M12 20.2 4.6 13c-2-2-2-5 0-6.8 1.9-1.8 4.7-1.6 6.4.4l1 1.2 1-1.2c1.7-2 4.5-2.2 6.4-.4 2 1.8 2 4.8 0 6.8L12 20.2Z"/>'),
+  flask: ic('<path d="M9 2.5h6M10 3v6.5L4.8 18a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 9.5V3"/><path d="M7.5 15h9"/>'),
+  x: ic('<path d="M6 6l12 12M18 6 6 18"/>', 'stroke-width="1.8"'),
+  warning: ic('<path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4.2"/><circle cx="12" cy="17" r=".4" fill="currentColor" stroke="none"/>'),
+  book: ic('<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"/>'),
+  cornerDownRight: ic('<path d="M6 4v8a4 4 0 0 0 4 4h9"/><path d="M15 12l4 4-4 4"/>'),
+  externalLink: ic('<path d="M9 6H5.8A1.8 1.8 0 0 0 4 7.8v10.4A1.8 1.8 0 0 0 5.8 20h10.4A1.8 1.8 0 0 0 18 18.2V15"/><path d="M13.5 4H20v6.5"/><path d="M10.5 13.5 20 4"/>'),
+  target: ic('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6" fill="currentColor" stroke="none"/>'),
+  checklist: ic('<path d="M4.5 6.5l1.3 1.3L8 5.5"/><path d="M4.5 12.5l1.3 1.3 2.2-2.3"/><path d="M4.5 18.5l1.3 1.3 2.2-2.3"/><path d="M11.5 6.5h8M11.5 12.5h8M11.5 18.5h8"/>'),
+  chat: ic('<path d="M4 5h16v11H8l-4 4V5Z"/>'),
+  hammer: ic('<path d="M15 4l5 5-2 2-5-5Z"/><path d="M12.5 6.5l5 5-2.5 2.5-5-5Z"/><path d="M3 21l7.5-7.5"/>'),
+  levelUp: ic('<path d="M4 20v-5M4 20h4M10 20v-9M10 20h4M16 20v-13M16 20h4"/><path d="M4 12l6-6 4 4 7-7"/>'),
+};
+// deriva ícone + cor de uma categoria de proficiência a partir do texto — sem precisar de campo
+// novo no banco (categoria continua sendo texto livre). Cobre os tipos mais comuns por palavra-
+// chave; qualquer nome fora disso cai num ícone genérico + cor gerada por hash do próprio texto
+// (estável pra cada categoria, sem precisar o Mestre escolher uma cor manualmente).
+function profCategoryIcon(cat) {
+  const s = (cat || '').toLowerCase();
+  if (/armadura|armor|escudo|shield/.test(s)) return ICONS.shield;
+  if (/arma\b|armas|weapon|espada|arco|machado|lança|adaga/.test(s)) return ICONS.dagger;
+  if (/idioma|língua|lingua|language/.test(s)) return ICONS.chat;
+  if (/ofício|oficio|ferramenta|tool|craft|artesanato/.test(s)) return ICONS.hammer;
+  if (/medicina|cura|heal|medic|primeiros socorros/.test(s)) return ICONS.heart;
+  if (/perícia|pericia|skill|saving|resistência|resistencia/.test(s)) return ICONS.target;
+  return ICONS.checklist;
+}
+function profCategoryColor(cat) {
+  if (!cat) return '#8a95a1';
+  let h = 0; for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) >>> 0;
+  return `hsl(${h % 360} 58% 58%)`;
+}
+const systemId = new URLSearchParams(location.search).get('id');
+const CATEGORIES = ['Arma', 'Armadura', 'Escudo', 'Ferramenta', 'Consumível', 'Acessório', 'Artefato', 'Material', 'Outro'];
+const RARITIES = ['Comum', 'Incomum', 'Raro', 'Épico', 'Lendário', 'Único'];
+
+let system = null, currentTab = 'geral';
+function showMsg(t, kind) { const m = $('msg'); m.textContent = t; m.className = 'msg show ' + (kind || 'err'); setTimeout(() => { if (m.textContent === t) m.className = 'msg'; }, 4000); }
+
+const TABS = [['geral', `<span class="ic">${ICONS.gear}</span>Geral`], ['status', `<span class="ic">${ICONS.bolt}</span>Status`], ['pericias', `<span class="ic">${ICONS.target}</span>Perícias`], ['proficiencias', `<span class="ic">${ICONS.checklist}</span>Proficiências`], ['classes', `<span class="ic">${ICONS.shield}</span>Classes`], ['nivel', `<span class="ic">${ICONS.levelUp}</span>Nível`], ['arvores', `<span class="ic">${ICONS.tree}</span>Árvores`], ['itens', `<span class="ic">${ICONS.bag}</span>Itens`]];
+
+(async () => {
+  if (!systemId) { location.href = 'app.html'; return; }
+  const session = await db.requireSession();
+  if (!session) return;
+  const [profile] = await Promise.all([db.getMyProfile()]);
+  $('who').innerHTML = '<b>' + esc(profile?.display_name || '—') + '</b>';
+  try { system = await db.getSystem(systemId); } catch (e) { $('content').innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; return; }
+  if (!system) { document.querySelector('.page').innerHTML = '<div class="empty">Sistema não encontrado. <a href="app.html" style="color:var(--brass)">Voltar</a></div>'; return; }
+  $('sys-name').innerHTML = esc(system.name) + '<small>CONSTRUTOR DE SISTEMA</small>';
+  $('tabs').innerHTML = TABS.map(([id, label]) => `<button data-tab="${id}" onclick="openTab('${id}')">${label}</button>`).join('');
+  openTab('geral');
+})();
+
+window.openTab = (name) => {
+  currentTab = name;
+  [...$('tabs').children].forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  const c = $('content'); c.innerHTML = '<div class="empty">Carregando…</div>';
+  ({ geral: renderGeral, status: renderStatus, pericias: renderPericias, proficiencias: renderProficiencias, classes: renderClasses, nivel: renderNivel, arvores: renderArvores, itens: renderItens }[name])(c)
+    .catch((e) => { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
+};
+
+/* ===================== GERAL ===================== */
+async function renderGeral(c) {
+  const guide = [
+    [`<span class="ic">${ICONS.bolt}</span>Status`, 'Crie os atributos e fórmulas do jogo.', 'status'],
+    [`<span class="ic">${ICONS.target}</span>Perícias`, 'Habilidades calculadas a partir dos status.', 'pericias'],
+    [`<span class="ic">${ICONS.checklist}</span>Proficiências`, 'Liga/desliga: sabe usar ou não.', 'proficiencias'],
+    [`<span class="ic">${ICONS.shield}</span>Classes`, 'Classes, subclasses e status base.', 'classes'],
+    [`<span class="ic">${ICONS.levelUp}</span>Nível`, 'Pontos de status concedidos por nível.', 'nivel'],
+    [`<span class="ic">${ICONS.tree}</span>Árvores`, 'Desenhe as árvores de habilidade.', 'arvores'],
+    [`<span class="ic">${ICONS.bag}</span>Itens`, 'Itens do sistema com modificadores.', 'itens'],
+  ];
+  c.innerHTML = `
+    <div class="section-title">Identidade do sistema</div>
+    <div class="fld"><label>Nome</label><input id="g-name" value="${esc(system.name)}" oninput="markGeralDirty()"></div>
+    <div class="fld"><label>Descrição</label>
+      <textarea id="g-desc" oninput="markGeralDirty()" placeholder="Sobre o que é este sistema..."
+        style="width:100%;min-height:80px;background:var(--field);border:1px solid var(--line2);border-radius:10px;color:var(--ink);font-family:var(--serif);font-size:14px;padding:11px 12px;line-height:1.55">${esc(system.description)}</textarea></div>
+    <div class="fld">
+      <label class="check-row" for="g-published">
+        <input type="checkbox" id="g-published" ${system.is_published ? 'checked' : ''} onchange="markGeralDirty()">
+        <span>Publicar na loja — outros usuários podem ver este sistema e favoritá-lo</span>
+      </label>
+    </div>
+    <button class="btn go sm" id="geral-save-btn" style="display:none" onclick="saveGeral()"><span class="spin"></span>Salvar alterações</button>
+
+    <div class="section-title">Monte seu sistema — ordem recomendada</div>
+    <div class="onboard" style="margin-bottom:22px"><div class="steps" style="margin-top:0">
+      ${guide.map((g, i) => `<div class="ostep"><div class="n">${i + 1}</div>
+        <div><b>${g[0]}</b><p>${g[1]}</p><button class="btn sm auto" onclick="openTab('${g[2]}')">Abrir</button></div></div>`).join('')}
+    </div></div>
+
+    <div class="section-title">Zona de perigo</div>
+    <button class="btn danger auto sm" onclick="delSys()">Excluir sistema</button>`;
+}
+window.markGeralDirty = () => { const b = $('geral-save-btn'); if (b) b.style.display = ''; };
+window.saveGeral = () => {
+  const btn = $('geral-save-btn'); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+  const name = $('g-name').value.trim(), description = $('g-desc').value.trim(), is_published = $('g-published').checked;
+  db.updateSystem(systemId, { name, description, is_published }).then(() => {
+    system.name = name; system.description = description; system.is_published = is_published;
+    const nm = $('sys-name'); if (nm && nm.firstChild) nm.firstChild.textContent = name;
+    if (btn) btn.style.display = 'none';
+    showMsg('Salvo.', 'ok');
+  }).catch((e) => showMsg(e.message))
+    .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
+};
+window.delSys = async () => {
+  const ok = await confirmModal({ title: 'Excluir sistema', desc: `Excluir "${system.name}"? Apaga status, classes, árvores e vínculos. Não dá pra desfazer.`, confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteSystem(systemId).then(() => location.href='app.html').catch((e) => showMsg(e.message));
+};
+
+/* ===================== STATUS ===================== */
+let _statusStats = [];
+let _profsCache = []; // proficiências com "nome na fórmula" — pro testador de fórmula reconhecer
+async function renderStatus(c) {
+  const [stats, profs] = await Promise.all([db.listStats(systemId), db.listProficiencies(systemId)]);
+  _statusStats = stats; _profsCache = profs;
+  const recursos = stats.filter((s) => s.is_resource);
+  const status = stats.filter((s) => !s.is_resource && !s.is_skill);
+  c.innerHTML = `
+    <div class="section-title">Status do sistema</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
+      <b style="color:var(--maq)">Recurso</b> (ex.: HP, Mana, Sanidade) tem destaque na ficha com barra de atual/máximo e pode ser um valor fixo ou uma fórmula.
+      <b style="color:var(--brass)">Status</b> (ex.: Força, Destreza) não tem valor na criação — você define o valor de cada um por classe, na aba Classes.
+      O <b style="color:var(--maq)">nome na fórmula</b> é o apelido usado pra referenciar o status nas fórmulas. A <b>cor</b> pinta a caixinha dele na ficha.</p>
+
+    <div class="section-title"><span class="ic">${ICONS.bolt}</span>Recursos <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(atual/máximo, com destaque)</span></div>
+    <div class="list">${recursos.length ? recursos.map(statRow).join('') : '<div class="empty">Nenhum recurso ainda.</div>'}</div>
+
+    <div class="section-title"><span class="ic">${ICONS.dagger}</span>Status <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(valor por classe + pontos de status)</span></div>
+    <div class="list">${status.length ? status.map(statRow).join('') : '<div class="empty">Nenhum status ainda.</div>'}</div>
+
+    <div class="surface" style="margin-top:16px">
+      <div class="item-form">
+        <div class="fld"><label>Nome</label><input id="st-name" placeholder="Ex.: Pontos de Vida" maxlength="40"></div>
+        <div class="fld"><label>Nome na fórmula</label><input id="st-formkey" placeholder="Ex.: HP" maxlength="20"></div>
+        <div class="fld"><label>Tipo</label>
+          <select id="st-type" class="fld-input" onchange="onStatTypeChange()">
+            <option value="status">Status (valor definido depois, por classe)</option>
+            <option value="resource-fixed">Recurso — valor fixo</option>
+            <option value="resource-formula">Recurso — fórmula</option>
+          </select></div>
+        <div class="fld"><label>Cor</label>
+          <button type="button" class="color-swatch full" style="--sw:#7ee6dc" onclick="openColorPicker(this, '#7ee6dc', (v)=>{ document.getElementById('st-color').value = v; })"></button>
+          <input type="hidden" id="st-color" value="#7ee6dc"></div>
+        <div class="fld" id="st-extra-wrap" style="display:none"></div>
+        <div class="full"><button class="btn go auto" onclick="addStat()">+ Adicionar status</button></div>
+      </div>
+    </div>
+
+    ${formulaTutorial(stats)}`;
+}
+window.onStatTypeChange = () => {
+  const v = $('st-type').value;
+  const wrap = $('st-extra-wrap');
+  if (v === 'status') { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  wrap.style.display = '';
+  wrap.innerHTML = v === 'resource-formula' ? extraFormula() : extraDefault();
+};
+window.extraDefault = () => `<label>Valor máximo (fixo)</label><input id="st-extra" placeholder="Ex.: 30">`;
+window.extraFormula = () => `<label>Fórmula do máximo</label><input id="st-extra" placeholder="Ex.: CON*10">`;
+function statRow(s) {
+  const isC = s.kind === 'computed';
+  return `<div class="list-row" style="flex-wrap:wrap">
+    <div class="grow"><input class="nm" style="background:transparent;border:0;color:var(--ink);font-family:var(--serif);font-size:15px;width:100%" value="${esc(s.name)}" onchange="onStatFieldChange('${s.id}','name',this.value)">
+      <div class="sub" style="display:flex;align-items:center;gap:6px;margin-top:3px">${isC ? 'calculado' : 'base'} · na fórmula:
+        <input value="${esc(s.formula_key)}" placeholder="apelido" onchange="onStatFieldChange('${s.id}','formula_key',this.value)"
+          style="width:100px;background:var(--field);border:1px solid var(--line2);border-radius:6px;color:var(--maq);font-family:var(--mono);font-size:11px;padding:3px 7px"></div></div>
+    <input value="${esc(isC ? s.formula : s.default_value)}" placeholder="${isC ? 'fórmula (ex.: FORCA*5 + 10)' : 'valor padrão'}"
+      style="flex:1 1 180px;min-width:140px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:${isC?'var(--maq)':'var(--ink)'};font-family:var(--mono);font-size:12px;padding:8px 10px"
+      onchange="onStatFieldChange('${s.id}','${isC?'formula':'default_value'}',this.value)">
+    <button type="button" class="color-swatch" style="--sw:${esc(s.color || '#7ee6dc')}" title="Cor da caixa na ficha" onclick="openColorPicker(this, '${esc(s.color || '#7ee6dc')}', (v)=>onStatFieldChange('${s.id}','color',v))"></button>
+    <button class="btn sm go" id="stat-save-${s.id}" style="display:none" onclick="saveStatRow('${s.id}')"><span class="spin"></span>Salvar</button>
+    <button class="btn sm auto" style="${s.is_resource ? 'border-color:var(--maq);color:var(--maq)' : ''}" onclick="toggleResource('${s.id}', ${!s.is_resource})" title="Recurso: mostra atual/máximo na ficha (ex.: HP)">${s.is_resource ? `<span class="ic">${ICONS.heart}</span>recurso` : 'recurso?'}</button>
+    ${isC ? `<button class="btn sm auto" onclick="toggleTest('${s.id}')" title="Testar a fórmula"><span class="ic">${ICONS.flask}</span>Testar</button>` : ''}
+    <button class="btn sm danger auto" onclick="delStat('${s.id}')"><span class="ic">${ICONS.x}</span></button>
+  </div>
+  ${isC ? `<div id="test-${s.id}" class="surface" style="display:none;margin:-2px 0 8px;padding:14px"></div>` : ''}`;
+}
+window.toggleResource = (id, val) => {
+  const s = _statusStats.find((x) => x.id === id); if (s) s.is_resource = val;
+  const patch = { is_resource: val };
+  if (val && s && !s.color) patch.color = '#7ee6dc'; // cor padrão ao virar recurso
+  db.updateStat(id, patch).then(() => openTab('status')).catch((e) => showMsg(e.message));
+};
+window.formulaTutorial = (stats) => {
+  const exemplos = stats.filter((s) => s.formula_key).slice(0, 3).map((s) => s.formula_key);
+  const ex = exemplos.length >= 2 ? `${exemplos[0]} * 5 + ${exemplos[1] || '10'}` : 'FORCA * 5 + 10';
+  return `<div class="surface" style="margin-top:16px">
+    <h4 style="font-family:var(--disp);font-size:15px;color:var(--bone);margin:0 0 12px"><span class="ic">${ICONS.book}</span>Como criar fórmulas</h4>
+    <div style="font-family:var(--serif);font-size:13.5px;color:var(--ink-dim);line-height:1.75">
+      <p style="margin:0 0 10px">Um status <b>Calculado</b> não é preenchido pelo jogador — ele é calculado a partir de outros status usando uma <b>fórmula</b>.</p>
+      <p style="margin:0 0 6px">Na fórmula você referencia outros status pelo <b style="color:var(--maq)">nome na fórmula</b> (o apelido). Pode usar:</p>
+      <ul style="margin:0 0 10px;padding-left:20px;font-family:var(--mono);font-size:12px;color:var(--ink)">
+        <li>Números: <code>10</code>, <code>2.5</code></li>
+        <li>Operações: <code>+</code>  <code>-</code>  <code>*</code>  <code>/</code></li>
+        <li>Parênteses: <code>( )</code> para agrupar</li>
+        <li>Os apelidos dos seus status: <code>${esc(stats.map((s)=>s.formula_key).filter(Boolean).join(', ') || 'HP, FORCA, DES')}</code></li>
+      </ul>
+      <p style="margin:0 0 6px"><b>Exemplo:</b></p>
+      <div style="font-family:var(--mono);font-size:12px;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--bone)">
+        Ataque (calculado) = <span style="color:var(--maq)">${esc(ex)}</span></div>
+      <p style="margin:10px 0 0;font-size:12px;color:var(--ink-faint)">Dica: use apelidos curtos, sem espaços nem acentos (ex.: <code>HP</code>, <code>MANA</code>, <code>FORCA</code>, <code>DES</code>). Assim fica fácil escrever as fórmulas.</p>
+    </div></div>`;
+};
+window.addStat = () => {
+  const name = $('st-name').value.trim(); if (!name) { showMsg('Dê um nome ao status.'); return; }
+  const type = $('st-type').value;
+  const extra = $('st-extra')?.value.trim() || '';
+  const stat = { name, formula_key: $('st-formkey').value.trim() || null, sort_order: Date.now() % 100000, color: $('st-color')?.value || '#7ee6dc' };
+  if (type === 'status') {
+    stat.kind = 'base'; stat.is_resource = false; stat.default_value = null;
+  } else {
+    stat.is_resource = true;
+    if (type === 'resource-formula') { stat.kind = 'computed'; stat.formula = extra; }
+    else { stat.kind = 'base'; stat.default_value = extra; }
+  }
+  db.createStat(systemId, stat).then(() => openTab('status')).catch((e) => showMsg(e.message));
+};
+// não grava mais no banco a cada campo — só atualiza o rascunho em memória (mantém o painel de
+// "Testar" com valores frescos) e mostra o botão Salvar dessa linha. saveStatRow() grava tudo
+// de uma vez quando o usuário decide confirmar.
+window.onStatFieldChange = (id, k, v) => {
+  const s = _statusStats.find((x) => x.id === id); if (s) s[k] = v.trim();
+  const b = $('stat-save-' + id); if (b) b.style.display = '';
+};
+window.saveStatRow = (id) => {
+  const s = _statusStats.find((x) => x.id === id); if (!s) return;
+  const btn = $('stat-save-' + id); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+  const patch = { name: (s.name || '').trim(), formula_key: (s.formula_key || '').trim() };
+  if (s.kind === 'computed') patch.formula = (s.formula || '').trim(); else patch.default_value = (s.default_value || '').trim();
+  patch.color = s.color || null;
+  db.updateStat(id, patch).then(() => { if (btn) btn.style.display = 'none'; showMsg('Salvo.', 'ok'); })
+    .catch((e) => showMsg(e.message))
+    .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
+};
+window.delStat = (id) => db.deleteStat(id).then(() => openTab('status')).catch((e) => showMsg(e.message));
+
+/* ===================== PERÍCIAS ===================== */
+// perícia = um status "computed" com a etiqueta is_skill: sempre calculada por fórmula (nunca
+// preenchida pelo jogador), com cor própria pra aparecer numa caixinha compacta na ficha —
+// por isso reaproveita toda a infra de fórmula/teste dos Status (_statusStats, computeStat etc.)
+async function renderPericias(c) {
+  const [stats, profs] = await Promise.all([db.listStats(systemId), db.listProficiencies(systemId)]);
+  _statusStats = stats; _profsCache = profs;
+  const pericias = stats.filter((s) => s.is_skill);
+  c.innerHTML = `
+    <div class="section-title">Perícias do sistema</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
+      Uma <b style="color:var(--brass)">Perícia</b> é sempre calculada por <b>fórmula</b> (ex.: DES + PROF) — o jogador nunca digita o valor dela, só vê o resultado.
+      Use o <b style="color:var(--maq)">nome na fórmula</b> dos Status (aba Status) pra montar a conta. Na ficha ela aparece como uma caixinha pequena, com a cor escolhida, só com nome e valor.</p>
+
+    <div class="surface" style="margin-bottom:16px">
+      <label class="check-row" for="pe-enabled">
+        <input type="checkbox" id="pe-enabled" ${system.skills_enabled ? 'checked' : ''} onchange="toggleSkillsEnabled(this.checked)">
+        <span>Usar perícias nesta mesa — desativado, a seção de Perícias nem aparece na ficha do jogador (mas o que você montar aqui fica salvo pra quando ativar).</span>
+      </label>
+    </div>
+
+    <div class="list">${pericias.length ? pericias.map(periciaRow).join('') : '<div class="empty">Nenhuma perícia ainda.</div>'}</div>
+
+    <div class="surface" style="margin-top:16px">
+      <div class="item-form">
+        <div class="fld"><label>Nome</label><input id="pe-name" placeholder="Ex.: Furtividade" maxlength="40"></div>
+        <div class="fld"><label>Nome na fórmula</label><input id="pe-formkey" placeholder="Ex.: FURTIVIDADE" maxlength="20"></div>
+        <div class="fld"><label>Fórmula</label><input id="pe-formula" placeholder="Ex.: DES + PROF"></div>
+        <div class="fld"><label>Cor</label>
+          <button type="button" class="color-swatch full" style="--sw:#7ee6dc" onclick="openColorPicker(this, '#7ee6dc', (v)=>{ document.getElementById('pe-color').value = v; })"></button>
+          <input type="hidden" id="pe-color" value="#7ee6dc"></div>
+        <div class="full"><button class="btn go auto" onclick="addPericia()">+ Adicionar perícia</button></div>
+      </div>
+    </div>
+
+    ${formulaTutorial(stats)}`;
+}
+function periciaRow(s) {
+  return `<div class="list-row" style="flex-wrap:wrap">
+    <button type="button" class="color-swatch" style="--sw:${esc(s.color || '#7ee6dc')}" title="Cor da caixinha na ficha" onclick="openColorPicker(this, '${esc(s.color || '#7ee6dc')}', (v)=>onStatFieldChange('${s.id}','color',v))"></button>
+    <div class="grow"><input class="nm" style="background:transparent;border:0;color:var(--ink);font-family:var(--serif);font-size:15px;width:100%" value="${esc(s.name)}" onchange="onStatFieldChange('${s.id}','name',this.value)">
+      <div class="sub" style="display:flex;align-items:center;gap:6px;margin-top:3px">na fórmula:
+        <input value="${esc(s.formula_key)}" placeholder="apelido" onchange="onStatFieldChange('${s.id}','formula_key',this.value)"
+          style="width:100px;background:var(--field);border:1px solid var(--line2);border-radius:6px;color:var(--maq);font-family:var(--mono);font-size:11px;padding:3px 7px"></div></div>
+    <input value="${esc(s.formula)}" placeholder="fórmula (ex.: DES + PROF)"
+      style="flex:1 1 180px;min-width:140px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--maq);font-family:var(--mono);font-size:12px;padding:8px 10px"
+      onchange="onStatFieldChange('${s.id}','formula',this.value)">
+    <button class="btn sm go" id="stat-save-${s.id}" style="display:none" onclick="saveStatRow('${s.id}')"><span class="spin"></span>Salvar</button>
+    <button class="btn sm auto" onclick="toggleTest('${s.id}')" title="Testar a fórmula"><span class="ic">${ICONS.flask}</span>Testar</button>
+    <button class="btn sm danger auto" onclick="delStat('${s.id}')"><span class="ic">${ICONS.x}</span></button>
+  </div>
+  <div id="test-${s.id}" class="surface" style="display:none;margin:-2px 0 8px;padding:14px"></div>`;
+}
+window.addPericia = () => {
+  const name = $('pe-name').value.trim(); if (!name) { showMsg('Dê um nome à perícia.'); return; }
+  const stat = {
+    name, formula_key: $('pe-formkey').value.trim() || null,
+    formula: $('pe-formula').value.trim(),
+    kind: 'computed', is_resource: false, is_skill: true,
+    color: $('pe-color').value || '#7ee6dc',
+    sort_order: Date.now() % 100000,
+  };
+  db.createStat(systemId, stat).then(() => openTab('pericias')).catch((e) => showMsg(e.message));
+};
+window.toggleSkillsEnabled = (val) => {
+  system.skills_enabled = val;
+  db.updateSystem(systemId, { skills_enabled: val })
+    .then(() => showMsg(val ? 'Perícias ativadas — já aparecem na ficha do jogador.' : 'Perícias desativadas — sumiram da ficha do jogador.', 'ok'))
+    .catch((e) => showMsg(e.message));
+};
+
+/* ===================== PROFICIÊNCIAS ===================== */
+// diferente da Perícia (sempre numérica/fórmula), a Proficiência é liga/desliga — "sabe usar" ou
+// não (arma, armadura, ferramenta, idioma...). Sem valor, sem fórmula. Concedida por Classe (aba
+// Classes, botão "Proficiências ▾") e, pontualmente, pelo Mestre direto na ficha de um jogador.
+let _profsList = [];
+// pacotes prontos — nomes genéricos de fantasia (não amarrados a nenhum sistema comercial
+// específico), só pra o Mestre não digitar um por um. addProfPreset() pula o que já existe.
+const PROF_PRESETS = {
+  idiomas: { category: 'Idioma', items: ['Comum', 'Élfico', 'Anão', 'Orc', 'Goblin', 'Dracônico', 'Silvestre', 'Gigante', 'Infernal', 'Celestial'] },
+  oficios: { category: 'Ofício', items: ['Ferramentas de ferreiro', 'Ferramentas de alquimista', 'Kit de curandeiro', 'Ferramentas de ladrão', 'Instrumento musical', 'Utensílios de cozinheiro', 'Ferramentas de carpinteiro'] },
+  armas: { category: 'Arma', items: ['Armas simples', 'Armas marciais', 'Adaga', 'Espada longa', 'Arco curto', 'Machado de batalha', 'Lança'] },
+};
+window.addProfPreset = (key) => {
+  const preset = PROF_PRESETS[key]; if (!preset) return;
+  const have = new Set(_profsList.filter((p) => (p.category || '') === preset.category).map((p) => p.name.toLowerCase()));
+  const toAdd = preset.items.filter((n) => !have.has(n.toLowerCase()));
+  if (!toAdd.length) { showMsg('Essas já existem nessa categoria.', 'ok'); return; }
+  Promise.all(toAdd.map((name, i) => db.createProficiency(systemId, { name, category: preset.category, sort_order: Date.now() % 100000 + i })))
+    .then(() => openTab('proficiencias')).catch((e) => showMsg(e.message));
+};
+async function renderProficiencias(c) {
+  const profs = await db.listProficiencies(systemId);
+  _profsList = profs;
+  c.innerHTML = `
+    <div class="section-title">Proficiências do sistema</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
+      Uma <b style="color:var(--brass)">Proficiência</b> é liga/desliga — o personagem sabe usar ou não (ex.: Espada longa, Armadura pesada, Idioma Élfico). Sem fórmula, sem valor.
+      Marque quais cada <b>Classe</b> concede na aba Classes (botão "Proficiências ▾"). Dando um <b style="color:var(--maq)">nome na fórmula</b>, ela também pode ser usada dentro de uma fórmula de Status/Perícia (vira 1 se tem, 0 se não tem).</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      <button class="btn sm auto" onclick="addProfPreset('idiomas')"><span class="ic">${ICONS.chat}</span>+ Idiomas comuns</button>
+      <button class="btn sm auto" onclick="addProfPreset('oficios')"><span class="ic">${ICONS.hammer}</span>+ Ofícios comuns</button>
+      <button class="btn sm auto" onclick="addProfPreset('armas')"><span class="ic">${ICONS.dagger}</span>+ Armas comuns</button>
+    </div>
+
+    ${profs.length ? groupProfsByCategory(profs).map(([cat, list]) => `
+      <div class="prof-cat-head" style="--pcc:${profCategoryColor(cat)}"><span class="ic">${profCategoryIcon(cat)}</span>${esc(cat)}</div>
+      <div class="list" style="margin-bottom:18px">${list.map(profRow).join('')}</div>
+    `).join('') : emptyState(ICONS.checklist, 'Nenhuma proficiência ainda',
+      'Ex.: tipos de arma, armadura, ferramenta ou idioma que um personagem pode ou não saber usar.')}
+
+    <div class="surface">
+      <div class="item-form">
+        <div class="fld"><label>Nome</label><input id="pr-name" placeholder="Ex.: Espada longa" maxlength="40"></div>
+        <div class="fld"><label>Categoria</label><input id="pr-cat" placeholder="Ex.: Arma" maxlength="24"></div>
+        <div class="fld"><label>Nome na fórmula <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional)</span></label><input id="pr-formkey" placeholder="Ex.: PROF_FERRARIA" maxlength="24"></div>
+        <div class="full"><button class="btn go auto" onclick="addProficiencia()">+ Adicionar proficiência</button></div>
+      </div>
+    </div>`;
+}
+function profRow(p) {
+  return `<div class="list-row" style="flex-wrap:wrap">
+    <div class="grow"><input class="nm" style="background:transparent;border:0;color:var(--ink);font-family:var(--serif);font-size:15px;width:100%" value="${esc(p.name)}" onchange="updateProfField('${p.id}','name',this.value)">
+      <div class="sub" style="display:flex;align-items:center;gap:6px;margin-top:3px">na fórmula:
+        <input value="${esc(p.formula_key || '')}" placeholder="opcional" onchange="updateProfField('${p.id}','formula_key',this.value)"
+          style="width:120px;background:var(--field);border:1px solid var(--line2);border-radius:6px;color:var(--maq);font-family:var(--mono);font-size:11px;padding:3px 7px"></div></div>
+    <input value="${esc(p.category || '')}" placeholder="categoria"
+      style="width:130px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink-dim);font-family:var(--mono);font-size:12px;padding:8px 10px"
+      onchange="updateProfField('${p.id}','category',this.value)">
+    <button class="btn sm danger auto" onclick="delProficiencia('${p.id}')"><span class="ic">${ICONS.x}</span></button>
+  </div>`;
+}
+window.addProficiencia = () => {
+  const name = $('pr-name').value.trim(); if (!name) { showMsg('Dê um nome à proficiência.'); return; }
+  const category = $('pr-cat').value.trim() || null;
+  const formula_key = $('pr-formkey').value.trim() || null;
+  db.createProficiency(systemId, { name, category, formula_key, sort_order: Date.now() % 100000 })
+    .then(() => openTab('proficiencias')).catch((e) => showMsg(e.message));
+};
+window.updateProfField = (id, k, v) => {
+  db.updateProficiency(id, { [k]: v.trim() || null }).then(() => showMsg('Salvo.', 'ok')).catch((e) => showMsg(e.message));
+};
+window.delProficiencia = async (id) => {
+  const ok = await confirmModal({ title: 'Excluir proficiência', desc: 'Ela some das classes e fichas que já a usam. Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteProficiency(id).then(() => openTab('proficiencias')).catch((e) => showMsg(e.message));
+};
+// agrupa preservando a ordem de aparição das categorias (sort_order já veio do banco)
+function groupProfsByCategory(list) {
+  const map = new Map();
+  list.forEach((p) => { const cat = p.category || 'Geral'; if (!map.has(cat)) map.set(cat, []); map.get(cat).push(p); });
+  return [...map.entries()];
+}
+
+/* ---------- avaliador de fórmula ---------- */
+// procura primeiro nos Status/Perícias; se não achar, procura nas Proficiências com nome na
+// fórmula (vira um pseudo-status "base" fixo em 1/0 — é assim que uma fórmula pode checar
+// "o personagem tem essa proficiência?" sem precisar de um caminho de avaliação separado)
+const statByKey = (key) => {
+  const k = key.trim();
+  const s = _statusStats.find((x) => (x.formula_key || '').trim() === k);
+  if (s) return s;
+  const p = _profsCache.find((x) => (x.formula_key || '').trim() === k);
+  return p ? { id: 'prof:' + p.id, name: p.name, kind: 'base', formula_key: p.formula_key, default_value: '0', is_proficiency: true } : undefined;
+};
+// calcula o valor de um status; base = usa o valor de teste; calculado = resolve a fórmula
+function computeStat(stat, baseVals, seen = new Set()) {
+  if (stat.kind !== 'computed') {
+    const raw = baseVals[(stat.formula_key || '').trim()];
+    const n = Number(raw);
+    if (raw === undefined || raw === '' || isNaN(n)) throw new Error(`"${stat.formula_key || stat.name}" sem valor`);
+    return n;
+  }
+  if (seen.has(stat.id)) throw new Error('referência circular');
+  const seen2 = new Set(seen); seen2.add(stat.id);
+  const tokens = (stat.formula || '').match(/[A-Za-zÀ-ú_][A-Za-zÀ-ú0-9_]*|\d+\.?\d*|[+\-*/()]/g) || [];
+  if (!tokens.length) throw new Error('fórmula vazia');
+  const expr = tokens.map((tok) => {
+    if (/^[\d.]/.test(tok) || /^[+\-*/()]$/.test(tok)) return tok;
+    const ref = statByKey(tok);
+    if (!ref) throw new Error(`"${tok}" não é um status`);
+    return '(' + computeStat(ref, baseVals, seen2) + ')';
+  }).join(' ');
+  if (!/^[\d+\-*/().\s]*$/.test(expr)) throw new Error('fórmula inválida');
+  let r; try { r = Function('"use strict";return (' + expr + ')')(); } catch (_) { throw new Error('fórmula inválida'); }
+  if (!isFinite(r)) throw new Error('divisão por zero?');
+  return Math.round(r * 1000) / 1000;
+}
+
+/* ---------- testador (botão Testar + área de saída) ---------- */
+window.toggleTest = (statId) => {
+  const box = $('test-' + statId);
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  const base = _statusStats.filter((s) => s.kind !== 'computed' && (s.formula_key || '').trim());
+  const profs = _profsCache.filter((p) => (p.formula_key || '').trim());
+  box.innerHTML = `
+    <div class="sub" style="margin-bottom:8px">Valores de teste (status base):</div>
+    ${base.length ? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">${base.map((b) => `
+      <label style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);display:flex;align-items:center;gap:6px">${esc(b.formula_key)}
+        <input class="tv" data-key="${esc((b.formula_key || '').trim())}" value="${esc(b.default_value || '0')}" inputmode="decimal"
+          style="width:74px;background:var(--field);border:1px solid var(--line2);border-radius:6px;color:var(--ink);font-family:var(--mono);font-size:12px;padding:5px 8px" oninput="runTest('${statId}')"></label>`).join('')}</div>`
+      : '<div class="sub" style="color:var(--escarlate);margin-bottom:10px">Crie ao menos um status base (com nome na fórmula) para testar.</div>'}
+    ${profs.length ? `<div class="sub" style="margin-bottom:8px">Proficiências de teste (tem ou não tem):</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">${profs.map((p) => `
+      <label class="check-row" style="font-size:11px">
+        <input type="checkbox" class="tv" data-key="${esc((p.formula_key || '').trim())}" data-bool="1" onchange="runTest('${statId}')">
+        <span>${esc(p.name)} <span style="color:var(--maq);font-family:var(--mono)">(${esc(p.formula_key)})</span></span>
+      </label>`).join('')}</div>` : ''}
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="btn go auto sm" onclick="runTest('${statId}')"><span class="ic">${ICONS.flask}</span>Testar</button>
+      <div style="font-family:var(--mono);font-size:15px" id="result-${statId}">—</div>
+    </div>`;
+  box.style.display = '';
+  runTest(statId);
+};
+window.runTest = (statId) => {
+  const stat = _statusStats.find((s) => s.id === statId);
+  const box = $('test-' + statId), out = $('result-' + statId);
+  const baseVals = {};
+  box.querySelectorAll('.tv').forEach((inp) => { baseVals[inp.dataset.key] = inp.dataset.bool ? (inp.checked ? '1' : '0') : inp.value; });
+  try { const r = computeStat(stat, baseVals); out.style.color = 'var(--maq)'; out.textContent = '= ' + r; }
+  catch (e) { out.style.color = 'var(--escarlate)'; out.innerHTML = `<span class="ic">${ICONS.warning}</span>${esc(e.message)}`; }
+};
+
+/* ===================== CLASSES ===================== */
+let _stats = [];
+let _profs = [];
+// rascunho por classe/subclasse: {[classId]: {name?, baseStats:{statId:value}}} — nada grava
+// no banco até clicar em Salvar naquela linha (nome + todo o painel "Status base" juntos).
+let _classDrafts = {};
+async function renderClasses(c) {
+  const [classes, stats, profs] = await Promise.all([db.listClasses(systemId), db.listStats(systemId), db.listProficiencies(systemId)]);
+  _stats = stats; _profs = profs; _classDrafts = {};
+  const roots = classes.filter((x) => !x.parent_id);
+  const subs = (pid) => classes.filter((x) => x.parent_id === pid);
+  const classCard = (cl, isSub) => `
+    <div class="list-row" style="flex-direction:column;align-items:stretch;gap:8px;${isSub ? 'margin-left:22px;border-color:var(--line)' : ''}">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input value="${esc(cl.name)}" oninput="onClassFieldChange('${cl.id}','name',this.value)"
+          style="flex:1;background:transparent;border:0;color:${isSub?'var(--ink)':'var(--bone)'};font-family:var(--disp);font-size:${isSub?14:16}px">
+        ${!isSub ? `<button type="button" class="color-swatch" style="--sw:${esc(cl.color || '#7ee6dc')}" title="Cor da classe na ficha do jogador (subclasses puxam a mesma cor)" onclick="openColorPicker(this, '${esc(cl.color || '#7ee6dc')}', (v)=>onClassFieldChange('${cl.id}','color',v))"></button>` : ''}
+        <span class="badge">${isSub ? 'Subclasse' : 'Classe'}</span>
+        <button class="btn sm go" id="class-save-${cl.id}" style="display:none" onclick="saveClass('${cl.id}')"><span class="spin"></span>Salvar</button>
+        <button class="btn sm auto" onclick="toggleBase('${cl.id}', this)">Status base ▾</button>
+        <button class="btn sm auto" onclick="toggleClassProfs('${cl.id}')">Proficiências ▾</button>
+        <button class="btn sm danger auto" onclick="delClass('${cl.id}')"><span class="ic">${ICONS.x}</span></button>
+      </div>
+      <div class="base-panel" id="base-${cl.id}" style="display:none"></div>
+      <div class="base-panel" id="profs-${cl.id}" style="display:none"></div>
+    </div>
+    ${!isSub ? subs(cl.id).map((s) => classCard(s, true)).join('') + `
+      <form class="inline-form" style="margin-left:22px;margin-bottom:8px" onsubmit="return addSub(event,'${cl.id}')">
+        <input placeholder="Nova subclasse de ${esc(cl.name)}" required maxlength="40">
+        <button class="btn go auto sm" type="submit">+ Subclasse</button>
+      </form>` : ''}`;
+  c.innerHTML = `
+    <div class="section-title">Classes e subclasses</div>
+    <div class="list">${roots.length ? roots.map((cl) => classCard(cl, false)).join('') : emptyState(ICONS.shield, 'Nenhuma classe ainda',
+      'Classes definem os status base e as árvores de cada tipo de personagem. Crie a primeira no campo abaixo ↓')}</div>
+    <form class="inline-form" style="margin-top:14px" onsubmit="return addClass(event)">
+      <input id="cl-name" placeholder="Nova classe (ex.: Guerreiro)" required maxlength="40">
+      <button class="btn go auto" type="submit">+ Criar classe</button>
+    </form>`;
+}
+window.addClass = (ev) => { ev.preventDefault(); const n = $('cl-name').value.trim(); if (!n) return false;
+  db.createClass(systemId, { name: n, sort_order: Date.now() % 100000 }).then(() => openTab('classes')).catch((e) => showMsg(e.message)); return false; };
+window.addSub = (ev, parentId) => { ev.preventDefault(); const inp = ev.target.querySelector('input'); const n = inp.value.trim(); if (!n) return false;
+  db.createClass(systemId, { name: n, parent_id: parentId, sort_order: Date.now() % 100000 }).then(() => openTab('classes')).catch((e) => showMsg(e.message)); return false; };
+window.delClass = async (id) => {
+  const ok = await confirmModal({ title: 'Excluir classe', desc: 'Isso também exclui todas as subclasses dela. Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteClass(id).then(() => openTab('classes')).catch((e) => showMsg(e.message));
+};
+function classDraft(id) { return _classDrafts[id] || (_classDrafts[id] = { baseStats: {} }); }
+window.onClassFieldChange = (id, k, v) => {
+  classDraft(id)[k] = v;
+  const b = $('class-save-' + id); if (b) b.style.display = '';
+};
+window.onClassBaseChange = (classId, statId, v) => {
+  classDraft(classId).baseStats[statId] = v;
+  const b = $('class-save-' + classId); if (b) b.style.display = '';
+};
+window.toggleBase = async (classId, btn) => {
+  const panel = $('base-' + classId);
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  if (!_stats.length) { panel.innerHTML = '<div class="sub" style="padding:8px">Crie status na aba “Status” primeiro.</div>'; panel.style.display = ''; return; }
+  const vals = await db.getClassBaseStats(classId);
+  const draft = classDraft(classId).baseStats;
+  panel.innerHTML = _stats.map((s) => `<div class="fld row" style="margin-bottom:6px"><label style="flex:0 0 120px">${esc(s.name)}</label>
+    <input value="${esc(draft[s.id] ?? vals[s.id] ?? s.default_value ?? '')}" oninput="onClassBaseChange('${classId}','${s.id}',this.value)"></div>`).join('');
+  panel.style.display = '';
+};
+async function renderClassProfsPanel(classId) {
+  const panel = $('profs-' + classId);
+  const granted = await db.getClassProficiencies(classId);
+  panel.innerHTML = groupProfsByCategory(_profs).map(([cat, list]) => {
+    const allOn = list.every((p) => granted.has(p.id));
+    return `<div class="prof-cat-head sm" style="--pcc:${profCategoryColor(cat)}">
+      <span class="ic">${profCategoryIcon(cat)}</span>${esc(cat)}
+      <button type="button" class="btn sm auto" style="margin-left:auto" onclick="bulkClassProfToggle('${classId}','${encodeURIComponent(cat)}',${!allOn})">${allOn ? 'Desmarcar todas' : 'Marcar todas'}</button>
+    </div>
+    ${list.map((p) => `<label class="check-row" style="margin-bottom:6px">
+      <input type="checkbox" ${granted.has(p.id) ? 'checked' : ''} onchange="onClassProfToggle('${classId}','${p.id}',this.checked)">
+      <span>${esc(p.name)}</span>
+    </label>`).join('')}`;
+  }).join('');
+}
+window.toggleClassProfs = async (classId) => {
+  const panel = $('profs-' + classId);
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  if (!_profs.length) { panel.innerHTML = '<div class="sub" style="padding:8px">Crie proficiências na aba "Proficiências" primeiro.</div>'; panel.style.display = ''; return; }
+  await renderClassProfsPanel(classId);
+  panel.style.display = '';
+};
+window.onClassProfToggle = (classId, profId, checked) => {
+  db.setClassProficiency(classId, profId, checked).catch((e) => showMsg(e.message));
+};
+window.bulkClassProfToggle = (classId, catEnc, grant) => {
+  const category = decodeURIComponent(catEnc);
+  const entry = groupProfsByCategory(_profs).find(([cat]) => cat === category);
+  const list = entry ? entry[1] : [];
+  Promise.all(list.map((p) => db.setClassProficiency(classId, p.id, grant)))
+    .then(() => renderClassProfsPanel(classId))
+    .catch((e) => showMsg(e.message));
+};
+window.saveClass = (id) => {
+  const draft = _classDrafts[id]; if (!draft) return;
+  const btn = $('class-save-' + id); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+  const ops = [];
+  const patch = {};
+  if (draft.name !== undefined) patch.name = draft.name.trim();
+  if (draft.color !== undefined) patch.color = draft.color;
+  if (Object.keys(patch).length) ops.push(db.updateClass(id, patch));
+  Object.entries(draft.baseStats).forEach(([statId, v]) => ops.push(db.setClassBaseStat(id, statId, v.trim())));
+  Promise.all(ops).then(() => {
+    delete _classDrafts[id];
+    if (btn) btn.style.display = 'none';
+    showMsg('Salvo.', 'ok');
+  }).catch((e) => showMsg(e.message))
+    .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
+};
+
+/* ===================== NÍVEL ===================== */
+// progressão automática em duas camadas:
+// 1) um PADRÃO por nível (pontos de status + pontos por árvore) que vale pra todo nível daí pra
+//    frente — não precisa mais criar uma linha por nível um a um.
+// 2) EXCEÇÕES pontuais: um nível específico pode substituir o padrão (ex.: "nível 10 dá o dobro").
+// O personagem começa no nível 1 (sem concessão); ao subir de nível na ficha, o resync soma o
+// padrão (ou a exceção, se houver) de cada nível pulado desde o último já pago — nunca retroage,
+// nunca sobrescreve o que já foi dado.
+let _nivelTrees = [];
+async function renderNivel(c) {
+  const [levels, levelTrees, trees] = await Promise.all([
+    db.listSystemLevels(systemId), db.listSystemLevelTrees(systemId), db.listSystemTrees(systemId),
+  ]);
+  _nivelTrees = trees;
+  // uma linha de exceção por nível que apareça em QUALQUER uma das duas tabelas — um nível pode
+  // existir só pra mexer numa árvore, sem tocar no status, ou vice-versa
+  const nums = [...new Set([...levels.map((l) => l.level), ...levelTrees.map((l) => l.level)])].sort((a, b) => a - b);
+  const statByLevel = {}; levels.forEach((l) => { statByLevel[l.level] = l.stat_points; });
+  const treeByLevel = {};
+  levelTrees.forEach((l) => { (treeByLevel[l.level] || (treeByLevel[l.level] = {}))[l.tree_id] = l.points; });
+  c.innerHTML = `
+    <div class="section-title">Progressão de nível</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 16px">
+      Todo personagem começa no <b>nível 1</b>, sem concessão. Configure um <b style="color:var(--brass)">padrão por nível</b> — vale pra todo nível seguinte, sem precisar cadastrar um por um — e, se algum nível específico precisar fugir da regra, adicione uma <b>exceção</b> só pra ele.</p>
+
+    <div class="section-title" style="font-size:12px;margin-bottom:10px">Padrão por nível</div>
+
+    <div class="sub" style="margin:0 0 8px;color:var(--brass);text-transform:uppercase;letter-spacing:.1em;font-size:10px;font-family:var(--mono)">Pontos de status</div>
+    <div class="item-form" style="margin-bottom:20px">
+      <div class="fld full"><label>Pontos de status concedidos por nível</label>
+        <input type="number" min="0" value="${system.level_stat_points_default || 0}" onchange="updateLevelDefault(this.value)"></div>
+    </div>
+
+    ${trees.length ? `
+    <div class="sub" style="margin:0 0 8px;color:var(--maq);text-transform:uppercase;letter-spacing:.1em;font-size:10px;font-family:var(--mono)">Pontos de árvore de habilidade</div>
+    <div class="item-form">
+      ${trees.map((t) => `<div class="fld"><label>${esc(t.name)}</label>
+        <input type="number" min="0" value="${t.level_points_default || 0}" onchange="updateTreeLevelDefault('${t.id}', this.value)"></div>`).join('')}
+    </div>` : ''}
+
+    <div class="section-title" style="font-size:12px;margin-top:24px;margin-bottom:10px">Exceções por nível <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(substituem o padrão só naquele nível — deixe em branco pra voltar a usar o padrão)</span></div>
+    <div class="list">${nums.length ? nums.map((n) => levelRow(n, statByLevel[n], treeByLevel[n] || {}, trees)).join('') : '<div class="empty">Nenhuma exceção — todo nível usa o padrão acima.</div>'}</div>
+
+    <form class="inline-form" style="margin-top:14px" onsubmit="return addLevel(event)">
+      <input id="lv-level" type="number" min="2" placeholder="Nível da exceção (ex.: 10)" required style="max-width:220px">
+      <button class="btn go auto" type="submit">+ Adicionar exceção</button>
+    </form>`;
+}
+function levelRow(level, statPoints, treeGrants, trees) {
+  return `<div class="list-row" style="flex-direction:column;align-items:stretch;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="grow nm">Nível ${level}</div>
+      <button class="btn sm danger auto" onclick="delLevel(${level})"><span class="ic">${ICONS.x}</span></button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px">
+      <div style="flex:1 1 150px;min-width:150px">
+        <div class="sub" style="color:var(--brass);text-transform:uppercase;letter-spacing:.1em;font-size:9px;font-family:var(--mono);margin-bottom:6px">Pontos de status</div>
+        <input type="number" min="0" value="${statPoints ?? ''}" placeholder="usa o padrão"
+          style="width:100%;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);padding:8px 10px"
+          onchange="updateLevelPoints(${level}, this.value)">
+      </div>
+      ${trees.length ? `<div style="flex:2 1 240px;min-width:200px">
+        <div class="sub" style="color:var(--maq);text-transform:uppercase;letter-spacing:.1em;font-size:9px;font-family:var(--mono);margin-bottom:6px">Pontos de árvore de habilidade</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${trees.map((t) => `<label style="display:flex;flex-direction:column;gap:4px;font-family:var(--mono);font-size:10px;color:var(--ink-dim)">${esc(t.name)}
+            <input type="number" min="0" value="${treeGrants[t.id] ?? ''}" placeholder="padrão"
+              style="width:90px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);padding:7px 9px"
+              onchange="updateLevelTreePoints(${level}, '${t.id}', this.value)"></label>`).join('')}
+        </div>
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+window.addLevel = (ev) => {
+  ev.preventDefault();
+  const level = parseInt($('lv-level').value);
+  if (!level || level < 2) { showMsg('O nível precisa ser 2 ou mais (o nível 1 é o inicial, sem concessão).'); return false; }
+  db.setSystemLevel(systemId, level, null).then(() => openTab('nivel')).catch((e) => showMsg(e.message));
+  return false;
+};
+window.updateLevelDefault = (v) => {
+  const points = parseInt(v) || 0;
+  db.updateSystem(systemId, { level_stat_points_default: points })
+    .then(() => { system.level_stat_points_default = points; showMsg('Salvo.', 'ok'); }).catch((e) => showMsg(e.message));
+};
+window.updateTreeLevelDefault = (treeId, v) => {
+  const points = parseInt(v) || 0;
+  db.updateSystemTree(treeId, { level_points_default: points }).then(() => {
+    const t = _nivelTrees.find((x) => x.id === treeId); if (t) t.level_points_default = points;
+    showMsg('Salvo.', 'ok');
+  }).catch((e) => showMsg(e.message));
+};
+window.updateLevelPoints = (level, v) => {
+  const t = v.trim();
+  db.setSystemLevel(systemId, level, t === '' ? null : (parseInt(t) || 0)).then(() => showMsg('Salvo.', 'ok')).catch((e) => showMsg(e.message));
+};
+window.updateLevelTreePoints = (level, treeId, v) => {
+  const t = v.trim();
+  const op = t === '' ? db.deleteSystemLevelTree(systemId, level, treeId) : db.setSystemLevelTree(systemId, level, treeId, parseInt(t) || 0);
+  op.then(() => showMsg('Salvo.', 'ok')).catch((e) => showMsg(e.message));
+};
+window.delLevel = async (level) => {
+  const ok = await confirmModal({ title: 'Excluir exceção', desc: `O nível ${level} volta a usar o padrão. Personagens que já alcançaram esse nível mantêm os pontos que já ganharam.`, confirmLabel: 'Excluir' });
+  if (!ok) return;
+  Promise.all([db.deleteSystemLevel(systemId, level), ...(_nivelTrees.map((t) => db.deleteSystemLevelTree(systemId, level, t.id)))])
+    .then(() => openTab('nivel')).catch((e) => showMsg(e.message));
+};
+
+/* ===================== ÁRVORES ===================== */
+async function renderArvores(c) {
+  const [trees, classes] = await Promise.all([db.listSystemTrees(systemId), db.listClasses(systemId)]);
+  const label = (cl) => cl.parent_id ? `<span class="ic">${ICONS.cornerDownRight}</span>${esc(cl.name)}` : esc(cl.name);
+  const sel = (on) => 'cursor:pointer;' + (on ? 'color:#08161a;background:linear-gradient(90deg,var(--brass),#f3dca0)' : '');
+  const treeCard = async (t) => {
+    const assigned = await db.getTreeClasses(t.id);
+    return `<div class="list-row" style="flex-direction:column;align-items:stretch;gap:10px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div class="nm" style="flex:1;min-width:140px">${esc(t.name)}</div>
+        <a class="btn sm go auto" style="text-decoration:none" href="arvore.html?t=${Date.now()}&tree=${t.id}&system=${systemId}"><span class="ic">${ICONS.externalLink}</span>Acessar árvore</a>
+        <button class="btn sm danger auto" onclick="delTree('${t.id}')">Excluir</button>
+      </div>
+      <div class="sub">Atribuir a classes/subclasses:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${classes.length ? classes.map((cl) => `
+        <label class="badge" style="${sel(assigned.includes(cl.id))}">
+          <input type="checkbox" ${assigned.includes(cl.id)?'checked':''} style="display:none" onchange="toggleAssign('${t.id}','${cl.id}',this)">${label(cl)}</label>`).join('') : '<span class="sub">Crie classes primeiro.</span>'}</div>
+    </div>`;
+  };
+  const cards = await Promise.all(trees.map(treeCard));
+  c.innerHTML = `
+    <div class="section-title">Árvores de habilidade</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
+      Crie árvores, atribua a subclasses e clique em <b>Acessar árvore</b> para montar/editar a Árvore de Esferas dela. Cada árvore é independente.</p>
+    <div class="list">${cards.length ? cards.join('') : emptyState(ICONS.tree, 'Nenhuma árvore ainda',
+      'Árvores de habilidade (esferas) que você desenha no editor visual e atribui a classes. Crie a primeira no campo abaixo ↓')}</div>
+    <form onsubmit="return addTree(event)" style="margin-top:14px">
+      <div class="fld"><label>Formato da grade <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(define como as esferas se encaixam e como cópias giradas se comportam — dá pra mudar depois no editor)</span></label>
+        <select id="tr-shape" class="fld-input">
+          <option value="octagon">Octógono</option>
+          <option value="hexagon">Hexágono</option>
+          <option value="linear">Linear (quadrado)</option>
+        </select></div>
+      <div class="inline-form">
+        <input id="tr-name" placeholder="Nova árvore (ex.: Caminho da Máquina)" required maxlength="60">
+        <button class="btn go auto" type="submit">+ Criar árvore</button>
+      </div>
+    </form>`;
+}
+window.addTree = (ev) => { ev.preventDefault(); const n = $('tr-name').value.trim(); if (!n) return false;
+  db.createSystemTree(systemId, n, $('tr-shape').value).then(() => openTab('arvores')).catch((e) => showMsg(e.message)); return false; };
+window.delTree = (id) => db.deleteSystemTree(id).then(() => openTab('arvores')).catch((e) => showMsg(e.message));
+window.toggleAssign = (treeId, classId, cb) => {
+  const on = cb.checked;
+  const label = cb.closest('label');
+  const style = (v) => 'cursor:pointer;' + (v ? 'color:#08161a;background:linear-gradient(90deg,var(--brass),#f3dca0)' : '');
+  if (label) label.style.cssText = style(on);            // reflete na hora
+  const op = on ? db.assignTreeClass(treeId, classId) : db.unassignTreeClass(treeId, classId);
+  op.catch((e) => { showMsg(e.message); cb.checked = !on; if (label) label.style.cssText = style(cb.checked); });
+};
+
+/* ===================== ITENS ===================== */
+let _sysItems = [];
+let _sysStats = []; // status do sistema — alimenta os seletores "Escala com" (só existe aqui dentro)
+let _siImgUrl = null, _siImgFile = null; // imagem do item do sistema em edição
+const statKey = (s) => s.formula_key || s.name;
+const statLabel = (key) => _sysStats.find((s) => statKey(s) === key)?.name || key;
+function statOptionsHtml(selected) {
+  return '<option value="">— nenhum —</option>' + _sysStats.map((s) => {
+    const key = statKey(s);
+    return `<option value="${esc(key)}" ${selected === key ? 'selected' : ''}>${esc(s.name)}</option>`;
+  }).join('');
+}
+let _sysProfs = [];
+const profLabel = (id) => _sysProfs.find((p) => p.id === id)?.name || '';
+function profOptionsHtml(selected) {
+  return '<option value="">— nenhuma —</option>' + _sysProfs.map((p) =>
+    `<option value="${esc(p.id)}" ${selected === p.id ? 'selected' : ''}>${esc(p.name)}${p.category ? ' (' + esc(p.category) + ')' : ''}</option>`
+  ).join('');
+}
+async function renderItens(c) {
+  const [inSystem, library, stats, profs] = await Promise.all([db.listSystemItems(systemId), db.listItems(), db.listStats(systemId), db.listProficiencies(systemId)]);
+  _sysItems = inSystem;
+  _sysStats = stats;
+  _sysProfs = profs;
+  const usedSources = new Set(inSystem.map((i) => i.source_item_id).filter(Boolean));
+  const avail = library.filter((i) => !usedSources.has(i.id));
+  const badges = (it) => `${it.rarity ? `<span class="badge r-${esc((it.rarity||'').toLowerCase())}">${esc(it.rarity)}</span>` : ''}${it.category ? `<span class="badge cat">${esc(it.category)}</span>` : ''}${it.weapon_damage ? `<span class="badge mod">Dano ${esc(it.weapon_damage)}${it.damage_scale ? ' · ' + esc(statLabel(it.damage_scale)) : ''}</span>` : ''}${(it.protection != null && it.protection !== '') ? `<span class="badge mod">Proteção ${esc(String(it.protection))}${it.protection_scale ? ' · ' + esc(statLabel(it.protection_scale)) : ''}</span>` : ''}${it.proficiency_id ? `<span class="badge" style="border-color:var(--brass);color:var(--brass)"><span class="ic">${ICONS.checklist}</span>${esc(profLabel(it.proficiency_id))}</span>` : ''}`;
+  c.innerHTML = `
+    <div class="section-title">Itens do sistema (${inSystem.length})</div>
+    <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:0 0 12px">
+      Itens aqui são <b>cópias do sistema</b> — editá-los NÃO altera o item original da sua biblioteca.</p>
+    <button class="btn go auto sm" onclick="openSysItem()">+ Criar item no sistema</button>
+
+    <div id="sysitem-editor" class="surface" style="display:none;margin-top:14px"></div>
+
+    <div class="list" style="margin-top:14px">${inSystem.length ? inSystem.map((it) => `
+      <div class="list-row">
+        ${it.image_url ? `<img class="item-thumb" src="${esc(it.image_url)}" alt="" loading="lazy">` : ''}
+        <div class="grow"><div class="nm">${esc(it.name)}</div>
+          <div class="sub" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:4px">${badges(it)}
+            ${(it.modifiers||[]).map((m)=>`<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}
+            ${it.source_item_id ? '<span class="badge" style="color:var(--ink-faint)">da biblioteca</span>' : ''}</div></div>
+        <button class="btn sm auto" onclick="openSysItem('${it.id}')">Editar</button>
+        <button class="btn sm danger auto" onclick="rmSysItem('${it.id}')"><span class="ic">${ICONS.x}</span></button>
+      </div>`).join('') : emptyState(ICONS.bag, 'Nenhum item no sistema',
+        'Crie itens direto no sistema ou copie da sua biblioteca — eles ficam disponíveis pros jogadores das mesas.',
+        '<button class="btn go auto sm" onclick="openSysItem()">+ Criar item no sistema</button>')}</div>
+
+    <div class="section-title">Adicionar da sua biblioteca</div>
+    <div class="list">${avail.length ? avail.map((it) => `
+      <div class="list-row"><div class="grow"><div class="nm">${esc(it.name)}</div>
+        <div class="sub">${[it.category,it.rarity].filter(Boolean).map(esc).join(' · ')}</div></div>
+        <button class="btn sm auto" onclick="addLibItem('${it.id}')">Copiar p/ sistema</button></div>`).join('')
+      : '<div class="empty">Nada novo na biblioteca (ou tudo já foi copiado).</div>'}</div>
+
+    <datalist id="stat-keys">${stats.map((s)=>`<option value="${esc(s.formula_key||s.name)}">${esc(s.name)}</option>`).join('')}</datalist>`;
+}
+window.openSysItem = (id = null) => {
+  const it = id ? _sysItems.find((x) => x.id === id) : null;
+  const box = $('sysitem-editor'); box.dataset.editing = id || '';
+  box.innerHTML = `
+    <h4 style="font-family:var(--disp);font-size:15px;color:var(--bone);margin:0 0 14px">${id ? 'Editar item do sistema' : 'Novo item do sistema'}</h4>
+    <div class="item-form">
+      <div class="fld"><label>Nome</label><input id="si-name" maxlength="80" value="${esc(it?.name||'')}"></div>
+      <div class="fld"><label>Categoria</label><select id="si-cat" class="fld-input" onchange="updateSiCategoryFields()">${CATEGORIES.map((x)=>`<option ${it&&it.category===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="fld"><label>Raridade</label><select id="si-rar" class="fld-input">${RARITIES.map((x)=>`<option ${it&&it.rarity===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="fld"><label>Proficiência necessária <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional)</span></label>
+        <select id="si-prof" class="fld-input">${profOptionsHtml(it?.proficiency_id || '')}</select></div>
+
+      <div class="fld" id="si-damage-fld" style="display:none">
+        <label>Dano <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(fórmula, ex.: 1d8+2)</span></label>
+        <input id="si-damage" value="${esc(it?.weapon_damage||'')}" placeholder="Ex.: 1d8+2" aria-describedby="si-damage-err">
+        <div class="fld-err" id="si-damage-err"></div>
+      </div>
+      <div class="fld" id="si-damage-scale-fld" style="display:none">
+        <label>Escala com <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — status deste sistema)</span></label>
+        <select id="si-damage-scale" class="fld-input">${statOptionsHtml(it?.damage_scale || '')}</select>
+      </div>
+      <div class="fld" id="si-protection-fld" style="display:none">
+        <label>Proteção</label>
+        <input id="si-protection" type="number" min="0" step="1" value="${it?.protection ?? ''}" placeholder="Ex.: 5" aria-describedby="si-protection-err">
+        <div class="fld-err" id="si-protection-err"></div>
+      </div>
+      <div class="fld" id="si-protection-scale-fld" style="display:none">
+        <label>Escala com <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — status deste sistema)</span></label>
+        <select id="si-protection-scale" class="fld-input">${statOptionsHtml(it?.protection_scale || '')}</select>
+      </div>
+
+      <div class="fld full"><label>Descrição</label><input id="si-desc" value="${esc(it?.description||'')}" placeholder="O que o item faz..."></div>
+      <div class="fld full"><label>Imagem do item <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — até 3 MB)</span></label>
+        <div class="img-picker">
+          <img id="si-img-prev" class="img-thumb" alt="" ${it?.image_url ? `src="${esc(it.image_url)}"` : 'style="display:none"'}>
+          <div class="img-actions">
+            <input type="file" id="si-img-file" accept="image/*" style="display:none" onchange="onSiImg(this)">
+            <button type="button" class="btn auto sm" onclick="document.getElementById('si-img-file').click()">Escolher imagem</button>
+            <button type="button" class="btn auto sm" id="si-img-rm" ${it?.image_url ? '' : 'style="display:none"'} onclick="clearSiImg()">Remover</button>
+          </div>
+        </div></div>
+      <div class="fld full"><label>Modificadores de status <span id="si-mods-hint" style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(usa os status deste sistema)</span></label>
+        <div id="si-mods"></div>
+        <button type="button" class="btn auto sm" id="si-mods-add" onclick="addSiMod()">+ Modificador</button>
+        <div class="fld-err" id="si-mods-err"></div></div>
+      <div class="full actions"><button class="btn" onclick="closeSysItem()">Cancelar</button>
+        <button class="btn go" onclick="saveSysItem()">Salvar</button></div>
+    </div>`;
+  _siImgUrl = it?.image_url || null; _siImgFile = null;
+  $('si-mods').innerHTML = '';
+  (it?.modifiers || []).forEach((m) => addSiMod(m.name, m.value));
+  clearSiFieldErrors();
+  updateSiCategoryFields();
+  box.style.display = ''; $('si-name').focus();
+};
+window.updateSiCategoryFields = () => {
+  const cat = $('si-cat').value;
+  const isWeapon = cat === 'Arma';
+  const isProtective = cat === 'Armadura' || cat === 'Escudo';
+  const needsModifier = cat === 'Acessório' || cat === 'Artefato';
+  $('si-damage-fld').style.display = isWeapon ? '' : 'none';
+  $('si-damage-scale-fld').style.display = isWeapon ? '' : 'none';
+  $('si-protection-fld').style.display = isProtective ? '' : 'none';
+  $('si-protection-scale-fld').style.display = isProtective ? '' : 'none';
+  $('si-mods-hint').textContent = needsModifier
+    ? '(obrigatório nesta categoria — adicione pelo menos 1)'
+    : '(usa os status deste sistema)';
+  if (!isWeapon) { $('si-damage').value = ''; $('si-damage-scale').value = ''; }
+  if (!isProtective) { $('si-protection').value = ''; $('si-protection-scale').value = ''; }
+};
+function setSiFieldError(fieldId, errId, msg) {
+  const el = $(fieldId);
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'SELECT')) { el.classList.add('invalid'); el.setAttribute('aria-invalid', 'true'); }
+  const err = $(errId);
+  if (err) { err.textContent = msg; err.classList.add('show'); }
+}
+function clearSiFieldErrors() {
+  const box = $('sysitem-editor'); if (!box) return;
+  box.querySelectorAll('.invalid').forEach((el) => { el.classList.remove('invalid'); el.removeAttribute('aria-invalid'); });
+  box.querySelectorAll('.fld-err.show').forEach((el) => el.classList.remove('show'));
+}
+window.closeSysItem = () => { const b = $('sysitem-editor'); b.style.display = 'none'; b.innerHTML = ''; _siImgUrl = null; _siImgFile = null; };
+window.onSiImg = (input) => {
+  const f = input.files && input.files[0]; if (!f) return;
+  if (!f.type.startsWith('image/')) { showMsg('Selecione um arquivo de imagem.'); input.value = ''; return; }
+  if (f.size > 3 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 3 MB).'); input.value = ''; return; }
+  _siImgFile = f;
+  const p = $('si-img-prev'); p.src = URL.createObjectURL(f); p.style.display = ''; $('si-img-rm').style.display = '';
+};
+window.clearSiImg = () => {
+  _siImgFile = null; _siImgUrl = null; $('si-img-file').value = '';
+  const p = $('si-img-prev'); p.removeAttribute('src'); p.style.display = 'none'; $('si-img-rm').style.display = 'none';
+};
+window.addSiMod = (name = '', value = '') => {
+  const row = document.createElement('div'); row.className = 'mod-row';
+  row.innerHTML = `<input class="mn" list="stat-keys" placeholder="Status (ex.: HP)" value="${esc(name)}">
+    <input class="mv" placeholder="+/-" value="${esc(value)}"><button type="button" onclick="this.parentElement.remove()"><span class="ic">${ICONS.x}</span></button>`;
+  $('si-mods').appendChild(row);
+};
+window.saveSysItem = async () => {
+  clearSiFieldErrors();
+  const name = $('si-name').value.trim(); if (!name) { showMsg('Dê um nome ao item.'); return; }
+  const modifiers = [...document.querySelectorAll('#si-mods .mod-row')].map((r) => ({ name: r.querySelector('.mn').value.trim(), value: r.querySelector('.mv').value.trim() })).filter((m) => m.name);
+  const category = $('si-cat').value;
+  const weaponDamage = $('si-damage').value.trim();
+  const protectionRaw = $('si-protection').value;
+  let firstInvalid = null;
+  if (category === 'Arma') {
+    if (!weaponDamage) { setSiFieldError('si-damage', 'si-damage-err', 'Informe o dano (ex.: 1d8+2).'); firstInvalid = firstInvalid || 'si-damage'; }
+  } else if (category === 'Armadura' || category === 'Escudo') {
+    if (protectionRaw === '') { setSiFieldError('si-protection', 'si-protection-err', 'Informe o valor de proteção.'); firstInvalid = firstInvalid || 'si-protection'; }
+  } else if (category === 'Acessório' || category === 'Artefato') {
+    if (!modifiers.length) { $('si-mods-err').textContent = 'Adicione pelo menos 1 modificador pra esta categoria.'; $('si-mods-err').classList.add('show'); firstInvalid = firstInvalid || 'si-mods-add'; }
+  }
+  if (firstInvalid) { $(firstInvalid).focus(); return; }
+  try {
+    if (_siImgFile) { showMsg('Enviando imagem…', 'ok'); _siImgUrl = await db.uploadImage(_siImgFile, 'items'); }
+    const isProtective = category === 'Armadura' || category === 'Escudo';
+    const payload = {
+      name, category, rarity: $('si-rar').value, description: $('si-desc').value.trim(), modifiers, image_url: _siImgUrl,
+      weapon_damage: category === 'Arma' ? weaponDamage : null,
+      damage_scale: category === 'Arma' ? ($('si-damage-scale').value || null) : null,
+      protection: isProtective ? Number(protectionRaw) : null,
+      protection_scale: isProtective ? ($('si-protection-scale').value || null) : null,
+      proficiency_id: $('si-prof').value || null,
+    };
+    const editing = $('sysitem-editor').dataset.editing;
+    await (editing ? db.updateSystemItem(editing, payload) : db.createSystemItem(systemId, payload));
+    openTab('itens');
+  } catch (e) { showMsg(e.message); }
+};
+window.rmSysItem = async (id) => {
+  const ok = await confirmModal({ title: 'Remover item do sistema', desc: 'Isso não afeta o item na sua biblioteca — só remove a cópia deste sistema.', confirmLabel: 'Remover' });
+  if (!ok) return;
+  db.deleteSystemItem(id).then(() => openTab('itens')).catch((e) => showMsg(e.message));
+};
+window.addLibItem = (libId) => db.addSystemItemFromLibrary(systemId, libId).then(() => openTab('itens')).catch((e) => showMsg(e.message));
+</script>
+</body>
+</html>

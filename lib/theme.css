@@ -1,0 +1,1117 @@
+/* ============================================================
+   Tema Vitality — tokens visuais reaproveitados do protótipo
+   (liquid glass, fundo cósmico, fontes, botões e campos).
+   ============================================================ */
+:root{
+  color-scheme: dark;
+  --bgA:138,104,214; --bgB:74,118,206; --bgC:196,132,224; --bgGlow:255,242,255; --bgDeep:#1b1536; --bgEdge:#080615;
+  --maq:#35c6d4; --carne:#f2585e; --escarlate:#f2585e; --brass:#18b5c6; --good:#3ecf7e; --bone:#e9edf1;--on-primary:#04222a;
+  --ink:#e9edf1; --ink-dim:#93a0ab; --ink-faint:#5c6771;
+  --line:rgba(233,237,241,.09); --line2:rgba(233,237,241,.16);
+  /* tokens de superfície (semânticos — trocam por tema) */
+  --app-bg:#0c0f12;
+  --field:#181d23; --field-2:#141820;
+  --panel:#12161b; --surface:#12161b;
+  --bar:#12161b;
+  --title-grad:linear-gradient(90deg,var(--bone),var(--bone));
+  --disp:'Space Grotesk',sans-serif; --serif:'Hanken Grotesk',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
+  --glass:#12161b;
+  --glass-rim:0 0 #0000;
+  --glass-lift:0 8px 24px rgba(0,0,0,.42);
+  /* movimento — curva "expo-out" (assentamento premium, tipo Linear/Vercel) */
+  --ease:cubic-bezier(0.16,1,0.3,1); --ease-in:cubic-bezier(0.4,0,1,1);
+  --dur-1:.12s; --dur-2:.2s; --dur-3:.34s;
+}
+/* ---------- TEMA CLARO ---------- */
+:root[data-theme="light"]{
+  color-scheme: light;
+  --maq:#0e8f9c; --carne:#d43f45; --escarlate:#d43f45; --brass:#0f9aab; --good:#188a4e; --bone:#12161b;--on-primary:#ffffff;
+  --ink:#1f242c; --ink-dim:#515c68; --ink-faint:#8a96a2;
+  --line:rgba(20,28,45,.12); --line2:rgba(20,28,45,.18);
+  --app-bg:#eef1f5;
+  --field:#ffffff; --field-2:#f2f5f8;
+  --panel:#ffffff; --surface:#ffffff;
+  --bar:#ffffff;
+  --title-grad:linear-gradient(90deg,var(--bone),var(--bone));
+  --glass:#ffffff;
+  --glass-rim:inset 1px 1px 0 rgba(255,255,255,.9), inset 0 0 0 1px rgba(20,28,45,.05);
+  --glass-lift:0 10px 28px rgba(40,55,85,.12), 0 2px 6px rgba(40,55,85,.06);
+  /* nebulosa de fundo pastel para o tema claro (mesa/sistema) */
+  --bgA:150,120,220; --bgB:110,150,220; --bgC:210,160,230; --bgGlow:255,255,255;
+  --bgDeep:#eef0f6; --bgEdge:#dde1ea;
+}
+:root[data-theme="light"] #fallback{opacity:.6}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--app-bg)}
+body{font-family:var(--serif);color:var(--ink);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+
+/* ---------- camadas de fundo ---------- */
+#fallback{position:fixed;inset:0;pointer-events:none;z-index:-2;
+  background:
+   radial-gradient(1000px 760px at 30% 24%, rgba(var(--bgA),.26), transparent 60%),
+   radial-gradient(1100px 860px at 74% 80%, rgba(var(--bgB),.22), transparent 62%),
+   radial-gradient(760px 640px at 55% 52%, rgba(var(--bgC),.14), transparent 60%),
+   radial-gradient(460px 380px at 50% 46%, rgba(var(--bgGlow),.10), transparent 60%),
+   radial-gradient(1700px 1300px at 50% 44%, var(--bgDeep), var(--bgEdge) 82%)}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:-1}
+
+/* ---------- vidro genérico ---------- */
+.glass{background:var(--glass);-webkit-backdrop-filter:none;backdrop-filter:none;
+  border:1px solid var(--line2);box-shadow:var(--glass-rim),var(--glass-lift)}
+
+/* ---------- títulos ---------- */
+.title{font-family:var(--disp);font-weight:700;letter-spacing:.2em;font-size:18px;
+  background:var(--title-grad);-webkit-background-clip:text;background-clip:text;color:transparent;white-space:nowrap}
+.title small{display:block;font-family:var(--mono);font-weight:400;font-size:9px;letter-spacing:.4em;color:var(--ink-faint);margin-top:5px}
+
+/* ---------- campos ---------- */
+.fld{margin-bottom:14px}
+.fld label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px}
+.fld input{width:100%;background:var(--field);border:1px solid var(--line2);border-radius:10px;color:var(--ink);font-family:var(--serif);font-size:15px;padding:12px 13px}
+.fld input::placeholder{color:var(--ink-faint)}
+.fld input:focus{outline:none;border-color:var(--brass)}
+/* estado de erro inline (formulários com campo obrigatório condicional) */
+.fld-err{display:none;font-family:var(--mono);font-size:10px;color:var(--escarlate);margin-top:6px;line-height:1.4}
+.fld-err.show{display:block}
+.fld input.invalid,.fld select.invalid{border-color:var(--escarlate)}
+.fld input.invalid:focus,.fld select.invalid:focus{border-color:var(--escarlate)}
+
+/* ---------- botões ---------- */
+.btn{width:100%;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;border-radius:11px;padding:13px;cursor:pointer;border:1px solid var(--line2);background:var(--field);color:var(--ink-dim);transition:.15s;display:flex;align-items:center;justify-content:center;gap:9px}
+.btn:hover{color:var(--ink);border-color:var(--ink-faint)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:default;transform:none}
+.btn.go{background:var(--brass);color:var(--on-primary);border:0;font-weight:700}
+.btn.go:hover{filter:brightness(1.04)}
+/* ações destrutivas — precisam LER como perigo (excluir, remover, apagar) */
+.btn.danger{color:var(--escarlate);border-color:rgba(242,88,94,.32)}
+.btn.danger:hover{color:#fff;background:var(--escarlate);border-color:var(--escarlate)}
+
+/* ---------- segmented (entrar / criar conta) ---------- */
+.seg{display:flex;border-radius:999px;overflow:hidden;padding:3px;margin-bottom:22px}
+.seg button{flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:transparent;color:var(--ink-dim);border:0;padding:10px 14px;cursor:pointer;border-radius:999px;transition:.18s}
+.seg button.on{color:var(--on-primary);background:var(--brass)}
+
+/* ---------- divisor "ou" ---------- */
+.divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--ink-faint);font-family:var(--mono);font-size:10px;letter-spacing:.3em;text-transform:uppercase}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* ---------- mensagens ---------- */
+.msg{font-family:var(--mono);font-size:11px;letter-spacing:.02em;line-height:1.5;border-radius:10px;padding:11px 13px;margin-bottom:16px;display:none}
+.msg.show{display:block}
+/* fundo sólido (color-mix com --surface, opaco) em vez de um tom translúcido — o toast fica fixo
+   por cima de qualquer tela, e com pouca opacidade dava pra ler o conteúdo por trás dele.
+   Modelo padrão pra qualquer caixa de aviso nova: cor de destaque + var(--surface), nunca rgba(...,baixo%) sozinho. */
+.msg.err{color:#ffd0c8;background:color-mix(in srgb,var(--escarlate) 30%,var(--surface));border:1px solid var(--escarlate)}
+.msg.ok{color:#d6fff7;background:color-mix(in srgb,var(--maq) 30%,var(--surface));border:1px solid var(--maq)}
+
+/* ---------- spinner ---------- */
+.spin{width:15px;height:15px;border-radius:50%;border:2px solid rgba(8,22,26,.35);border-top-color:var(--on-primary);animation:rot .7s linear infinite;display:none}
+.btn.loading .spin{display:inline-block}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+:focus-visible{outline:2px solid var(--maq);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+/* ============================================================
+   App shell — lobby / mesa
+   ============================================================ */
+/* altura fixa (não mais "auto" via padding vertical) — mais fina, e dá um número definido pros
+   filhos esticarem contra (align-self:stretch) sem precisar de margem negativa, que inflava a
+   altura real do header em vez de encostar o sublinhado na borda de baixo dele */
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;
+  height:52px;padding:0 18px;background:var(--bar);
+  border-bottom:1px solid var(--line2);backdrop-filter:none;-webkit-backdrop-filter:none}
+.topbar .title{font-size:15px}
+.topbar .spacer{flex:1}
+.user-chip{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-size:13px;color:var(--ink-dim);
+  border-radius:0;padding:0}
+.user-chip b{color:var(--bone);font-weight:600}
+.user-chip.glass{background:transparent;border:0;box-shadow:none;padding:0}
+.topbar-brand{display:flex;align-items:center;gap:8px;font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.12em;color:var(--bone);text-decoration:none;white-space:nowrap}
+.topbar-brand .mark{color:var(--brass);font-size:17px}
+.topbar-brand:hover{color:var(--brass)}
+.iconbtn{width:30px;height:30px;border-radius:9px;border:1px solid var(--line2);background:var(--field);
+  color:var(--ink-dim);font-family:var(--mono);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.iconbtn:hover{color:var(--ink)}
+
+.page{max-width:920px;margin:0 auto;padding:8px 18px 60px}
+.section-title{font-family:var(--mono);font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-faint);margin:26px 2px 12px}
+
+/* botão auto (não estica 100%) */
+.btn.auto{width:auto;display:inline-flex;padding:11px 18px}
+.btn.sm{padding:8px 12px;font-size:10px}
+
+/* grade de cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.card-tile{position:relative;border-radius:16px;padding:18px;cursor:pointer;transition:transform var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease);border:1px solid var(--line2);
+  background:var(--surface);
+  display:flex;flex-direction:column;gap:10px;min-height:120px;text-decoration:none;color:inherit}
+.card-tile:hover{border-color:var(--brass);transform:translateY(-2px)}
+.card-tile h3{font-family:var(--disp);font-size:17px;font-weight:600;margin:0;color:var(--bone)}
+.card-tile .role{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;padding:3px 8px;border-radius:6px;width:fit-content}
+.role.gm{color:var(--on-primary);background:var(--brass)}
+.role.player{color:var(--maq);border:1px solid rgba(53,198,212,.4)}
+.card-tile .meta{font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:.04em;margin-top:auto}
+
+/* card de ação (criar/entrar) */
+.action-row{display:flex;gap:14px;flex-wrap:wrap}
+.action-card{flex:1;min-width:260px;border-radius:16px;padding:18px;border:1px solid var(--line2);background:var(--surface)}
+/* .glass em card-tile/action-card continua funcionando onde já era usado (ex.: tiles de mesa.html) —
+   especificidade composta pra vencer o empate com a regra .glass sozinha, independente da ordem no arquivo */
+.card-tile.glass,.action-card.glass{background:var(--glass);-webkit-backdrop-filter:none;backdrop-filter:none;
+  border:1px solid var(--line2);box-shadow:var(--glass-rim),var(--glass-lift)}
+.action-card h4{font-family:var(--disp);font-size:15px;font-weight:600;margin:0 0 4px;color:var(--bone)}
+.action-card p{font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.5;margin:0 0 14px}
+.inline-form{display:flex;gap:8px}
+.inline-form input{flex:1;background:var(--field);border:1px solid var(--line2);border-radius:10px;
+  color:var(--ink);font-family:var(--serif);font-size:14px;padding:10px 12px}
+.inline-form input:focus{outline:none;border-color:var(--brass)}
+
+/* chip de código de convite */
+.code-chip{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);border-radius:10px;padding:8px 12px;border:1px solid var(--line2)}
+.code-chip .code{font-size:18px;letter-spacing:.22em;color:var(--brass);font-weight:700}
+.code-chip button{background:transparent;border:0;color:var(--ink-faint);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.code-chip button:hover{color:var(--ink)}
+
+
+/* listas (membros, itens, atributos) */
+.list{display:flex;flex-direction:column;gap:8px}
+.list-row{display:flex;align-items:center;gap:12px;border-radius:12px;padding:12px 14px;border:1px solid var(--line);transition:border-color .15s}
+.list-row:hover{border-color:var(--line2)}
+.list-row .grow{flex:1;min-width:0}
+.list-row .nm{font-family:var(--serif);font-size:15px;color:var(--ink)}
+.list-row .sub{font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:.04em;margin-top:2px}
+.empty{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-align:center;padding:28px;border:1px dashed var(--line2);border-radius:14px;letter-spacing:.03em}
+/* estado vazio com convite (ícone + título + descrição + CTA) — primeira impressão de cada seção */
+.empty-cta{display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;padding:40px 26px;
+  border:1px dashed var(--line2);border-radius:16px;background:var(--field-2);animation:fadeUp .3s var(--ease)}
+.ec-icon{line-height:1;margin-bottom:3px;color:var(--ink-faint)}
+.ec-icon svg{width:34px;height:34px;display:block}
+.ec-title{font-family:var(--disp);font-size:16px;font-weight:600;color:var(--bone)}
+.ec-desc{font-family:var(--mono);font-size:11px;color:var(--ink-faint);line-height:1.65;max-width:360px}
+.empty-cta .btn{margin-top:8px}
+
+/* campos inline menores p/ ficha */
+.fld.row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.fld.row label{margin:0;flex:0 0 130px}
+.fld.row input{flex:1}
+
+/* ============================================================
+   HOME — tela inicial (sólida + glass, estilo VTT)
+   ============================================================ */
+body.home-page{overflow-y:auto}
+/* fundo totalmente uniforme — uma superfície só, sem degradê nem emenda */
+#fallback.solid{background:var(--app-bg)}
+
+/* navbar superior */
+.nav{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;padding:12px 22px;
+  background:var(--bar);
+  border-bottom:1px solid var(--line2);backdrop-filter:none;-webkit-backdrop-filter:none}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:700;letter-spacing:.18em;font-size:15px;
+  background:var(--title-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand .mark{font-size:18px;-webkit-text-fill-color:var(--brass);color:var(--brass)}
+.brand small{display:block;font-family:var(--mono);font-weight:400;font-size:8px;letter-spacing:.42em;color:var(--ink-faint);-webkit-text-fill-color:var(--ink-faint);margin-top:3px}
+.nav .spacer{flex:1}
+
+/* menu do usuário (nome) */
+.nav-user{position:relative}
+.nav-user .chip{display:flex;align-items:center;gap:9px;cursor:pointer;border-radius:10px;padding:5px 8px 5px 6px;
+  border:0;background:transparent;font-family:var(--serif);font-size:13px;color:var(--ink);
+  appearance:none;-webkit-appearance:none;margin:0;text-align:left;transition:background .12s}
+.nav-user .chip:focus-visible{outline:2px solid var(--maq);outline-offset:2px}
+.nav-user .chip:hover{background:var(--field)}
+.nav-user .chip .av{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--disp);font-weight:700;font-size:13px;color:var(--on-primary);background:var(--brass)}
+.nav-user .chip b{color:var(--bone);font-weight:600;letter-spacing:0}
+/* fundo sólido (não só o .glass translúcido): backdrop-filter de um elemento aninhado dentro de outro que
+   também tem backdrop-filter (o .topbar) não renderiza em Chromium — sem isso o menu fica ilegível sobre fotos */
+.nav-user .drop{position:absolute;top:calc(100% + 8px);right:0;min-width:212px;display:none;flex-direction:column;gap:3px;
+  padding:7px;border-radius:13px;z-index:40;background:var(--panel)}
+.nav-user.open .drop{display:flex}
+.nav-user .drop button{font-family:var(--mono);font-size:12px;color:var(--ink);background:transparent;border:0;border-radius:9px;
+  padding:9px 11px;text-align:left;cursor:pointer}
+.nav-user .drop button:hover{background:var(--field)}
+.nav-user .drop a{display:block;font-family:var(--mono);font-size:12px;color:var(--ink);background:transparent;border:0;
+  border-radius:9px;padding:9px 11px;text-align:left;cursor:pointer;text-decoration:none}
+.nav-user .drop a:hover{background:var(--field)}
+.nav-user .drop button.on{color:var(--brass)}
+.nav-user .drop .divider{height:1px;background:var(--line);margin:5px 3px}
+
+/* menu combinado da mesa (topbar, canto esquerdo): reaproveita .nav-user/.chip/.drop do menu de conta —
+   mesmo componente, ancorado à esquerda em vez da direita, com hamburguer + avatar + nome no lugar do avatar+nome simples */
+.mesa-menu .chip{padding:5px 10px 5px 6px;border-radius:10px}
+.mesa-menu .hamburger{font-size:15px;line-height:1;color:var(--ink-dim)}
+.mesa-menu .drop{left:0;right:auto;min-width:230px}
+
+/* layout central */
+.home{max-width:1040px;margin:0 auto;padding:26px 22px 70px}
+.home-head{margin:6px 2px 20px}
+.home-head h1{font-family:var(--disp);font-weight:600;font-size:26px;margin:0 0 6px;color:var(--bone)}
+.home-head p{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-faint);margin:0}
+
+/* abas de seção (Mesas / Itens) — sublinhado */
+.home-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:24px}
+.home-tabs button{position:relative;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-faint);background:transparent;border:0;padding:12px 16px;cursor:pointer;transition:.15s}
+.home-tabs button:hover{color:var(--ink-dim)}
+.home-tabs button.on{color:var(--bone)}
+.home-tabs button.on::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;border-radius:2px;
+  background:var(--brass)}
+
+/* superfície sólida (aterra o conteúdo) */
+.surface{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
+
+/* selects no padrão dos inputs */
+select.fld-input,.fld select{width:100%;background:var(--field);border:1px solid var(--line2);border-radius:10px;
+  color:var(--ink);font-family:var(--serif);font-size:14px;padding:11px 12px;cursor:pointer}
+select.fld-input:focus{outline:none;border-color:var(--brass)}
+select option{background:var(--panel);color:var(--ink)}
+
+/* criador de item */
+.item-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.item-form .full{grid-column:1 / -1}
+.mod-row{display:flex;gap:8px;margin-bottom:8px}
+.mod-row input{background:var(--field);border:1px solid var(--line2);border-radius:9px;color:var(--ink);
+  font-family:var(--serif);font-size:14px;padding:9px 11px}
+.mod-row .mn{flex:1}.mod-row .mv{width:90px}
+.mod-row button{width:38px;border:1px solid var(--line2);background:var(--field);color:var(--ink-faint);border-radius:9px;cursor:pointer}
+.mod-row button:hover{color:var(--escarlate);border-color:rgba(242,88,94,.4)}
+
+.mods{display:flex;flex-wrap:wrap;gap:5px}
+
+/* ============================================================
+   Cards de item — pôster (Loja / Favoritos / Criar)
+   ============================================================ */
+.item-subtabs{max-width:340px}
+.item-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:4px}
+.poster-card{position:relative;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;
+  border:1px solid var(--line2);background-size:cover;background-position:center;background-color:var(--field-2);
+  transition:transform var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
+.poster-card:hover,.poster-card:focus-visible{transform:translateY(-3px);border-color:var(--brass);
+  box-shadow:0 14px 34px rgba(0,0,0,.42),0 0 0 1px rgba(24,181,198,.25)}
+.poster-card:focus-visible{outline:2px solid var(--maq);outline-offset:2px}
+.poster-card.ph{display:flex;align-items:center;justify-content:center}
+.poster-initial{font-family:var(--disp);font-size:44px;font-weight:700;color:var(--ink-faint);opacity:.55}
+.poster-card.ph.r-comum{background-image:linear-gradient(135deg,rgba(185,194,198,.22),var(--field-2))}
+.poster-card.ph.r-incomum{background-image:linear-gradient(135deg,rgba(143,230,160,.22),var(--field-2))}
+.poster-card.ph.r-raro{background-image:linear-gradient(135deg,rgba(122,184,255,.22),var(--field-2))}
+.poster-card.ph.r-épico{background-image:linear-gradient(135deg,rgba(199,156,255,.24),var(--field-2))}
+.poster-card.ph.r-lendário{background-image:linear-gradient(135deg,rgba(24,181,198,.26),var(--field-2))}
+.poster-card.ph.r-único{background-image:linear-gradient(135deg,rgba(242,88,94,.24),var(--field-2))}
+.poster-fav{position:absolute;top:8px;right:8px;z-index:3;width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.24);
+  background:rgba(10,12,18,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:#fff;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.82;
+  transition:opacity var(--dur-1) var(--ease),transform var(--dur-1) var(--ease),background var(--dur-1) var(--ease)}
+.poster-fav svg{width:15px;height:15px;fill:none;stroke:currentColor}
+.poster-fav:hover,.poster-fav:focus-visible{opacity:1;transform:scale(1.08)}
+.poster-fav.on{opacity:1;background:rgba(10,12,18,.7)}
+.poster-fav.on svg{fill:var(--escarlate);stroke:var(--escarlate)}
+.poster-hover{position:absolute;inset:0;z-index:2;display:flex;align-items:flex-start;padding:34px 10px 0;
+  background:rgba(6,8,13,.55);opacity:0;transition:opacity var(--dur-2) var(--ease);pointer-events:none}
+.poster-card:hover .poster-hover,.poster-card:focus-visible .poster-hover{opacity:1}
+.poster-hover p{font-family:var(--mono);font-size:10.5px;line-height:1.5;color:var(--ink-dim);margin:0}
+.poster-scrim{position:absolute;left:0;right:0;bottom:0;z-index:1;padding:20px 9px 9px;
+  background:linear-gradient(180deg,transparent,rgba(4,5,9,.86) 65%)}
+.poster-badges{display:flex;gap:4px;margin-bottom:4px}
+.poster-name{font-family:var(--disp);font-size:13.5px;font-weight:600;color:#fff;margin:0;line-height:1.25;
+  text-shadow:0 1px 4px rgba(0,0,0,.6);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.poster-meta{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,.7);margin-top:3px;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+/* selo de publicação — só aparece nos seus próprios itens/sistemas */
+.poster-pub{position:absolute;top:8px;left:8px;z-index:3;font-family:var(--mono);font-size:8px;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 7px;border-radius:6px;color:rgba(255,255,255,.85);background:rgba(10,12,18,.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.poster-pub.on{color:var(--maq)}
+@media (prefers-reduced-motion:reduce){.poster-card:hover,.poster-card:focus-visible{transform:none}}
+
+/* checkbox de publicar (item/sistema na loja) */
+.check-row{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.check-row input[type=checkbox]{width:16px;height:16px;margin-top:2px;accent-color:var(--brass);cursor:pointer;flex:0 0 auto}
+.check-row span{font-family:var(--serif);font-size:13px;color:var(--ink-dim);line-height:1.5}
+
+/* modal de detalhe do item */
+.item-detail .idet-img{width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-bottom:12px;background:var(--field-2)}
+.item-detail .idet-badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.item-detail .idet-creator{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin:0 0 14px}
+.item-detail .idet-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.item-detail .idet-actions .btn.on{color:var(--escarlate);border-color:rgba(242,88,94,.4)}
+.item-detail .idet-actions .btn svg{width:13px;height:13px;fill:none;stroke:currentColor;vertical-align:-2px;margin-right:5px}
+.item-detail .idet-actions .btn.on svg{fill:var(--escarlate);stroke:var(--escarlate)}
+
+.badge{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:6px;border:1px solid var(--line2);color:var(--ink-dim);white-space:nowrap}
+.badge.mod{color:var(--maq);border-color:rgba(53,198,212,.35);text-transform:none;letter-spacing:.02em}
+.badge.cat{color:var(--ink-dim)}
+.badge.r-comum{color:#b9c2c6;border-color:rgba(185,194,198,.4)}
+.badge.r-incomum{color:#8fe6a0;border-color:rgba(143,230,160,.4)}
+.badge.r-raro{color:#7ab8ff;border-color:rgba(122,184,255,.4)}
+.badge.r-épico{color:#c79cff;border-color:rgba(199,156,255,.45)}
+.badge.r-lendário{color:var(--brass);border-color:rgba(24,181,198,.5)}
+.badge.r-único{color:var(--escarlate);border-color:rgba(242,88,94,.5)}
+
+@media (max-width:680px){ .item-form{grid-template-columns:1fr} .home{padding:20px 14px 60px} .nav{padding:11px 14px} }
+
+/* ============================================================
+   POLISH v2 — animações, toasts, guias, onboarding, filtros
+   ============================================================ */
+/* movimento */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes popIn{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:none}}
+.page,.home{animation:fadeIn .25s var(--ease)}
+.grid>*{animation:fadeUp .35s var(--ease) backwards}
+.grid>*:nth-child(2){animation-delay:.04s}.grid>*:nth-child(3){animation-delay:.08s}
+.grid>*:nth-child(4){animation-delay:.12s}.grid>*:nth-child(5){animation-delay:.16s}.grid>*:nth-child(6){animation-delay:.2s}
+.list>*{animation:fadeUp .28s var(--ease) backwards}
+.action-card{animation:fadeUp .3s var(--ease) backwards}
+.btn{transition:transform var(--dur-1) var(--ease), box-shadow var(--dur-2) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease), filter var(--dur-1) var(--ease)}
+.btn:hover{transform:translateY(-1px)}
+.card-tile:active{transform:scale(.985)}
+.btn.go{box-shadow:0 4px 16px rgba(24,181,198,.22)}
+.btn.go:hover{box-shadow:0 6px 20px rgba(24,181,198,.32)}
+.card-tile:hover{box-shadow:0 12px 32px rgba(0,0,0,.4), 0 0 0 1px rgba(24,181,198,.28)}
+::selection{background:rgba(24,181,198,.35)}
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.13);border-radius:8px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ícones nas abas */
+.ic{margin-right:7px;opacity:.95;display:inline-flex;vertical-align:-3px}
+.ic svg{width:15px;height:15px}
+
+/* campo de busca com ícone embutido */
+.search-field{position:relative;flex:1;min-width:180px}
+.search-field svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--ink-faint);pointer-events:none}
+.search-field input{padding-left:34px}
+
+/* toast — o antigo #msg agora flutua no topo */
+.msg{position:fixed;top:74px;left:50%;transform:translate(-50%,-10px);z-index:90;display:block;margin:0!important;
+  min-width:240px;max-width:min(92vw,460px);text-align:center;opacity:0;pointer-events:none;
+  transition:opacity .25s ease, transform .25s ease;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.msg.show{opacity:1;transform:translate(-50%,0)}
+
+/* botão flutuante de ajuda */
+.help-fab{position:fixed;right:16px;bottom:16px;z-index:70;width:42px;height:42px;border-radius:50%;border:0;cursor:pointer;
+  background:var(--brass);color:var(--on-primary);font-family:var(--disp);font-size:19px;font-weight:700;
+  box-shadow:0 8px 24px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.12);transition:transform .15s}
+.help-fab:hover{transform:scale(1.08)}
+
+/* modal de guia */
+.ui-modal{position:fixed;inset:0;z-index:95;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:rgba(5,7,12,.72);animation:fadeIn .18s var(--ease)}
+.ui-modal .box{width:100%;max-width:560px;max-height:82vh;overflow:auto;border-radius:18px;padding:24px 26px;
+  background:var(--panel);border:1px solid var(--line2);box-shadow:0 22px 60px rgba(0,0,0,.55);animation:popIn .22s var(--ease)}
+.guide .ghead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.guide h3{font-family:var(--disp);font-size:18px;color:var(--bone);margin:0;flex:1}
+.guide .x{background:transparent;border:0;color:var(--ink-faint);font-size:24px;cursor:pointer;line-height:1}
+.guide .gintro{font-family:var(--serif);font-size:14px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px}
+.gstep{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.gstep .n{flex:0 0 26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--brass);color:var(--on-primary);font-family:var(--mono);font-weight:700;font-size:13px}
+.gstep b{font-family:var(--serif);font-size:14.5px;color:var(--bone)}
+.gstep p{font-family:var(--serif);font-size:13px;color:var(--ink-dim);line-height:1.55;margin:3px 0 0}
+.gtips{margin-top:14px;border:1px solid rgba(53,198,212,.25);background:rgba(53,198,212,.06);border-radius:12px;padding:12px 14px}
+.gtips b{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--maq)}
+.gtips ul{margin:8px 0 0;padding-left:18px}
+.gtips li{font-family:var(--serif);font-size:13px;color:var(--ink-dim);line-height:1.6}
+
+/* onboarding (primeiros passos) e guia rápido */
+.onboard{border:1px solid rgba(24,181,198,.32);border-radius:16px;padding:16px 18px;margin:0 0 22px;
+  background:linear-gradient(135deg,rgba(24,181,198,.09),rgba(24,181,198,.02));animation:fadeUp .3s var(--ease)}
+.onboard .ohead{display:flex;align-items:center;gap:10px}
+.onboard h3{font-family:var(--disp);font-size:15px;color:var(--bone);margin:0;flex:1}
+.onboard .x{background:transparent;border:0;color:var(--ink-faint);font-size:20px;cursor:pointer;line-height:1}
+.onboard .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:12px}
+.ostep{display:flex;gap:10px;background:var(--field-2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.ostep.done{opacity:.55}
+.ostep .n{flex:0 0 24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--brass);color:var(--on-primary);font-family:var(--mono);font-weight:700;font-size:12px}
+.ostep b{font-family:var(--serif);font-size:13.5px;color:var(--bone)}
+.ostep p{font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.5;margin:3px 0 8px}
+
+/* barra de busca / filtros */
+.toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.toolbar input{flex:1;min-width:180px;background:var(--field);border:1px solid var(--line2);border-radius:10px;
+  color:var(--ink);font-family:var(--serif);font-size:14px;padding:10px 12px}
+.toolbar input:focus{outline:none;border-color:var(--brass)}
+.toolbar select{max-width:220px;width:auto}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;animation-iteration-count:1!important}
+  .btn:hover,.btn:active,.help-fab:hover,.card-tile:hover,.card-tile:active{transform:none}
+}
+
+/* ============================================================
+   Rolador de dados (mesa) + recursos (atual/máximo)
+   ============================================================ */
+.dice-fab{position:fixed;right:16px;bottom:122px;z-index:70;height:42px;padding:0 16px;border-radius:999px;border:0;cursor:pointer;
+  background:var(--maq);color:var(--on-primary);font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;
+  box-shadow:0 8px 24px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.12);transition:transform .15s;display:flex;align-items:center;gap:7px}
+.dice-fab:hover{transform:translateY(-2px)}
+.dice-panel{position:fixed;left:50%;bottom:174px;transform:translateX(-50%);z-index:72;width:340px;max-width:calc(100vw - 32px);max-height:65vh;
+  display:none;flex-direction:column;border-radius:16px;overflow:hidden;background:var(--panel);border:1px solid var(--line2);
+  box-shadow:0 20px 55px rgba(0,0,0,.55);animation:popIn .2s var(--ease)}
+.dice-panel.open{display:flex}
+.dice-panel .dh{display:flex;align-items:center;gap:8px;padding:16px;border-bottom:1px solid var(--line)}
+.dice-panel .dh b{font-family:var(--disp);font-size:14px;color:var(--bone);flex:1}
+.dice-panel .dh .x{background:transparent;border:0;color:var(--ink-faint);font-size:20px;cursor:pointer;line-height:1}
+.dice-log{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column-reverse;gap:8px;min-height:120px}
+.roll{border:1px solid var(--line);border-radius:10px;padding:8px 10px;animation:fadeUp .25s var(--ease)}
+.roll.mine{border-color:rgba(24,181,198,.4);background:rgba(24,181,198,.05)}
+.roll .rtop{display:flex;align-items:baseline;gap:8px}
+.roll .who{font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:var(--brass);text-transform:uppercase}
+.roll .ftxt{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-left:auto}
+.roll .tot{font-family:var(--disp);font-size:22px;font-weight:700;color:var(--bone);line-height:1}
+.roll .det{font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin-top:3px;word-break:break-word}
+.roll.secret{border-style:dashed}
+/* pillar III (resolução mecânica): a rolagem em si é o evento mais importante da sessão — landing
+   é um "batida" tier-2 aplicada só quando ela acabou de chegar (própria ou de outro jogador),
+   nunca no carregamento inicial do log (renderRolls não passa justLanded) */
+.roll.landing{animation:rollLand .5s var(--ease)}
+.roll .tot.crit-max{color:var(--good);text-shadow:0 0 12px rgba(62,207,126,.5)}
+.roll .tot.crit-min{color:var(--escarlate);text-shadow:0 0 10px rgba(242,88,94,.5)}
+.roll.landing .tot.crit-max,.roll.landing .tot.crit-min{animation:critPulse .55s var(--ease)}
+/* selo de texto ao lado do número quando a rolagem bate no máximo/mínimo do dado */
+.roll .crit-tag{font-family:var(--mono);font-weight:700;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.roll .crit-tag.max{color:var(--good)}
+.roll .crit-tag.min{color:var(--escarlate)}
+@keyframes rollLand{0%{transform:scale(.96)}45%{transform:scale(1.015)}100%{transform:scale(1)}}
+@keyframes critPulse{0%,100%{transform:scale(1)}35%{transform:scale(1.18)}}
+
+/* montador interativo: quantidade + dado + status/fórmula do guia rápido */
+.dice-builder{display:flex;gap:6px;padding:10px 14px 12px;flex-wrap:wrap}
+.dice-builder select{background:var(--field);border:1px solid var(--line2);border-radius:9px;color:var(--ink);
+  font-family:var(--mono);font-size:12px;padding:8px 9px;flex:1 1 90px;min-width:0}
+.dice-builder .dice-qty{width:52px;flex:0 0 auto;background:var(--field);border:1px solid var(--line2);border-radius:9px;
+  color:var(--ink);font-family:var(--mono);font-size:12px;padding:8px 6px;text-align:center}
+.dice-builder select:focus,.dice-builder .dice-qty:focus{outline:none;border-color:var(--maq)}
+.dice-builder .btn{flex:0 0 auto}
+
+/* abas do painel direito: Rolagens / Conversa (mesmo padrão visual de .home-tabs) */
+.rail-tabs{display:flex;flex:0 0 auto;border-bottom:1px solid var(--line)}
+.rail-tabs button{flex:1;font-family:var(--mono);font-weight:600;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-faint);background:transparent;border:0;padding:11px;cursor:pointer;
+  box-shadow:inset 0 -2px 0 transparent;transition:color .12s,box-shadow .12s}
+.rail-tabs button:hover{color:var(--ink-dim)}
+.rail-tabs button.on{color:var(--bone);box-shadow:inset 0 -2px 0 var(--brass)}
+
+/* chat da mesa (aba "Conversa") — mesma estrutura visual do log de rolagens */
+.chat-log{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column-reverse;gap:8px;min-height:120px}
+.chat-msg{border:1px solid var(--line);border-radius:10px;padding:8px 10px;animation:fadeUp .25s var(--ease)}
+.chat-msg.mine{border-color:rgba(24,181,198,.4);background:rgba(24,181,198,.05)}
+.chat-msg .ctop{display:flex;align-items:baseline;gap:8px}
+.chat-msg .who{font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:var(--brass);text-transform:uppercase}
+.chat-msg .cwhen{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-left:auto}
+.chat-msg .cbody{font-family:var(--serif);font-size:13.5px;color:var(--ink);margin-top:4px;line-height:1.45;word-break:break-word;white-space:pre-wrap}
+.chat-msg.landing{animation:rollLand .5s var(--ease)}
+
+/* rodapé fixo com o campo de mensagem — sempre visível, não importa a aba ativa */
+.chat-input-row{flex:0 0 auto;border-top:1px solid var(--line);padding:16px;display:flex;gap:8px;align-items:center}
+.chat-input-row input{flex:1;min-width:0;font-family:var(--serif);font-size:13px;color:var(--ink);
+  background:var(--field);border:1px solid var(--line2);border-radius:10px;padding:10px 12px}
+.chat-input-row input::placeholder{color:var(--ink-faint)}
+.chat-input-row input:focus{outline:none;border-color:var(--brass)}
+.chat-input-row button{width:38px;height:38px;flex:0 0 auto;border-radius:10px;border:0;cursor:pointer;
+  background:var(--brass);color:var(--on-primary);display:flex;align-items:center;justify-content:center;transition:filter .15s,transform .15s}
+.chat-input-row button:hover{filter:brightness(1.06)}
+.chat-input-row button:active{transform:scale(.94)}
+
+/* recurso: barra comprida (o PRINCIPAL da ficha) — a cor vem do sistema (GM escolhe) */
+.res-row{margin-bottom:14px}
+/* passo do recurso — só o par −/+ (sem caixa, sem campos atual/máx: isso já está no res-head) */
+.res-bar-row{display:flex;align-items:center;gap:10px}
+.res-step{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.res-btn{width:27px;height:27px;border-radius:7px;border:1px solid var(--line2);background:var(--field);
+  color:var(--ink);font-family:var(--mono);font-size:14px;cursor:pointer;line-height:1;transition:.12s}
+.res-btn:hover{color:var(--maq);border-color:var(--maq)}
+.res-btn.dmg:hover{color:var(--escarlate);border-color:rgba(242,88,94,.5)}
+
+/* ============================================================
+   HUD de status na ficha — painel estilo game, com a cara do site
+   ============================================================ */
+.status-hud{border:1px solid var(--line2);border-radius:18px;padding:16px 16px 18px;background:var(--surface);
+  box-shadow:var(--glass-rim), 0 10px 30px rgba(0,0,0,.22);margin-bottom:20px;container-type:inline-size}
+.hud-sec-label{font-family:var(--mono);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-faint);
+  display:flex;align-items:center;gap:10px;margin:0 2px 11px}
+.hud-sec-label .ln{flex:1;height:1px;background:linear-gradient(90deg,var(--line2),transparent)}
+
+/* principais (recursos) em destaque — pílulas grandes, é o que o olho pega primeiro */
+.hud-bars{display:flex;flex-direction:column;gap:14px;margin-bottom:22px}
+
+/* secundários: grade de nome + caixa de número (sem ícones, como pedido) */
+.hud-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.hud-cell{display:flex;align-items:center;gap:10px;border:1px solid var(--line2);border-radius:12px;padding:11px 13px;background:var(--field-2)}
+.hud-cell .cn{flex:1;min-width:0;font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-num{min-width:50px;text-align:center;font-family:var(--mono);font-weight:700;font-size:18px;color:var(--bone);
+  border:1px solid var(--line2);border-radius:9px;padding:5px 8px;background:var(--field)}
+.hud-num.calc{color:var(--maq)}
+.hud-cell .plus,.stat-ctl .plus{width:30px;height:30px;flex:0 0 auto;border-radius:8px;border:1px solid var(--line2);background:var(--field);
+  color:var(--maq);font-family:var(--mono);font-size:15px;cursor:pointer;line-height:1}
+.hud-cell .plus:hover:not(:disabled),.stat-ctl .plus:hover:not(:disabled){border-color:var(--maq)}
+.hud-cell .plus:disabled,.stat-ctl .plus:disabled{opacity:.32;cursor:default}
+.hud-cell.points{grid-column:1 / -1;border-color:rgba(24,181,198,.42);background:rgba(24,181,198,.07)}
+.hud-cell.points .cn{color:var(--brass)}
+.hud-cell.points .hud-num{color:var(--brass);border-color:rgba(24,181,198,.5)}
+@media (max-width:560px){ .hud-grid{grid-template-columns:1fr} }
+
+/* ficha: cabeçalho da aba "Atributos" + retrato/recursos num só cartão + status em cartões individuais */
+.ficha-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+.ficha-head .section-title{margin:0}
+.ficha-hint{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+
+/* nº de colunas fixo por linha (3 a 5, via container query no .status-hud) em vez de auto-fit:
+   auto-fit deixava a contagem variar livremente com a largura (podia virar 1 coluna no celular
+   ou 7+ num desktop bem largo) — aqui toda linha fica sempre com 3, 4 ou 5 status, e o que passar
+   de 5 desce pra linha de baixo seguindo a mesma contagem */
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+@container (min-width:474px){ .stat-grid{grid-template-columns:repeat(4,1fr)} }
+@container (min-width:625px){ .stat-grid{grid-template-columns:repeat(5,1fr)} }
+/* mesmo visual do "points-card/points-bar" (borda + fundo na cor, translúcidos) que as perícias
+   já usam — cada status usa a própria cor (--stc, escolhida pelo Mestre), no tamanho de sempre */
+.stat-tile{position:relative;
+  border:1px solid color-mix(in srgb,var(--stc,var(--maq)) 42%,transparent);
+  background:color-mix(in srgb,var(--stc,var(--maq)) 7%,transparent);
+  border-radius:14px;padding:16px 12px 12px;display:flex;flex-direction:column;align-items:center;gap:2px;transition:border-color .15s}
+.stat-tile:hover{border-color:var(--stc,var(--maq))}
+.stat-tile .mod-badge{position:absolute;top:9px;right:9px;font-family:var(--mono);font-weight:700;font-size:10px;
+  padding:2px 6px;border-radius:6px;background:rgba(24,181,198,.16);color:var(--brass)}
+.stat-val{font-family:var(--mono);font-weight:700;font-size:26px;line-height:1;color:var(--bone);margin:6px 0 3px}
+.stat-val.calc{color:var(--stc,var(--maq))}
+/* pillar I: um tier-1 discreto (não tier-2 — ponto de status é rotina, não evento de jogo) só
+   pra confirmar que o clique foi ouvido antes mesmo do botão "Salvar status" aparecer */
+.stat-val.bump{animation:statBump .2s var(--ease)}
+@keyframes statBump{0%{transform:scale(1)}50%{transform:scale(1.14)}100%{transform:scale(1)}}
+.stat-name{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);
+  text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.stat-ctl{display:flex;align-items:center;gap:8px;margin-top:10px}
+
+/* perícias: mesmo visual do "points-card/points-bar" (borda + fundo na cor, translúcidos), só
+   que no tamanho enxuto de uma caixinha — cada perícia usa a própria cor (--skc) em vez do brass fixo */
+.skill-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.skill-chip{display:flex;align-items:center;gap:8px;min-width:0;
+  border:1px solid color-mix(in srgb,var(--skc,var(--maq)) 42%,transparent);
+  background:color-mix(in srgb,var(--skc,var(--maq)) 7%,transparent);
+  border-radius:10px;padding:8px 10px}
+.skill-chip .skc-name{flex:1;min-width:0;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skill-chip .skc-val{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:14px;color:var(--skc,var(--maq))}
+
+/* proficiências: liga/desliga, sem valor — pílula apagada quando não tem, sólida quando tem.
+   Na visão do Mestre os chips viram <button> (clicável pra conceder/revogar). --pcc (cor da
+   categoria, por hash do texto — ver profCategoryColor/profCategoryIcon) fica no .prof-group,
+   que é ancestral comum do rótulo e dos chips, pra cascatear (custom property herda por DOM). */
+.prof-groups{display:flex;flex-direction:column;gap:14px}
+.prof-group{display:flex;flex-direction:column;gap:6px}
+.prof-cat{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--pcc,var(--ink-faint))}
+.prof-cat .ic{width:13px;height:13px}
+.prof-chips{display:flex;flex-wrap:wrap;gap:7px}
+.prof-chip{font-family:var(--mono);font-size:11px;letter-spacing:.03em;padding:6px 12px;border-radius:999px;
+  border:1px solid var(--line2);background:var(--field-2);color:var(--ink-faint);}
+.prof-chip.on{border-color:var(--pcc,var(--brass));background:color-mix(in srgb,var(--pcc,var(--brass)) 18%,var(--surface));color:var(--pcc,var(--brass));font-weight:600}
+button.prof-chip{cursor:pointer;transition:border-color .12s,transform .12s;font:inherit}
+button.prof-chip:hover{border-color:var(--pcc,var(--brass));transform:translateY(-1px)}
+
+/* cabeçalho de categoria no construtor de sistema — catálogo de Proficiências e painel de
+   concessão por Classe. Mesma cor/ícone por categoria da ficha, só que como um section-header. */
+.prof-cat-head{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--pcc,var(--ink-dim));margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line2)}
+.prof-cat-head .ic{color:var(--pcc,var(--ink-dim))}
+.prof-cat-head.sm{font-size:10px;margin:10px 0 6px}
+
+/* seletor de cor próprio — um color picker de verdade (quadrado de saturação/brilho + barra de
+   matiz arrastáveis + hex + paleta), substitui <input type="color"> nativo do navegador — ver
+   openColorPicker() em sistema.html/arvore.html. O gatilho é este swatch; o popover flutuante é
+   .color-pop, montado sob demanda em document.body (position:fixed, sempre por cima). */
+.color-swatch{--sw:#7ee6dc;width:34px;height:34px;padding:0;border-radius:8px;border:1px solid var(--line2);
+  background:var(--sw);cursor:pointer;transition:transform .12s,border-color .12s;flex:0 0 auto;appearance:none}
+.color-swatch:hover{transform:scale(1.06);border-color:var(--brass)}
+.color-swatch.full{width:100%;height:38px;border-radius:8px}
+.color-swatch.sm{width:24px;height:24px;border-radius:6px}
+
+.color-pop{position:fixed;z-index:120;background:var(--surface);border:1px solid var(--line2);border-radius:14px;
+  padding:12px;box-shadow:0 18px 44px rgba(0,0,0,.5);width:212px;animation:popIn .16s var(--ease)}
+.cp-sv{position:relative;width:100%;height:120px;border-radius:10px;margin-bottom:10px;cursor:crosshair;
+  touch-action:none;background:linear-gradient(to top,#000,transparent),linear-gradient(to right,#fff,hsl(var(--h,0) 100% 50%))}
+.cp-sv-cursor{position:absolute;left:0;top:0;width:14px;height:14px;border-radius:50%;border:2px solid #fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.55),0 1px 4px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none}
+.cp-hue{position:relative;width:100%;height:14px;border-radius:7px;margin-bottom:10px;cursor:pointer;touch-action:none;
+  background:linear-gradient(to right,#f00 0%,#ff0 17%,#0f0 33%,#0ff 50%,#00f 67%,#f0f 83%,#f00 100%)}
+.cp-hue-cursor{position:absolute;left:0;top:50%;width:16px;height:16px;border-radius:50%;border:2px solid #fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.55),0 1px 4px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none}
+.cp-bottom{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.cp-preview{--sw:#7ee6dc;width:32px;height:32px;border-radius:8px;background:var(--sw);border:1px solid var(--line2);flex:0 0 auto}
+.cp-hex{flex:1;min-width:0;background:var(--field);border:1px solid var(--line2);border-radius:8px;
+  color:var(--ink);font-family:var(--mono);font-size:12px;padding:7px 9px;text-transform:uppercase}
+/* grid com largura fixa (repeat(8,1fr)) + swatch com tamanho fixo (22px) não bate: 8×22px + os
+   espaçamentos passa da largura interna do popover e a grade estoura pela lateral. Solução: o
+   swatch nunca tem px fixo, sempre 100% da própria coluna (com aspect-ratio pra ficar quadrado). */
+.cp-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.cp-swatch{--sw:#000;width:100%;aspect-ratio:1;min-width:0;border-radius:6px;border:1px solid rgba(255,255,255,.14);
+  background:var(--sw);cursor:pointer;padding:0;transition:transform .1s;appearance:none}
+.cp-swatch:hover{transform:scale(1.18)}
+
+.points-card{border:1px solid rgba(24,181,198,.42);background:rgba(24,181,198,.07);border-radius:18px;padding:16px}
+.points-value{font-family:var(--mono);font-weight:700;font-size:30px;color:var(--brass);line-height:1;margin:6px 0 4px}
+
+/* barra de pontos de status da própria ficha (jogador) — comprida, ocupando a largura toda embaixo
+   da grade de status, em vez de uma coluna estreita e desproporcional do lado direito */
+.points-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:16px;padding:14px 18px;
+  border-radius:14px;border:1px solid rgba(24,181,198,.42);background:rgba(24,181,198,.07)}
+.points-bar .pb-label{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--brass);white-space:nowrap}
+.points-bar .pb-value{font-family:var(--disp);font-weight:700;font-size:26px;color:var(--brass);line-height:1}
+.points-bar .pb-hint{font-family:var(--serif);font-size:13px;color:var(--ink-dim)}
+.points-bar .btn{margin-left:auto;width:auto}
+@media (max-width:560px){ .points-bar .btn{margin-left:0;width:100%} }
+
+/* ============================================================
+   Guia rápido — fórmulas pessoais do jogador (item + status)
+   ============================================================ */
+.formula-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line2);border-radius:12px;
+  padding:11px 14px;margin-bottom:8px;background:var(--field-2)}
+.formula-row .fn{flex:1;min-width:0}
+.formula-row .fn b{font-family:var(--serif);font-size:14.5px;color:var(--ink)}
+.formula-row .fn .fbreak{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-top:2px}
+.formula-row .fresult{font-family:var(--disp);font-weight:700;font-size:22px;color:var(--maq);flex:0 0 auto;min-width:44px;text-align:center}
+.fterm-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.fterm-row select,.fterm-row input{background:var(--field);border:1px solid var(--line2);border-radius:8px;
+  color:var(--ink);font-family:var(--mono);font-size:12px;padding:7px 9px}
+.fterm-row .fnum{width:70px}
+.fterm-sign{width:30px;text-align:center;font-family:var(--mono);font-weight:700;color:var(--brass);flex:0 0 auto}
+
+/* ============================================================
+   Player de áudio do YouTube (mesa) — barra fixa embaixo, presa
+   (não arrastável); um painel de busca/fila abre ancorado acima
+   dela, centralizado (não "na lateral"). Tokens mapeados pros do
+   tema; seletores escopados sob #yt-bar/#yt-panel de propósito —
+   nomes de classe genéricos (.list, .card, .row...) não podem vazar
+   pro resto do app.
+   ============================================================ */
+#yt-bar{
+  --cta-glow:0 4px 16px rgba(24,181,198,.22); --cta-glow-h:0 6px 20px rgba(24,181,198,.32);
+  position:fixed;left:0;right:0;bottom:0;z-index:71;height:50px;display:flex;align-items:center;gap:10px;
+  padding:0 14px;background:var(--bar);border-top:1px solid var(--line2);color:var(--ink);
+  -webkit-backdrop-filter:none;backdrop-filter:none;font-family:var(--serif)}
+
+#yt-bar .yt-controls{display:flex;align-items:center;gap:3px;flex:0 0 auto}
+#yt-bar .yt-btn{width:30px;height:30px;border-radius:9px;border:1px solid var(--line2);background:var(--field);
+  color:var(--ink);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:.12s;flex-shrink:0}
+#yt-bar .yt-btn:hover{color:var(--brass);border-color:var(--brass)}
+#yt-bar .yt-btn.play{width:38px;height:38px;background:var(--brass);color:var(--on-primary);border:0;box-shadow:var(--cta-glow)}
+#yt-bar .yt-btn.play:hover{box-shadow:var(--cta-glow-h);border-color:transparent}
+#yt-bar .yt-btn.play svg{width:16px;height:16px}
+#yt-bar .yt-btn svg{width:15px;height:15px}
+#yt-bar .yt-btn#yt-panel-toggle{color:var(--ink-dim)}
+#yt-bar .yt-btn#yt-panel-toggle:hover{color:var(--brass);border-color:var(--brass)}
+#yt-bar .yt-btn.tgl{color:var(--ink-faint);position:relative}
+#yt-bar .yt-btn.tgl:hover{color:var(--ink);border-color:var(--line2)}
+#yt-bar .yt-btn.tgl.active{color:var(--maq);border-color:var(--maq)}
+#yt-bar .yt-btn.tgl .one{display:none;position:absolute;top:-2px;right:-2px;
+  font-family:var(--mono);font-size:7px;font-weight:700;color:var(--app-bg);background:var(--maq);
+  line-height:1;padding:1px 2px;border-radius:3px}
+
+#yt-bar .yt-track{flex:0 1 130px;min-width:0;font-family:var(--serif);font-size:12.5px;color:var(--ink-dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#yt-bar .yt-track.error{color:var(--escarlate)}
+#yt-bar .yt-track.idle{color:var(--ink-faint);font-style:italic}
+
+#yt-bar .yt-progress-wrap{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+#yt-bar .yt-time{font-family:var(--mono);font-size:10px;color:var(--ink-faint);flex:0 0 auto}
+#yt-bar .yt-vol{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+
+#yt-bar #yt-seek,#yt-bar #yt-vol{-webkit-appearance:none;appearance:none;height:5px;border-radius:5px;
+  background:var(--field-2);outline:none;cursor:pointer}
+#yt-bar #yt-seek{flex:1;min-width:0}
+#yt-bar #yt-vol{width:70px}
+#yt-bar #yt-seek::-webkit-slider-thumb,#yt-bar #yt-vol::-webkit-slider-thumb{
+  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--brass);cursor:pointer;box-shadow:0 0 6px rgba(24,181,198,.5)}
+#yt-bar #yt-seek::-moz-range-thumb,#yt-bar #yt-vol::-moz-range-thumb{
+  width:12px;height:12px;border:none;border-radius:50%;background:var(--brass);cursor:pointer}
+
+/* Jogador não controla — barra de progresso é só visual (sem thumb arrastável) */
+#yt-bar .yt-progress-bar{flex:1;min-width:0;height:5px;border-radius:5px;background:var(--field-2);overflow:hidden;position:relative}
+#yt-bar .yt-progress-bar .yt-fill{display:block;height:100%;width:100%;border-radius:5px;
+  background:var(--brass);transform:scaleX(0);transform-origin:left;transition:transform .2s linear}
+
+/* ---- painel de busca/fila — sobe ancorado acima da barra, centralizado ---- */
+#yt-panel{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:72;
+  width:400px;max-width:calc(100vw - 32px);max-height:60vh;
+  display:none;flex-direction:column;border-radius:16px;overflow:hidden;background:var(--panel);border:1px solid var(--line2);
+  box-shadow:0 20px 55px rgba(0,0,0,.55);animation:popIn .2s var(--ease);font-family:var(--serif)}
+#yt-panel.open{display:flex}
+#yt-panel .yt-panel-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+#yt-panel .yt-panel-head b{font-family:var(--disp);font-size:14px;color:var(--bone);flex:1}
+#yt-panel .yt-panel-head .x{background:transparent;border:0;color:var(--ink-faint);font-size:20px;cursor:pointer;line-height:1}
+#yt-panel .yt-panel-body{padding:14px 16px;overflow-y:auto}
+#yt-panel .yt-panel-body::-webkit-scrollbar{width:8px}
+#yt-panel .yt-panel-body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px}
+
+#yt-panel .url-row{display:flex;gap:8px;margin-bottom:8px}
+#yt-panel .url-row input{flex:1;padding:12px 13px;border-radius:10px;border:1px solid var(--line2);
+  background:var(--field);color:var(--ink);font-family:var(--serif);font-size:14px;outline:none;
+  transition:border-color var(--dur-1) var(--ease)}
+#yt-panel .url-row input::placeholder{color:var(--ink-faint)}
+#yt-panel .url-row input:focus{border-color:var(--brass)}
+#yt-panel #yt-search{padding:0 16px;border:1px solid var(--line2);border-radius:10px;background:var(--field);
+  color:var(--ink-dim);font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;cursor:pointer;transition:all var(--dur-1) var(--ease)}
+#yt-panel #yt-search:hover{color:var(--ink);background:rgba(255,255,255,.10);transform:translateY(-1px)}
+#yt-panel #yt-search:active{transform:scale(.97)}
+
+#yt-panel #yt-search-status{font-family:var(--serif);font-size:12.5px;font-style:italic;color:var(--ink-faint);min-height:16px;margin-bottom:8px}
+#yt-panel #yt-search-status.error{color:var(--escarlate);font-style:normal}
+#yt-panel #yt-search-status.ok{color:var(--maq);font-style:normal}
+
+#yt-panel #yt-result{margin-bottom:12px}
+#yt-panel #yt-result:empty{margin-bottom:0}
+#yt-panel .card{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px}
+#yt-panel .card img{width:72px;height:54px;object-fit:cover;border-radius:8px;flex-shrink:0}
+#yt-panel .card .meta{min-width:0;display:flex;flex-direction:column;justify-content:center}
+#yt-panel .card .meta .t{font-family:var(--serif);font-size:14px;font-weight:600;color:var(--ink);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#yt-panel .card .meta .a{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#yt-panel .pl-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+#yt-panel .pl-head .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)}
+#yt-panel #pl-all{width:auto!important;height:auto!important;padding:6px 10px!important;
+  font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-dim);background:var(--field);border:1px solid var(--line2)!important;border-radius:7px}
+#yt-panel #pl-all:hover{color:var(--ink)}
+
+#yt-panel .list{max-height:172px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.15)}
+#yt-panel .list::-webkit-scrollbar{width:8px}
+#yt-panel .list::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px}
+#yt-panel .row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+#yt-panel .row:last-child{border-bottom:none}
+#yt-panel .row .rt{flex:1;min-width:0;font-family:var(--serif);font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#yt-panel .acts{display:flex;gap:8px}
+#yt-panel .acts button{flex:1;padding:12px;border:1px solid var(--line2);border-radius:7px;cursor:pointer;
+  font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  background:var(--field);color:var(--ink-dim);transition:all var(--dur-1) var(--ease)}
+#yt-panel .acts button:hover{color:var(--ink);background:rgba(255,255,255,.10);transform:translateY(-1px)}
+#yt-panel .acts button:active{transform:scale(.97)}
+#yt-panel .acts button.primary{background:var(--brass);color:var(--on-primary);
+  border:none;font-weight:700;box-shadow:var(--cta-glow)}
+#yt-panel .acts button.primary:hover{color:var(--on-primary);box-shadow:var(--cta-glow-h)}
+
+#yt-panel .rowbtn{width:28px;height:28px;flex-shrink:0;border:1px solid var(--line2);border-radius:7px;
+  background:var(--field);color:var(--ink-dim);cursor:pointer;font-size:12px;
+  display:flex;align-items:center;justify-content:center;transition:all var(--dur-1) var(--ease)}
+#yt-panel .rowbtn:hover{color:var(--ink);transform:translateY(-1px)}
+#yt-panel .rowbtn.play{background:var(--brass);color:var(--on-primary);border:none;box-shadow:var(--cta-glow);font-weight:700}
+#yt-panel .rowbtn.play:hover{color:var(--on-primary);box-shadow:var(--cta-glow-h)}
+
+#yt-panel .sep{height:1px;background:var(--line);margin:14px 0}
+
+#yt-panel .queue-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+#yt-panel .queue-head .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)}
+#yt-panel #yt-clear{background:none;border:none;color:var(--escarlate);font-family:var(--mono);
+  font-size:9px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+  padding:4px 8px;border-radius:6px;transition:all var(--dur-1) var(--ease)}
+#yt-panel #yt-clear:hover{background:var(--escarlate);color:#fff}
+#yt-panel #yt-queue-empty{font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-faint);padding:6px 2px}
+#yt-panel .qrow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+#yt-panel .qrow:last-child{border-bottom:none}
+#yt-panel .qrow.current{background:linear-gradient(90deg,rgba(24,181,198,.14),transparent);box-shadow:inset 2px 0 0 var(--brass)}
+#yt-panel .qrow .idx{font-family:var(--mono);font-size:10px;color:var(--ink-faint);min-width:18px;cursor:pointer}
+#yt-panel .qrow.current .idx{color:var(--brass)}
+#yt-panel .qrow .qt{flex:1;min-width:0;font-family:var(--serif);font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+#yt-panel .qrow .x{width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:var(--ink-faint);cursor:pointer;font-size:12px}
+#yt-panel .qrow .x:hover{background:rgba(242,88,94,.15);color:var(--escarlate)}
+
+#yt-panel .hint{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:12px;line-height:1.7;text-align:center}
+
+#yt-player-host{position:fixed;left:-9999px;top:-9999px;width:320px;height:180px;overflow:hidden}
+
+/* botão de desbloqueio quando o navegador bloqueia autoplay (Jogador entrando com música já tocando) */
+.yt-unlock-fab{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:73;height:36px;padding:0 14px;border-radius:999px;border:0;
+  cursor:pointer;background:var(--brass);color:var(--on-primary);font-family:var(--mono);font-weight:700;
+  font-size:11px;box-shadow:0 8px 20px rgba(0,0,0,.4);display:flex;align-items:center;gap:6px}
+
+/* barra fixa embaixo empurra o conteúdo e os fabs pra não sobrepor */
+body.has-ytbar{padding-bottom:0}
+body.has-ytbar .page{padding-bottom:126px}
+body.has-ytbar .help-fab{bottom:70px}
+body.has-ytbar .theme-fab{bottom:70px}
+
+@media (prefers-reduced-motion:reduce){
+  #yt-bar *,#yt-panel *{transition:none!important;animation:none!important}
+  #yt-bar button:hover,#yt-panel button:hover,#yt-bar button:active,#yt-panel button:active{transform:none!important}
+}
+
+/* ============================================================
+   Alternador de tema (claro/escuro) — botão flutuante
+   ============================================================ */
+.theme-fab{position:fixed;left:16px;bottom:16px;z-index:70;width:42px;height:42px;border-radius:50%;cursor:pointer;
+  border:1px solid var(--line2);background:var(--panel);color:var(--ink);font-size:18px;line-height:1;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.28);transition:transform .15s, border-color .15s}
+.theme-fab:hover{transform:scale(1.08);border-color:var(--brass)}
+
+/* ============================================================
+   RESPONSIVO — celulares e tablets
+   ============================================================ */
+@media (max-width:760px){
+  .nav{padding:11px 14px;gap:10px}
+  .brand{font-size:13px;letter-spacing:.12em}
+  .brand small{letter-spacing:.28em}
+  .home{padding:20px 14px 84px}
+  .home-head h1{font-size:22px}
+  .page{padding:8px 14px 84px}
+  .grid{grid-template-columns:1fr}
+  .action-card{min-width:0}
+  .item-form{grid-template-columns:1fr}
+  .home-tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .home-tabs::-webkit-scrollbar{display:none}
+  .home-tabs button{white-space:nowrap;flex:0 0 auto}
+  .topbar{height:48px;padding:0 14px}
+  .mesa-toptabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .mesa-toptabs::-webkit-scrollbar{display:none}
+  .fld.row{flex-direction:column;align-items:stretch;gap:6px}
+  .fld.row label{flex:none}
+  .ui-modal{padding:12px}
+  .ui-modal .box{padding:20px 18px;max-height:88vh}
+  .dice-panel{left:8px;right:8px;transform:none;width:auto;max-width:none;bottom:168px}
+  .dice-fab{right:12px;bottom:118px}
+  .help-fab{right:12px;bottom:14px}
+  .theme-fab{left:12px;bottom:14px}
+  .msg{top:64px;min-width:0;max-width:92vw}
+  body.has-ytbar .page{padding-bottom:118px}
+  body.has-ytbar .help-fab{bottom:62px}
+  body.has-ytbar .theme-fab{bottom:62px}
+  #yt-bar{height:44px;padding:0 10px;gap:6px}
+  #yt-bar .yt-controls{gap:2px}
+  #yt-bar .yt-btn{width:26px;height:26px;font-size:10px}
+  #yt-bar .yt-btn svg{width:12px;height:12px}
+  #yt-bar .yt-btn.play{width:30px;height:30px}
+  #yt-bar .yt-btn.play svg{width:14px;height:14px}
+  #yt-bar .yt-track{flex-basis:70px;font-size:11px}
+  #yt-bar .yt-vol{display:none}
+  #yt-panel{left:8px;right:8px;bottom:62px;transform:none;width:auto;max-width:none;max-height:70vh}
+}
+@media (max-width:420px){
+  .home-head h1{font-size:20px}
+  .card-tile{min-height:auto}
+  .roll .tot{font-size:20px}
+}
+
+/* ============================================================
+   Imagens — itens (card + seletor) e foto de perfil da mesa
+   ============================================================ */
+.img-picker{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.img-thumb{width:64px;height:64px;border-radius:12px;object-fit:cover;border:1px solid var(--line2);background:var(--field-2);flex:0 0 auto}
+.img-actions{display:flex;gap:8px;flex-wrap:wrap}
+.item-thumb{width:42px;height:42px;border-radius:9px;object-fit:cover;border:1px solid var(--line2);background:var(--field-2);flex:0 0 auto}
+/* avatar da mesa (lobby + topo da mesa) */
+.mesa-av{width:46px;height:46px;border-radius:12px;object-fit:cover;border:1px solid var(--line2);flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-size:20px;color:var(--on-primary);
+  background:var(--brass)}
+.mesa-av.sm{width:30px;height:30px;border-radius:9px;font-size:14px;border-color:var(--line2)}
+.tile-head{display:flex;align-items:center;gap:12px}
+
+/* ============================================================
+   Ficha do personagem — cartão de perfil, galeria e lore
+   ============================================================ */
+.char-card{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;padding:16px 20px;border-radius:16px;border:1px solid var(--line2);
+  background:var(--surface);margin-bottom:20px}
+.char-portrait{width:76px;height:76px;border-radius:16px;object-fit:cover;border:1px solid var(--line2);flex:0 0 auto;background:var(--field-2)}
+.char-portrait.ph{display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-size:30px;color:var(--brass);
+  background:linear-gradient(135deg,var(--field),var(--field-2))}
+.char-info{min-width:0;flex:1}
+.char-info h2{font-family:var(--disp);font-size:20px;font-weight:600;margin:0 0 4px;color:var(--bone)}
+.char-meta{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.03em;margin-bottom:10px}
+.char-gallery{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0}
+.gal-thumb{position:relative;width:100px;aspect-ratio:1/1;border-radius:14px;overflow:hidden;border:1px solid var(--line2);
+  background:var(--field-2);box-shadow:0 2px 8px rgba(0,0,0,.14);transition:transform var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
+.gal-thumb:hover{transform:translateY(-2px)}
+.gal-thumb.main{border-color:var(--brass)}
+.gal-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.gal-badge{position:absolute;top:6px;left:6px;z-index:2;display:flex;align-items:center;gap:3px;font-family:var(--mono);font-size:8px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--on-primary);background:var(--brass);padding:3px 7px 3px 5px;border-radius:999px}
+.gal-badge svg{width:10px;height:10px}
+/* ações (trocar principal / remover) só aparecem ao passar o mouse — a miniatura fica limpa por padrão */
+.gal-thumb-actions{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;justify-content:center;gap:6px;padding:8px 6px 6px;
+  background:linear-gradient(0deg,rgba(0,0,0,.65),rgba(0,0,0,0));opacity:0;pointer-events:none;transition:opacity var(--dur-2) var(--ease)}
+.gal-thumb:hover .gal-thumb-actions,.gal-thumb:focus-within .gal-thumb-actions{opacity:1;pointer-events:auto}
+.gal-act{width:24px;height:24px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(8,12,20,.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.25);
+  color:#f1e7d4;cursor:pointer;transition:border-color .15s,color .15s}
+.gal-act svg{width:12px;height:12px}
+.gal-act:hover{border-color:var(--brass);color:var(--brass)}
+.gal-act.danger:hover{border-color:#e2685a;color:#e2685a}
+@media (hover:none){.gal-thumb-actions{opacity:1;pointer-events:auto}}
+
+/* biografia: separada da caixa de recursos/status, sem borda própria */
+.char-bio{margin-bottom:22px}
+/* visualização grande da foto do personagem (capa própria ou o avatar como capa) — identidade inteira
+   vive dentro da mesma caixa, sobre um fade na base, com atalhos de troca de foto sobrepostos */
+/* coluna flex: a foto (absoluta, preenche tudo) fica atrás; o spacer reserva a "janela" só-foto no topo
+   e cresce; a info fica em fluxo normal embaixo, então nunca é cortada nem sobrepõe o que vem depois,
+   não importa quantas linhas o nome/tags ocupem */
+.char-cover{position:relative;display:flex;flex-direction:column;border-radius:18px;overflow:hidden;
+  background:var(--field-2);border:1px solid var(--line2)}
+.char-cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;cursor:default;
+  touch-action:none;user-select:none;-webkit-user-drag:none}
+/* reposicionar (arrastar) só é possível depois de clicar "Editar capa" */
+.char-cover.editing .char-cover-img{cursor:grab}
+.char-cover-img.dragging{cursor:grabbing}
+.char-cover-scrim{position:absolute;left:0;right:0;bottom:0;height:75%;pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.55) 45%,rgba(0,0,0,.88) 85%)}
+/* controles de edição da capa/perfil ficam ocultos até passar o mouse sobre a caixa — só o essencial
+   (nome, tags, foto) some visível por padrão; teclado usa :focus-within pra não escondê-los de quem navega sem mouse */
+.char-cover-toolbar{position:absolute;top:14px;right:14px;z-index:2;display:flex;gap:8px;
+  opacity:0;pointer-events:none;transition:opacity var(--dur-2) var(--ease)}
+.char-cover:hover .char-cover-toolbar,.char-cover:focus-within .char-cover-toolbar,
+.char-cover.editing .char-cover-toolbar{opacity:1;pointer-events:auto}
+/* "Trocar capa" e o arrasto só aparecem depois de entrar no modo de edição — "Editar capa" é o único
+   atalho visível antes disso, pra não misturar reposicionar com só passar o mouse */
+.char-cover-toolbar .cover-replace-btn{display:none}
+.char-cover.editing .cover-replace-btn{display:flex}
+.btn.overlay{width:auto;background:rgba(8,12,20,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  border-color:rgba(255,255,255,.22);color:#f1e7d4}
+.btn.overlay:hover{background:rgba(8,12,20,.75);border-color:var(--brass);color:var(--brass)}
+.char-cover-spacer{flex:1 1 auto;min-height:150px}
+.char-cover-info{position:relative;z-index:2;flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:flex-end;
+  gap:12px 16px;padding:16px 18px}
+.char-portrait-wrap{position:relative;flex:0 0 auto}
+.char-cover-info .char-info{flex:1 1 160px;min-width:0;padding-bottom:2px}
+.char-cover-info .btn.overlay{margin-left:auto;opacity:0;pointer-events:none;transition:opacity var(--dur-2) var(--ease)}
+.char-cover:hover .char-cover-info .btn.overlay,.char-cover:focus-within .char-cover-info .btn.overlay{opacity:1;pointer-events:auto}
+.char-cover-info .char-portrait{width:124px;height:124px;border-radius:22px;border:3px solid var(--app-bg);
+  box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.char-cover-info .char-portrait.ph{font-size:44px}
+.portrait-edit-btn{position:absolute;right:-4px;bottom:-4px;width:26px;height:26px;border-radius:50%;padding:0;
+  background:rgba(8,12,20,.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  border:1px solid rgba(255,255,255,.25);color:#f1e7d4;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:11px;transition:border-color .15s,color .15s,opacity var(--dur-2) var(--ease);
+  opacity:0;pointer-events:none}
+.char-cover:hover .portrait-edit-btn,.char-cover:focus-within .portrait-edit-btn{opacity:1;pointer-events:auto}
+.portrait-edit-btn:hover{border-color:var(--brass);color:var(--brass)}
+@media (hover:none){
+  .char-cover-toolbar,.char-cover-info .btn.overlay,.portrait-edit-btn{opacity:1;pointer-events:auto}
+}
+/* nome/tags sentam sobre a foto — cor fixa clara, não a do tema, já que o fundo é sempre uma foto escurecida */
+.char-cover-info .char-info h2,.char-bio-row .char-info h2{font-size:28px}
+.char-cover-info .char-info h2{color:#f1e7d4;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.char-cover-info .char-tag{color:#f1e7d4;background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.24)}
+/* etiquetas de classe/subclasse usam a cor definida pelo Mestre via style inline (vence a regra
+   acima, que só serve pras tags genéricas de idade/sexo) — só precisam de sombra pra legibilidade
+   sobre a foto de capa */
+.char-cover-info .class-tag{text-shadow:0 1px 3px rgba(0,0,0,.55)}
+/* seletor inline de classe/subclasse (antes de escolhidas) — parece uma etiqueta, mas é clicável */
+.class-pick-inline{font-family:var(--mono);font-size:10.5px;letter-spacing:.03em;background:var(--field-2);
+  border:1px dashed var(--line2);border-radius:999px;padding:4px 11px;color:var(--ink-dim);cursor:pointer;max-width:160px}
+.class-pick-inline:hover{border-color:var(--brass);color:var(--brass)}
+.char-cover-info .class-pick-inline{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.32);color:#f1e7d4}
+.char-bio-row{display:flex;align-items:center;gap:16px}
+.char-tags{display:flex;flex-wrap:wrap;gap:6px}
+.char-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--ink-dim);
+  background:var(--field-2);border:1px solid var(--line2);border-radius:999px;padding:4px 11px}
+@media (max-width:600px){
+  .char-cover-spacer{min-height:120px}
+  .char-cover-info{padding:12px 14px;gap:10px 12px}
+  .char-cover-info .char-portrait{width:92px;height:92px;border-radius:16px}
+  .char-cover-info .char-portrait.ph{font-size:32px}
+  .char-cover-info .char-info h2,.char-bio-row .char-info h2{font-size:23px}
+}
+
+/* recurso interativo (ficha do próprio jogador): rótulo + barra única (não mais segmentada em pips) */
+.res-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.res-label{display:flex;align-items:center;gap:8px;font-family:var(--disp);font-weight:600;font-size:15px;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--res-color,var(--maq))}
+.res-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--res-color,var(--maq));
+  box-shadow:0 0 7px var(--res-color,var(--maq))}
+.res-amt-line{font-family:var(--mono);font-size:13px;color:var(--ink-dim)}
+.res-amt-line b{font-size:16px;color:var(--bone)}
+/* trilho + preenchimento — barra comprida única, um pouco mais grossa que o padrão de progress bar */
+.res-track{position:relative;flex:1;min-width:0;height:14px;border-radius:999px;background:var(--field-2);
+  border:1px solid var(--line2);overflow:hidden;box-shadow:inset 0 1px 4px rgba(0,0,0,.3)}
+.res-fill{position:absolute;inset:0;width:0%;border-radius:999px;background:var(--res-color,var(--maq));
+  transition:width .35s var(--ease)}
+/* pillar III: um flash breve no preenchimento inteiro em vez do repaint instantâneo — dano/cura
+   ainda avisa visualmente, só que na barra única em vez de varrer segmento por segmento */
+.res-fill.res-fill-heal{animation:resFillHeal .45s var(--ease)}
+.res-fill.res-fill-dmg{animation:resFillDmg .45s var(--ease)}
+@keyframes resFillHeal{0%{filter:brightness(1)}40%{filter:brightness(1.55);box-shadow:0 0 10px 1px var(--res-color,var(--maq))}100%{filter:brightness(1)}}
+@keyframes resFillDmg{0%{filter:brightness(1)}40%{filter:brightness(.55);box-shadow:0 0 10px 1px var(--escarlate)}100%{filter:brightness(1)}}
+
+/* ---------- ajustes finos do tema claro ---------- */
+:root[data-theme="light"] *{scrollbar-color:rgba(20,28,45,.28) transparent}
+:root[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(20,28,45,.24)}
+:root[data-theme="light"] .msg.err{color:#8a1c3a}
+:root[data-theme="light"] .msg.ok{color:#0a5b52}
+:root[data-theme="light"] .gtips{border-color:rgba(14,143,131,.3);background:rgba(14,143,131,.06)}
+:root[data-theme="light"] .role.player{border-color:rgba(14,143,131,.4)}
+
+/* reskin: fundo sólido plano, sem partículas cósmicas */
+#fallback{background:var(--app-bg)!important}
+#fx{display:none!important}
+
+/* ============================================================
+   MESA — cockpit de 3 colunas (trilho nav · ficha · dados)
+   escopado em .mesa-page; app/sistema/login não são afetados
+   ============================================================ */
+.mesa-nav{display:flex;flex-direction:column;gap:3px}
+.mesa-nav button,.mesa-nav a{display:flex;align-items:center;gap:9px;width:100%;text-align:left;font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-dim);background:transparent;border:0;border-radius:9px;padding:11px 12px;cursor:pointer;text-decoration:none;transition:background .12s,color .12s}
+.mesa-nav button:hover,.mesa-nav a:hover{background:var(--field);color:var(--ink)}
+.mesa-nav button.on{background:color-mix(in srgb,var(--brass) 15%,transparent);color:var(--brass)}
+.mesa-nav .divider{height:1px;background:var(--line);margin:7px 6px}
+.mesa-rail-left{padding:16px}
+.mesa-main{padding:16px 16px 44px}
+@media (min-width:821px){
+  .mesa-page{overflow:hidden}
+  .mesa-page .topbar{position:fixed;top:0;left:0;right:0;z-index:30}
+  .mesa-page .mesa-menu .hamburger{display:none}
+  .mesa-page .mesa-body{position:fixed;top:52px;bottom:50px;left:0;right:340px;display:grid;grid-template-columns:340px 1fr}
+  .mesa-page .mesa-rail-left{border-right:1px solid var(--line2);overflow:auto;background:var(--panel)}
+  .mesa-page .mesa-main{overflow:auto;padding:24px 32px 48px;min-width:0}
+  .mesa-page .dice-fab{display:none!important}
+  .mesa-page .dice-panel{display:flex!important;position:fixed;top:52px;bottom:50px;right:0;left:auto;width:340px;max-width:340px;max-height:none;transform:none;border:0;border-left:1px solid var(--line2);border-radius:0;box-shadow:none;z-index:20;animation:none}
+  .mesa-page .dice-panel .dh .x{display:none}
+  /* o canto direito agora tem o rodapé de chat (botão de enviar) fixo dentro do trilho de dados —
+     a aba de dicas (?) migra pro canto esquerdo, ao lado do alternador de tema, pra não ficar
+     flutuando em cima do botão de enviar mensagem */
+  .mesa-page .help-fab{left:68px;right:auto}
+}
+
+/* ============================================================
+   HOME — cara de menu de jogo (VTT), não dashboard/SSO
+   escopado em body.home-page
+   ============================================================ */
+body.home-page #fallback.solid{background:radial-gradient(1200px 520px at 50% -14%, color-mix(in srgb,var(--brass) 13%,transparent), transparent 68%),radial-gradient(900px 520px at 100% -6%, color-mix(in srgb,var(--brass) 6%,transparent), transparent 60%),var(--app-bg)}
+body.home-page .home{max-width:1120px;padding-top:38px}
+body.home-page .home-head{margin:6px 2px 30px}
+body.home-page .home-head h1{font-family:var(--disp);font-size:40px;letter-spacing:-.02em;line-height:1.02;color:var(--bone)}
+body.home-page .home-head p{font-size:14px;max-width:580px;line-height:1.6}
+body.home-page .home-tabs{gap:6px;margin-bottom:28px}
+body.home-page .home-tabs button{font-size:13px;padding:14px 20px}
+body.home-page .section-title{font-size:11px;letter-spacing:.24em;margin:32px 2px 16px}
+body.home-page .grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+body.home-page .card-tile{min-height:158px;padding:20px;border:1px solid var(--line2);background:linear-gradient(158deg,color-mix(in srgb,var(--brass) 7%,var(--surface)),var(--surface) 62%);position:relative;overflow:hidden}
+body.home-page .card-tile:hover{transform:translateY(-4px);border-color:var(--brass);box-shadow:0 18px 44px rgba(0,0,0,.5),0 0 0 1px color-mix(in srgb,var(--brass) 45%,transparent),0 0 34px -6px color-mix(in srgb,var(--brass) 45%,transparent)}
+body.home-page .card-tile h3{font-family:var(--disp);font-size:20px;color:var(--bone)}
+body.home-page .card-tile .meta{font-size:11px;color:var(--ink-dim);letter-spacing:.03em}
+body.home-page .card-tile .tile-head{display:flex;gap:13px;align-items:flex-start}
+body.home-page .card-tile .mesa-av{width:54px;height:54px;border-radius:13px;font-family:var(--disp);font-weight:700;font-size:22px;overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--brass) 16%,var(--field));color:var(--brass);border:1px solid var(--line2)}
+body.home-page .card-tile .mesa-av img{width:100%;height:100%;object-fit:cover}
+body.home-page .action-card{background:linear-gradient(158deg,color-mix(in srgb,var(--brass) 6%,var(--surface)),var(--surface) 66%);border:1px solid var(--line2)}
+body.home-page .action-card h4{font-family:var(--disp);font-size:16px;color:var(--bone)}
+
+/* MESA — abas no topo + party no trilho esquerdo */
+/* abas do topo esticam pra ocupar a altura toda do header (agora que .topbar tem altura FIXA,
+   align-self:stretch funciona limpo, sem precisar de margem negativa) — sem isso o botão fica
+   centralizado verticalmente e o sublinhado ativo (box-shadow inset) sobra "flutuando" no meio da
+   barra em vez de encostar na borda de baixo do header, que é onde ele precisa estar */
+.mesa-toptabs{display:flex;align-items:stretch;align-self:stretch;gap:2px;margin-left:6px;min-width:0}
+.mesa-toptabs button{display:flex;align-items:center;height:100%;font-family:var(--mono);font-weight:500;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint);background:transparent;border:0;padding:0 13px;cursor:pointer;white-space:nowrap;box-shadow:inset 0 -2px 0 transparent;transition:color .12s,box-shadow .12s}
+.mesa-toptabs button:hover{color:var(--ink-dim)}
+.mesa-toptabs button.on{color:var(--bone);box-shadow:inset 0 -2px 0 var(--brass)}
+.party-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin:0 2px 12px}
+.party-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;border:1px solid var(--line);margin-bottom:7px;background:var(--field-2)}
+.party-row.me{border-color:color-mix(in srgb,var(--brass) 45%,transparent);background:color-mix(in srgb,var(--brass) 10%,transparent)}
+.party-av{width:32px;height:32px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:700;font-size:14px;background:var(--field);border:1px solid var(--line2);color:var(--ink-dim)}
+.party-row.me .party-av{background:var(--brass);color:var(--on-primary);border:0}
+.party-info{min-width:0}
+.party-name{font-family:var(--serif);font-weight:600;font-size:13px;color:var(--bone);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.party-role{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:2px}
+.mesa-extra{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:2px}
+.mesa-extra button,.mesa-extra a{display:block;text-align:left;width:100%;font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);background:transparent;border:0;border-radius:8px;padding:9px 10px;cursor:pointer;text-decoration:none}
+.mesa-extra button:hover,.mesa-extra a:hover{background:var(--field);color:var(--ink)}

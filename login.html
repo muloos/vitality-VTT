@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("vt_theme")||"dark"}catch(e){}</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vitality · Acesso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/theme.css?v=9">
+<style>
+  html,body{min-height:100%}
+  /* rolagem liberada: em telas baixas o card não fica mais cortado/inacessível */
+  .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px 20px}
+  .card{width:100%;max-width:408px;border-radius:22px;padding:30px 28px 26px}
+  .head{text-align:center;margin-bottom:22px}
+  .head .title{font-size:20px}
+  .tagline{font-family:var(--serif);font-size:13.5px;color:var(--ink-dim);line-height:1.55;margin:13px auto 0;max-width:312px}
+  .foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--ink-faint);margin-top:20px}
+  form{display:block}
+  .gbtn .gicon{width:17px;height:17px;flex:0 0 auto}
+  /* mostrar/ocultar senha */
+  .pw-wrap{position:relative}
+  .pw-wrap input{padding-right:46px}
+  .pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;background:transparent;
+    color:var(--ink-faint);cursor:pointer;font-size:15px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .pw-toggle:hover{color:var(--ink)}
+  /* Google "em breve" — honesto, não parece quebrado */
+  .btn.soon{opacity:.75}
+  .soon-pill{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);
+    border:1px solid rgba(227,192,113,.4);border-radius:6px;padding:2px 6px}
+  @media (max-width:440px){ .card{padding:26px 20px} }
+</style>
+</head>
+<body>
+<div id="fallback"></div>
+<canvas id="fx"></canvas>
+
+<div class="wrap">
+  <div class="card glass">
+    <div class="head">
+      <div class="title">VITALITY<small>VTT · MESA VIRTUAL</small></div>
+      <p class="tagline">Crie seu próprio sistema de RPG e jogue com amigos: fichas, status, dados e trilha sonora — tudo numa mesa virtual.</p>
+    </div>
+
+    <div class="seg glass" role="tablist">
+      <button id="tab-signin" class="on" onclick="setMode('signin')">Entrar</button>
+      <button id="tab-signup" onclick="setMode('signup')">Criar conta</button>
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <form id="form" onsubmit="return submitForm(event)">
+      <div class="fld" id="fld-name" style="display:none">
+        <label for="name">Nome de exibição</label>
+        <input id="name" type="text" autocomplete="nickname" placeholder="Como vão te chamar na mesa">
+      </div>
+      <div class="fld">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" required placeholder="voce@exemplo.com">
+      </div>
+      <div class="fld">
+        <label for="password">Senha</label>
+        <div class="pw-wrap">
+          <input id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="••••••••">
+          <button type="button" class="pw-toggle" id="pw-toggle" onclick="togglePw()" aria-label="Mostrar senha" title="Mostrar senha"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+      <button type="submit" id="submit" class="btn go">
+        <span class="spin"></span><span id="submit-label">Entrar</span>
+      </button>
+    </form>
+
+    <div class="divider">ou</div>
+
+    <button class="btn gbtn soon" id="google" onclick="googleLogin()">
+      <svg class="gicon" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z"/>
+        <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+      </svg>
+      Continuar com Google
+      <span class="soon-pill">em breve</span>
+    </button>
+
+    <div class="foot">MÁQUINA · CARNE · ESCARLATE</div>
+  </div>
+</div>
+
+<script type="module">
+import { startParticles } from './lib/particles.js';
+import { signInWithPassword, signUp, signInWithGoogle, getSession } from './lib/db.js?v=24';
+
+startParticles(document.getElementById('fx'));
+
+const APP_URL = new URL('app.html', window.location.href).href;
+// `next` volta pro app.html/mesa.html/etc. de onde o usuário veio (só caminhos internos, nunca URL externa).
+const NEXT = (() => {
+  const raw = new URLSearchParams(location.search).get('next');
+  if (raw && raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('://')) return raw;
+  return null;
+})();
+const DEST = NEXT ? new URL(NEXT, window.location.href).href : APP_URL;
+let mode = 'signin';
+
+// Vira `true` só depois de habilitar o provider Google no painel do Supabase
+// (Authentication > Providers > Google, com Client ID/Secret do Google Cloud).
+// Enquanto false, o clique nem tenta o redirect — evita o erro cru
+// "Unsupported provider: provider is not enabled" que o Supabase devolve
+// como página de navegação (não dá pra capturar isso com try/catch).
+const GOOGLE_ENABLED = false;
+
+const $ = (id) => document.getElementById(id);
+const msgEl = $('msg');
+
+function showMsg(text, kind) {
+  msgEl.textContent = text;
+  msgEl.className = 'msg show ' + (kind || 'err');
+}
+function clearMsg() { msgEl.className = 'msg'; }
+
+function setLoading(on) {
+  const b = $('submit');
+  b.classList.toggle('loading', on);
+  b.disabled = on;
+  $('google').disabled = on;
+}
+
+window.setMode = (m) => {
+  mode = m;
+  clearMsg();
+  $('tab-signin').classList.toggle('on', m === 'signin');
+  $('tab-signup').classList.toggle('on', m === 'signup');
+  $('fld-name').style.display = m === 'signup' ? '' : 'none';
+  $('submit-label').textContent = m === 'signup' ? 'Criar conta' : 'Entrar';
+  $('password').setAttribute('autocomplete', m === 'signup' ? 'new-password' : 'current-password');
+};
+
+window.submitForm = (ev) => {
+  ev.preventDefault();
+  clearMsg();
+  const email = $('email').value.trim();
+  const password = $('password').value;
+  const name = $('name').value.trim();
+  setLoading(true);
+
+  const run = mode === 'signup'
+    ? signUp(email, password, name)
+    : signInWithPassword(email, password);
+
+  run.then((data) => {
+    if (mode === 'signup' && !data.session) {
+      // confirmação de email ligada no projeto
+      showMsg('Conta criada! Confirme o link enviado para seu email para entrar.', 'ok');
+      setLoading(false);
+      return;
+    }
+    window.location.href = DEST;
+  }).catch((err) => {
+    showMsg(translateError(err), 'err');
+    setLoading(false);
+  });
+  return false;
+};
+
+window.togglePw = () => {
+  const i = $('password'), b = $('pw-toggle');
+  const show = i.type === 'password';
+  i.type = show ? 'text' : 'password';
+  b.innerHTML = show
+    ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c7 0 10.5 7 10.5 7a13.2 13.2 0 0 1-3 3.9M6.4 6.4C3.7 8.1 1.5 12 1.5 12S5 19 12 19a10 10 0 0 0 4.2-.9"/><path d="M9.5 9.8a3 3 0 0 0 4.2 4.2"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  b.title = show ? 'Ocultar senha' : 'Mostrar senha';
+};
+
+window.googleLogin = () => {
+  clearMsg();
+  if (!GOOGLE_ENABLED) {
+    showMsg('Login com Google chega em breve. Por enquanto, entre com email e senha.', 'ok');
+    return;
+  }
+  setLoading(true);
+  signInWithGoogle(DEST).catch((err) => {
+    showMsg(translateError(err), 'err');
+    setLoading(false);
+  });
+};
+
+function translateError(err) {
+  const m = (err && err.message) || String(err);
+  if (/Invalid login credentials/i.test(m)) return 'Email ou senha incorretos.';
+  if (/User already registered/i.test(m)) return 'Esse email já tem conta. Tente entrar.';
+  if (/Password should be at least/i.test(m)) return 'A senha precisa de pelo menos 6 caracteres.';
+  if (/Email not confirmed/i.test(m)) return 'Confirme seu email antes de entrar.';
+  if (/provider is not enabled/i.test(m)) return 'Login com Google ainda não está habilitado no projeto.';
+  return m;
+}
+
+// Já logado? vai direto pro destino (ou pro app, se não veio de nenhuma página específica).
+getSession().then((s) => { if (s) window.location.href = DEST; else $('email').focus(); });
+</script>
+</body>
+</html>
