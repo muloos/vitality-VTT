@@ -8,9 +8,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=9">
+<link rel="stylesheet" href="lib/theme.css?v=35">
 </head>
 <body class="mesa-page">
+<script>try{
+  if(localStorage.getItem("vt_rail_collapsed")==="1")document.body.classList.add("rail-collapsed");
+  if(localStorage.getItem("vt_dice_collapsed")==="1")document.body.classList.add("dice-collapsed");
+  if(localStorage.getItem("vt_mobile_rail_collapsed")==="1")document.body.classList.add("mobile-rail-collapsed");
+}catch(e){}</script>
 <div id="fallback" class="solid"></div>
 
 <div class="topbar">
@@ -21,8 +26,9 @@
       <span id="mesa-av" class="mesa-av sm" style="display:none"></span>
       <div class="title" id="mesa-name">…</div>
     </button>
+    <div class="drop glass" id="mesa-menu-drop" role="menu"></div>
   </div>
-  <nav id="tabs" class="mesa-toptabs" role="menu"></nav>
+  <nav id="tabs" class="mesa-toptabs" role="tablist"></nav>
   <div class="spacer"></div>
   <div class="nav-user" id="nav-user">
     <button type="button" class="chip" id="nav-user-btn" aria-haspopup="menu" aria-expanded="false" onclick="toggleUserMenu()">
@@ -40,20 +46,33 @@
 </div>
 
 <div class="mesa-body">
-  <aside class="mesa-rail-left"><div id="party" class="party-list"></div><div id="mesa-extra" class="mesa-extra"></div></aside>
+  <aside class="mesa-rail-left" id="rail-left">
+    <button type="button" class="rail-mobile-toggle" id="rail-mobile-toggle" onclick="toggleMobileRail()" aria-expanded="true">
+      <span>Jogadores &amp; mesa</span>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div id="rail-left-body"><div id="party" class="party-list"></div><div id="mesa-requests"></div><div id="mesa-extra" class="mesa-extra"></div></div>
+  </aside>
   <main class="mesa-main">
     <div id="msg" class="msg"></div>
     <div id="content"></div>
   </main>
 </div>
+<button type="button" class="rail-toggle left" id="rail-toggle-left" onclick="toggleRailLeft()" title="Esconder/mostrar jogadores">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+</button>
+<button type="button" class="rail-toggle right" id="rail-toggle-right" onclick="toggleRailRight()" title="Esconder/mostrar dados">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+</button>
 
 <script type="module">
-import * as db from './lib/db.js?v=24';
-import { mountHelp, mountThemeToggle, openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme } from './lib/ui.js?v=3';
-import { mountYtPlayer } from './lib/ytplayer.js?v=3';
+import * as db from './lib/db.js?v=30';
+import { openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme, trapFocus } from './lib/ui.js?v=4';
+import { mountYtPlayer } from './lib/ytplayer.js?v=4';
 
-mountHelp('mesa');
-mountThemeToggle();
+// sem mountHelp/mountThemeToggle flutuantes aqui: "Ajuda ou suporte" e "Tema" já existem como itens
+// de texto no menu de conta (#nav-user, logo acima) — os FABs eram um atalho redundante pra mesma
+// ação, só ocupando espaço na tela por cima do tabuleiro.
 const $ = (id) => document.getElementById(id);
 const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>';
 const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>';
@@ -84,7 +103,8 @@ function confirmModal({ title, desc, confirmLabel = 'Confirmar', danger = true }
         <button class="btn auto ${danger ? 'danger' : 'go'}" id="cm-ok">${esc(confirmLabel)}</button>
       </div>
     </div>`;
-    const finish = (result) => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
+    const untrap = trapFocus(w);
+    const finish = (result) => { untrap(); w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
     const onEsc = (e) => { if (e.key === 'Escape') finish(false); };
     w.addEventListener('click', (e) => { if (e.target === w) finish(false); });
     w.querySelector('.x').onclick = () => finish(false);
@@ -122,9 +142,14 @@ const emptyState = (icon, title, desc, cta) => `<div class="empty-cta"><div clas
   <div class="ec-title">${title}</div><div class="ec-desc">${desc}</div>${cta || ''}</div>`;
 const campaignId = new URLSearchParams(location.search).get('id');
 
-let role = null, mesa = null, character = null, currentTab = null, sys = null, myId = null, _statMap = null, _unsub = null, _unsubChat = null;
+let role = null, mesa = null, character = null, currentTab = null, sys = null, myId = null, _statMap = null, _unsub = null, _unsubChat = null, _unsubItemReq = null;
+let _unsubCharLive = null, _unsubMembers = null, _unsubCampaign = null, _unsubGmView = null, _unsubPresence = null;
+let _onlineIds = new Set();
 let myName = null, myEmail = null;
 let inOnboarding = false;
+// junta N chamadas rápidas (ex.: resync de classe mexendo em vários atributos de uma vez) numa só —
+// evita re-renderizar a aba várias vezes em sequência quando um lote de mudanças chega em tempo real
+function debounce(fn, ms) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
 
 function showMsg(t, kind) { const m = $('msg'); m.textContent = t; m.className = 'msg show ' + (kind || 'err'); setTimeout(() => { if (m.textContent === t) m.className = 'msg'; }, 4000); }
 
@@ -138,8 +163,9 @@ function tabsFor() {
   const icDna = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3c0 6 12 12 12 18M18 3c0 6-12 12-12 18"/><path d="M7.5 7h9M7.5 17h9M6.5 12h11"/></svg></span>';
   const icBag = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/></svg></span>';
   const icPencil = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>';
+  const icSparkle = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="2.4"/></svg></span>';
   if (role === 'gm') return [['jogadores', icGroup + 'Jogadores'], ['atributos', (hasSys ? icGear : icChart) + (hasSys ? 'Sistema' : 'Atributos')], ['arvores', icTree + 'Árvores']];
-  return [['ficha', icScroll + 'Ficha'], ['biografia', icDna + 'Biografia'], ['inventario', icBag + 'Inventário'], ['anotacoes', icPencil + 'Anotações'], ['arvores', icTree + 'Árvores']];
+  return [['ficha', icScroll + 'Ficha'], ['biografia', icDna + 'Biografia'], ['inventario', icBag + 'Inventário'], ['habilidades', icSparkle + 'Habilidades'], ['anotacoes', icPencil + 'Anotações'], ['arvores', icTree + 'Árvores']];
 }
 
 (async () => {
@@ -189,21 +215,56 @@ function enterMesa() {
   openTab(tabsFor()[0][0]);
   mountDice();
   mountYtPlayer({ campaignId, role, db });
+  mountItemRequests();
+  mountLiveSync();
+}
+
+// mantém a tela sincronizada sem precisar de F5 quando outro cliente conectado (o próprio Mestre,
+// ou o jogador em outra aba/dispositivo) muda algo — pontos, itens, equipar, fotos, etc. Cada papel
+// assina só o que pode ver (RLS já garante isso no servidor); o callback só re-renderiza a aba atual
+// se ela depender do que mudou, pra não interromper à toa uma aba sem relação com a mudança.
+function mountLiveSync() {
+  if (role === 'player' && character) {
+    _unsubCharLive = db.subscribeCharacterLive(character.id, myId, debounce(() => {
+      if (currentTab === 'ficha') { patchFichaLive(); return; }
+      if (currentTab === 'inventario') { patchInventarioLive(); return; }
+      if (currentTab === 'arvores') { patchArvoresLive(); return; }
+    }, 300));
+  }
+  // o trilho de jogadores (#party) fica visível o tempo todo, pra Mestre e jogador — antes só o
+  // Mestre assinava isso, e só pra atualizar a lista DENTRO da aba "Jogadores"; o trilho lateral
+  // ficava mostrando gente que já tinha saído até dar F5
+  _unsubMembers = db.subscribeMemberships(campaignId, debounce(() => {
+    renderParty();
+    if (role === 'gm') patchJogadoresLive();
+  }, 300));
+  // ponto de presença (online agora) — canal efêmero, não grava nada no banco
+  _unsubPresence = db.subscribePresence(campaignId, myId, (online) => { _onlineIds = online; renderParty(); });
+  _unsubCampaign = db.subscribeCampaign(campaignId, debounce((row) => {
+    if (!row) return;
+    mesa = { ...mesa, ...row };
+    const sysName = sys?.system?.name;
+    $('mesa-name').innerHTML = esc(mesa.name) + '<small>' + (role === 'gm' ? 'MESTRE' : 'JOGADOR') + (sysName ? ' · SISTEMA: ' + esc(sysName).toUpperCase() : '') + '</small>';
+    paintMesaAvatar();
+  }, 300));
 }
 
 function buildTabs() {
   $('tabs').innerHTML = tabsFor().map(([id, label]) =>
-    `<button role="menuitem" data-tab="${id}" onclick="selectTab('${id}')">${label}</button>`).join('');
+    `<button role="tab" aria-selected="false" data-tab="${id}" onclick="selectTab('${id}')">${label}</button>`).join('');
   const extra = $('mesa-extra');
-  if (extra) {
-    const icKey = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/></svg></span>';
-    const icLogout = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>';
-    const icBack = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>';
-    const act = role === 'gm'
-      ? `<button onclick="copyCode()">${icKey}Código ${esc(mesa.join_code)}</button>`
-      : `<button onclick="leaveMesa()">${icLogout}Sair desta mesa</button>`;
-    extra.innerHTML = act + `<a href="app.html">${icBack}Voltar à plataforma</a>`;
-  }
+  const icKey = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/></svg></span>';
+  const icLogout = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>';
+  const icBack = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>';
+  // dois lugares mostram as mesmas ações (trilho esquerdo sempre visível + dropdown do topo, útil
+  // em telas onde o trilho não cabe/não tem como recolher) — mesmo HTML nos dois, só muda o atributo
+  // role="menuitem" que o dropdown precisa e o trilho não
+  const act = (menuitem) => role === 'gm'
+    ? `<button ${menuitem ? 'role="menuitem"' : ''} onclick="copyCode()">${icKey}Código ${esc(mesa.join_code)}</button>`
+    : `<button ${menuitem ? 'role="menuitem"' : ''} onclick="leaveMesa()">${icLogout}Sair desta mesa</button>`;
+  if (extra) extra.innerHTML = act(false) + `<a href="app.html">${icBack}Voltar à plataforma</a>`;
+  const menuDrop = $('mesa-menu-drop');
+  if (menuDrop) menuDrop.innerHTML = act(true) + `<a role="menuitem" href="app.html">${icBack}Voltar à plataforma</a>`;
 }
 async function renderParty() {
   const box = $('party'); if (!box) return;
@@ -216,8 +277,9 @@ async function renderParty() {
     const nm = m.profile?.display_name || '—';
     const initial = (nm.trim().charAt(0) || '?').toUpperCase();
     const me = m.user_id === myId;
+    const online = _onlineIds.has(m.user_id);
     return `<div class="party-row${me ? ' me' : ''}">
-      <div class="party-av">${esc(initial)}</div>
+      <div class="party-av">${esc(initial)}<span class="presence-dot${online ? ' on' : ''}" title="${online ? 'Online agora' : 'Offline'}"></span></div>
       <div class="party-info"><div class="party-name">${esc(nm)}${me ? ' · você' : ''}</div>
       <div class="party-role">${m.role === 'gm' ? 'Mestre' : 'Jogador'}</div></div>
     </div>`;
@@ -225,17 +287,39 @@ async function renderParty() {
 }
 window.selectTab = (id) => { closeMesaMenu(); openTab(id); };
 
+let _lastSistemaEmbedTabRendered; // sentinela pro guard abaixo — mesmo truque de _lastArvoreRenderedId
 window.openTab = (name) => {
+  // reclicar na aba Árvores enquanto a mesma árvore já está aberta não deve recriar o iframe do
+  // zero — só troca de aba (currentTab muda) ou troca de árvore (_arvoreViewingId muda) precisa
+  if (name === 'arvores' && currentTab === 'arvores' && _arvoreViewingId === _lastArvoreRenderedId) return;
+  // mesma lógica pro construtor de sistema embutido na aba "Sistema": reclicar nela sem trocar de
+  // sub-aba do sistema (Status/Itens/...) não pode recriar o iframe, senão qualquer edição em
+  // andamento ali dentro se perde
+  if (name === 'atributos' && currentTab === 'atributos' && _sistemaEmbedTab === _lastSistemaEmbedTabRendered) return;
+  // sair da visão somente-leitura do Mestre (viewPlayer) pra qualquer aba encerra a assinatura
+  // daquele personagem — senão ela ficaria viva pra sempre no fundo, mesmo sem ninguém olhando
+  if (_unsubGmView) { _unsubGmView(); _unsubGmView = null; }
   currentTab = name;
-  [...$('tabs').children].forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  [...$('tabs').children].forEach((b) => {
+    const on = b.dataset.tab === name;
+    b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on));
+  });
   const c = $('content');
   c.innerHTML = '<div class="empty">Carregando…</div>';
+  if (name === 'arvores') _lastArvoreRenderedId = _arvoreViewingId;
+  if (name === 'atributos') _lastSistemaEmbedTabRendered = _sistemaEmbedTab;
   const fn = { jogadores: renderJogadores, atributos: renderAtributos, arvores: renderArvores,
-               ficha: renderFicha, biografia: renderBiografia, inventario: renderInventario, anotacoes: renderAnotacoes }[name];
+               ficha: renderFicha, biografia: renderBiografia, inventario: renderInventario, anotacoes: renderAnotacoes,
+               habilidades: renderHabilidades }[name];
   fn(c).catch((e) => { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
 };
 
-window.copyCode = () => { navigator.clipboard?.writeText(mesa.join_code); showMsg('Código copiado.', 'ok'); };
+window.copyCode = () => {
+  if (!navigator.clipboard) { showMsg('Não deu pra copiar automaticamente — o código é ' + mesa.join_code + '.'); return; }
+  navigator.clipboard.writeText(mesa.join_code)
+    .then(() => showMsg('Código copiado.', 'ok'))
+    .catch(() => showMsg('Não deu pra copiar automaticamente — o código é ' + mesa.join_code + '.'));
+};
 window.openProfile = () => {
   closeUserMenu();
   openProfileModal({
@@ -277,6 +361,25 @@ window.toggleUserMenu = () => {
   const open = el.classList.toggle('open');
   $('nav-user-btn')?.setAttribute('aria-expanded', String(open));
   if (open) { closeMesaMenu(); el.querySelector('.drop [role="menuitem"]')?.focus(); }
+};
+// esconder/mostrar os trilhos laterais (só desktop — a media query de theme.css que faz o "slide"
+// só existe lá) — lembra a preferência entre visitas, igual ao tema
+window.toggleRailLeft = () => {
+  const collapsed = document.body.classList.toggle('rail-collapsed');
+  try { localStorage.setItem('vt_rail_collapsed', collapsed ? '1' : '0'); } catch (_) {}
+};
+window.toggleRailRight = () => {
+  const collapsed = document.body.classList.toggle('dice-collapsed');
+  try { localStorage.setItem('vt_dice_collapsed', collapsed ? '1' : '0'); } catch (_) {}
+};
+// versão mobile do recolher trilho esquerdo: abaixo de 821px não existe o cockpit de 3 colunas
+// (nem os botões rail-toggle, que só fazem sentido ancorados na borda de um layout largo) — sem
+// isso, a lista de jogadores + código/sair da mesa sempre empilhavam ACIMA do conteúdo da aba
+// escolhida, obrigando a rolar por tudo isso toda vez no celular
+window.toggleMobileRail = () => {
+  const collapsed = document.body.classList.toggle('mobile-rail-collapsed');
+  $('rail-mobile-toggle')?.setAttribute('aria-expanded', String(!collapsed));
+  try { localStorage.setItem('vt_mobile_rail_collapsed', collapsed ? '1' : '0'); } catch (_) {}
 };
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#mesa-menu')) closeMesaMenu();
@@ -335,19 +438,12 @@ async function renderJogadores(c) {
     <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 8px">
       Compartilhe o código <b style="color:var(--brass);letter-spacing:.15em">${esc(mesa.join_code)}</b> — quem entrar com ele vira Jogador desta mesa.</p>
 
-    <div class="section-title">Jogadores (${players.length})</div>
-    <div class="list">${members.map((m) => `
-      <div class="list-row">
-        <div class="grow"><div class="nm">${esc(m.profile?.display_name || '—')}</div>
-        <div class="sub">${m.role === 'gm' ? 'Mestre (você)' : 'Jogador'}</div></div>
-        ${m.role === 'player' ? `
-          <button class="btn sm auto" onclick="viewPlayer('${m.user_id}', this.dataset.n)" data-n="${esc(m.profile?.display_name || 'Jogador')}">Ver ficha</button>
-          <button class="btn sm danger auto" onclick="removePlayer('${m.user_id}', this.dataset.n)" data-n="${esc(m.profile?.display_name || 'Jogador')}">Remover</button>` : ''}
-      </div>`).join('')}</div>
-    ${players.length ? '' : '<p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin:10px 2px">Nenhum jogador entrou ainda.</p>'}
+    <div class="section-title">Jogadores <span id="jogadores-count">(${players.length})</span></div>
+    <div class="list" id="jogadores-list">${members.map(memberRowHtml).join('')}</div>
+    <p id="jogadores-empty-hint" style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin:10px 2px;${players.length ? 'display:none' : ''}">Nenhum jogador entrou ainda.</p>
 
     <div class="section-title">Configurações da mesa</div>
-    <div class="fld row"><label>Nome da mesa</label>
+    <div class="fld row"><label>Nome da mesa <span class="autosave-hint">salva ao sair do campo</span></label>
       <input value="${esc(mesa.name)}" onchange="renameMesa(this.value)"></div>
     <div class="fld row"><label>Foto da mesa</label>
       <div class="img-picker">
@@ -361,10 +457,42 @@ async function renderJogadores(c) {
     <button class="btn danger auto sm" onclick="deleteMesa()">Excluir mesa</button>`;
 }
 
+function memberRowHtml(m) {
+  return `<div class="list-row" data-id="${m.user_id}">
+    <div class="grow"><div class="nm">${esc(m.profile?.display_name || '—')}</div>
+    <div class="sub">${m.role === 'gm' ? 'Mestre (você)' : 'Jogador'}</div></div>
+    ${m.role === 'player' ? `
+      <button class="btn sm auto" onclick="viewPlayer('${m.user_id}', this.dataset.n)" data-n="${esc(m.profile?.display_name || 'Jogador')}">Ver ficha</button>
+      <button class="btn sm danger auto" onclick="removePlayer('${m.user_id}', this.dataset.n)" data-n="${esc(m.profile?.display_name || 'Jogador')}">Remover</button>` : ''}
+  </div>`;
+}
+// atualização leve da lista de jogadores (entrar/sair) — mexe só nas linhas que mudaram, sem
+// recarregar as Configurações da mesa (nome/foto) logo abaixo, que já são editadas ali mesmo
+async function patchJogadoresLive() {
+  if (currentTab !== 'jogadores') return;
+  try {
+    const members = await db.listMembers(campaignId);
+    const players = members.filter((m) => m.role === 'player');
+    const list = $('jogadores-list');
+    if (list) {
+      const existing = new Map([...list.querySelectorAll('[data-id]')].map((el) => [el.dataset.id, el]));
+      const seen = new Set();
+      members.forEach((m) => {
+        seen.add(m.user_id);
+        const fresh = memberRowHtml(m);
+        const old = existing.get(m.user_id);
+        if (old) old.outerHTML = fresh; else list.insertAdjacentHTML('beforeend', fresh);
+      });
+      existing.forEach((el, id) => { if (!seen.has(id)) el.remove(); });
+    }
+    const count = $('jogadores-count'); if (count) count.textContent = `(${players.length})`;
+    const hint = $('jogadores-empty-hint'); if (hint) hint.style.display = players.length ? 'none' : '';
+  } catch (_) {}
+}
 window.removePlayer = async (userId, name) => {
   const ok = await confirmModal({ title: 'Remover jogador', desc: `A ficha de ${name} nesta mesa será apagada. Não dá pra desfazer.`, confirmLabel: 'Remover' });
   if (!ok) return;
-  db.removeMember(campaignId, userId).then(() => { showMsg(`${name} removido(a).`, 'ok'); openTab('jogadores'); })
+  db.removeMember(campaignId, userId).then(() => { showMsg(`${name} removido(a).`, 'ok'); patchJogadoresLive(); renderParty(); })
     .catch((e) => showMsg(e.message));
 };
 window.renameMesa = (name) => {
@@ -378,12 +506,46 @@ window.deleteMesa = async () => {
   db.deleteCampaign(campaignId).then(() => { location.href = 'app.html'; }).catch((e) => showMsg(e.message));
 };
 
-// Ficha de um jogador, somente leitura (visão do Mestre — sem anotações)
-let _gmViewUserId = null, _gmViewName = '';
+// moldura de raridade "premium" (mesmo padrão de app.html/sistema.html, duplicado aqui de
+// propósito) — usada na mochila somente-leitura que o Mestre vê da ficha do jogador. Diferente
+// do rarityFxLayers() do tabuleiro (paper doll), que é outro efeito (aura/ground/rings/rays).
+function posterRarityLayers(rarity) {
+  const glintSpots = {
+    'Épico': [[16, 22]],
+    'Lendário': [[18, 18], [80, 28], [14, 66], [84, 86]],
+    'Único': [[12, 14], [82, 20], [6, 36], [90, 46], [16, 64], [86, 78], [24, 94], [72, 90], [48, 10], [46, 56], [66, 48]],
+  };
+  const spots = glintSpots[rarity] || [];
+  let glints = '';
+  spots.forEach((p, i) => {
+    const delay = (i * 0.28).toFixed(2);
+    const dur = (2.1 + (i % 4) * 0.3).toFixed(2);
+    const size = 8 + (i % 3) * 2;
+    glints += `<i class="pc-glint" style="left:${p[0]}%;top:${p[1]}%;width:${size}px;height:${size}px;animation-delay:${delay}s;animation-duration:${dur}s"></i>`;
+  });
+  let extra = '';
+  if (rarity === 'Épico' || rarity === 'Único') extra += `<span class="pc-sweep"></span>`;
+  if (rarity === 'Lendário' || rarity === 'Único') extra += `<span class="pc-highlight"></span><span class="pc-topline"></span><span class="pc-core"></span>`;
+  if (rarity === 'Único') extra += `<span class="pc-sweep pc-sweep2"></span><span class="pc-ring"></span><span class="pc-ring pc-ring2"></span>`;
+  return extra + glints;
+}
+// Ficha de um jogador, somente leitura (visão do Mestre — sem anotações). Dividida em sub-abas
+// (Ficha/Biografia/Inventário/Habilidades/Árvores), no mesmo espírito das abas que o próprio
+// jogador já tem — antes era tudo isso amontoado num scroll só. `viewPlayer` é a "casca": busca os
+// dados uma vez, desenha cabeçalho+sub-abas, e delega o conteúdo de cada sub-aba pra gmViewTab().
+// currentTab/openTab (nível superior da mesa, aba "Jogadores") continuam intocados — esse é um
+// dispatcher separado, senão as duas coisas se confundiriam.
+let _gmViewUserId = null, _gmViewName = '', _gmViewTab = 'ficha';
 async function viewPlayer(userId, name) {
   const c = $('content');
-  c.innerHTML = '<div class="empty">Carregando ficha…</div>';
+  const sameUser = _gmViewUserId === userId;
+  // troca de personagem visto sempre volta pra "Ficha"; reabrir o MESMO personagem (ex.: uma
+  // atualização ao vivo dele) preserva a sub-aba que o Mestre já estava lendo, sem jogar ele de
+  // volta pro topo no meio da leitura
+  if (!sameUser) { c.innerHTML = '<div class="empty">Carregando ficha…</div>'; _gmViewTab = 'ficha'; }
   _gmViewUserId = userId; _gmViewName = name;
+  // troca de personagem visto (ou reabrir o mesmo) sempre reinicia a assinatura — nunca acumula
+  if (_unsubGmView) { _unsubGmView(); _unsubGmView = null; }
   try {
     let sheet = await db.loadPlayerSheet(campaignId, userId);
     let gmChanged = sheet.character
@@ -391,33 +553,24 @@ async function viewPlayer(userId, name) {
     if (sheet.character) { try { const r = await db.applyLevelRewards(sheet.character.id); if (r.stat_points || r.tree_points) gmChanged = true; } catch (_) {} }
     if (gmChanged) sheet = await db.loadPlayerSheet(campaignId, userId); // busca de novo com os valores já atualizados
     const { character, attributes, values, resources, proficiencies, inventory, systemId } = sheet;
-    _gmViewChar = character; _gmViewAttrs = attributes; _gmViewValues = { ...values }; _gmViewProficiencies = { ...(proficiencies || {}) }; _gmViewProfCtx = profCtxFrom(_gmViewProficiencies);
+    _gmViewChar = character; _gmViewAttrs = attributes; _gmViewValues = { ...values }; _gmViewResources = { ...(resources || {}) };
+    _gmViewProficiencies = { ...(proficiencies || {}) }; _gmViewProfCtx = profCtxFrom(_gmViewProficiencies); _gmViewInventory = inventory;
     if (!character) { c.innerHTML = `<button class="btn auto sm" onclick="openTab('jogadores')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>Voltar aos jogadores</button>
       <div class="empty" style="margin-top:14px">Este jogador ainda não montou a ficha.</div>`; return; }
+    // ao vivo: se o próprio jogador mudar algo (equipar, gastar ponto, subir foto...) enquanto o
+    // Mestre está de olho nessa ficha, ela se atualiza sozinha, sem precisar reabrir "Ver ficha"
+    _unsubGmView = db.subscribeCharacterLive(character.id, userId, debounce(() => {
+      if (_gmViewUserId === userId) viewPlayer(userId, name);
+    }, 300));
     try { _gmViewSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, userId)), equipBonusMap(inventory, attributes)); }
     catch (_) { _gmViewSkillBonus = equipBonusMap(inventory, attributes); }
-    const trees = systemId ? await db.listSystemTrees(systemId).catch(() => []) : [];
-    const treeRows = await Promise.all(trees.map(async (t) => {
+    _gmViewProtection = protectionTotalIn(inventory, attributes, values, _gmViewSkillBonus, _gmViewProfCtx);
+    _gmViewTrees = systemId ? await db.listSystemTrees(systemId).catch(() => []) : [];
+    _gmViewTreeRows = await Promise.all(_gmViewTrees.map(async (t) => {
       let pts = 0;
       try { pts = await db.getTreePoints(t.id, userId); } catch (_) {}
       return { tree: t, pts };
     }));
-
-    const gmResBar = (a) => {
-      const max = evalStatIn(attributes, values, a, _gmViewSkillBonus, new Set(), _gmViewProfCtx) ?? 0;
-      let cur = resources?.[a.id]; if (cur == null || cur === '') cur = max; cur = Number(cur);
-      return `<div class="res-row" style="--res-color:${esc(a.color || '#35c6d4')}">
-        <div class="res-head">
-          <span class="res-label"><i class="res-dot"></i>${esc(a.name)}</span>
-          <span class="res-amt-line"><b>${cur}</b>&nbsp;/&nbsp;${max}</span>
-        </div>
-        <div class="res-bar-row"><div class="res-track">${resBarHtml(cur, max)}</div></div>
-      </div>`;
-    };
-    const primaries = attributes.filter((a) => a.is_resource);
-    const gmSkills = sys?.system?.skills_enabled ? attributes.filter((a) => a.is_skill) : [];
-    const secondary = attributes.filter((a) => !a.is_resource && !a.is_skill);
-    const hasBaseSec = secondary.some((a) => a.kind === 'base');
 
     c.innerHTML = `
       <button class="btn auto sm" onclick="openTab('jogadores')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>Voltar aos jogadores</button>
@@ -435,54 +588,175 @@ async function viewPlayer(userId, name) {
           </div>
         </div>
       </div>
-      ${(() => {
-        const prose = (label, val) => val ? `<div class="fld"><label>${label}</label><p style="font-size:14px;color:var(--ink-dim);line-height:1.6;margin:0">${esc(val)}</p></div>` : '';
-        return prose('Bio', character.bio) + prose('Aparência física', character.appearance) + prose('Naturalidade / origem', character.origin)
-          + prose('Traços de personalidade', character.personality) + prose('Ideais e motivações', character.ideals)
-          + prose('Vínculos', character.bonds) + prose('Defeitos e medos', character.flaws);
-      })()}
-
-      <div class="status-hud">
-        ${primaries.length ? `<div class="hud-sec-label">Recursos<span class="ln"></span></div>
-          <div class="hud-bars">${primaries.map(gmResBar).join('')}</div>` : ''}
-        <div class="hud-sec-label">Status${secondary.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
-        <div class="stat-grid">
-          ${secondary.map((a) => gmStatRow(a)).join('')}
-          ${secondary.length ? '' : '<div class="empty" style="grid-column:1/-1">Sem status secundários.</div>'}
-        </div>
-        ${hasBaseSec ? `<div class="points-card" style="margin-top:14px">
-          <div class="hud-sec-label">Pontos de status do jogador<span class="ln"></span></div>
-          <div style="display:flex;align-items:center;gap:14px;margin-top:4px">
-            <button class="plus" title="Tirar 1 ponto" onclick="gmAdjustPoints(-1)">−</button>
-            <span class="points-value" id="gm-points-badge" style="margin:0">${character.stat_points || 0}</span>
-            <button class="plus" title="Dar 1 ponto" onclick="gmAdjustPoints(1)">+</button>
-          </div>
-        </div>` : ''}
-        ${gmSkills.length ? `<div class="hud-sec-label" style="margin-top:18px">Perícias<span class="ln"></span></div>
-        <div class="skill-grid">${gmSkills.map(gmSkillChip).join('')}</div>` : ''}
-        ${sys?.proficiencies?.length ? `<div class="hud-sec-label" style="margin-top:18px">Proficiências <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(clique pra conceder/revogar)</span><span class="ln"></span></div>
-        <div class="prof-groups">${profChipsHtml(_gmViewProficiencies, true)}</div>` : ''}
-      </div>
-
-      ${trees.length ? `
-      <div class="section-title">Pontos de árvore de habilidade</div>
-      <div class="list">${treeRows.map(({ tree, pts }) => `
-        <div class="list-row"><div class="grow"><div class="nm">${esc(tree.name)}</div></div>
-          <input type="number" min="0" id="gm-treepts-${tree.id}" value="${pts}" style="max-width:70px;background:var(--field);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-family:var(--mono);padding:7px">
-          <button class="btn sm auto" onclick="gmSetTreePoints('${tree.id}','${userId}')">Definir</button>
-        </div>`).join('')}</div>` : ''}
-
-      <div class="section-title">Mochila</div>
-      <div class="list">${inventory.length ? inventory.map((it) => `
-        <div class="list-row"><div class="grow"><div class="nm">${esc(it.name)}${it.equipped ? ' <span class="badge" style="border-color:var(--maq);color:var(--maq)">equipado</span>' : ''}</div>
-          ${it.description ? `<div class="sub">${esc(it.description)}</div>` : ''}
-          ${(it.modifiers || []).length ? `<div class="mods" style="margin-top:5px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : ''}</div>
-          <div class="sub">x${it.qty}</div></div>`).join('')
-        : '<div class="empty">Mochila vazia.</div>'}</div>
+      <nav class="home-tabs" id="gmview-tabs" role="tablist" style="margin-top:18px">
+        <button role="tab" data-tab="ficha" onclick="gmViewTab('ficha')">Ficha</button>
+        <button role="tab" data-tab="biografia" onclick="gmViewTab('biografia')">Biografia</button>
+        <button role="tab" data-tab="inventario" onclick="gmViewTab('inventario')">Inventário</button>
+        <button role="tab" data-tab="habilidades" onclick="gmViewTab('habilidades')">Habilidades</button>
+        <button role="tab" data-tab="arvores" onclick="gmViewTab('arvores')">Árvores</button>
+      </nav>
+      <div id="gmview-content"></div>
       <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin:16px 2px 0">As anotações do jogador são privadas e não aparecem aqui.</p>`;
+    gmViewTab(_gmViewTab);
   } catch (e) { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; }
 }
 window.viewPlayer = viewPlayer;
+// dispatcher das sub-abas da ficha (Mestre) — separado do openTab() de nível superior da mesa de
+// propósito: aquele controla currentTab/#tabs/#content (a aba "Jogadores" etc.), e várias partes
+// do código (patchJogadoresLive, mountLiveSync) dependem de currentTab continuar significando só
+// isso. Essa sub-navegação vive inteira dentro do #gmview-content já criado por viewPlayer.
+window.gmViewTab = (name) => {
+  _gmViewTab = name;
+  document.querySelectorAll('#gmview-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  const c = $('gmview-content'); if (!c) return;
+  ({ ficha: renderGmFicha, biografia: renderGmBiografia, inventario: renderGmInventario,
+     habilidades: renderGmHabilidades, arvores: renderGmArvores }[name] || renderGmFicha)(c);
+};
+function renderGmFicha(c) {
+  const attributes = _gmViewAttrs, values = _gmViewValues, character = _gmViewChar;
+  const gmResBar = (a) => {
+    const max = evalStatIn(attributes, values, a, _gmViewSkillBonus, new Set(), _gmViewProfCtx) ?? 0;
+    let cur = _gmViewResources?.[a.id]; if (cur == null || cur === '') cur = max; cur = Number(cur);
+    const prot = _gmViewProtection || 0;
+    const protPct = (prot > 0 && max > 0) ? Math.max(2, Math.min(100, (prot / max) * 100)) : 0;
+    return `<div class="res-row" style="--res-color:${esc(a.color || '#35c6d4')}">
+      <div class="res-head">
+        <span class="res-label"><i class="res-dot"></i>${esc(a.name)}</span>
+        <span class="res-amt-line"><b>${cur}</b>&nbsp;/&nbsp;${max}${prot > 0 ? ` <span class="res-shield-badge" title="Proteção equipada">+${prot} proteção</span>` : ''}</span>
+      </div>
+      ${prot > 0 ? `<div class="res-shield-track" title="Proteção equipada: ${prot}"><div class="res-shield-fill" style="width:${protPct}%"></div></div>` : ''}
+      <div class="res-bar-row"><div class="res-track">${resBarHtml(cur, max)}</div></div>
+    </div>`;
+  };
+  const primaries = attributes.filter((a) => a.is_resource);
+  const gmSkills = sys?.system?.skills_enabled ? attributes.filter((a) => a.is_skill) : [];
+  const secondary = attributes.filter((a) => !a.is_resource && !a.is_skill);
+  const hasBaseSec = secondary.some((a) => a.kind === 'base');
+  c.innerHTML = `
+    <div class="status-hud">
+      ${primaries.length ? `<div class="hud-sec-label">Recursos<span class="ln"></span></div>
+        <div class="hud-bars">${primaries.map(gmResBar).join('')}</div>` : ''}
+      <div class="hud-sec-label">Status${secondary.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
+      <div class="stat-grid">
+        ${secondary.map((a) => gmStatRow(a)).join('')}
+        ${secondary.length ? '' : '<div class="empty" style="grid-column:1/-1">Sem status secundários.</div>'}
+      </div>
+      ${hasBaseSec ? `<div class="points-card" style="margin-top:14px">
+        <div class="hud-sec-label">Pontos de status do jogador<span class="ln"></span></div>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:4px">
+          <button class="plus" title="Tirar 1 ponto" onclick="gmAdjustPoints(-1)">−</button>
+          <span class="points-value" id="gm-points-badge" style="margin:0">${character.stat_points || 0}</span>
+          <button class="plus" title="Dar 1 ponto" onclick="gmAdjustPoints(1)">+</button>
+        </div>
+      </div>` : ''}
+      ${gmSkills.length ? `<div class="hud-sec-label" style="margin-top:18px">Perícias<span class="ln"></span></div>
+      <div class="skill-grid">${gmSkills.map(gmSkillChip).join('')}</div>` : ''}
+      ${sys?.proficiencies?.length ? `<div class="hud-sec-label" style="margin-top:18px">Proficiências <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(clique pra conceder/revogar)</span><span class="ln"></span></div>
+      <div class="prof-groups">${profChipsHtml(_gmViewProficiencies, true)}</div>` : ''}
+    </div>`;
+}
+function renderGmBiografia(c) {
+  const character = _gmViewChar;
+  // somente-leitura de propósito — tornar a biografia editável pelo Mestre não foi pedido e
+  // ampliaria a autoridade dele sobre um dado que é do jogador
+  const prose = (label, val) => val ? `<div class="fld"><label>${label}</label><p style="font-size:14px;color:var(--ink-dim);line-height:1.6;margin:0">${esc(val)}</p></div>` : '';
+  const html = prose('Bio', character.bio) + prose('Aparência física', character.appearance) + prose('Naturalidade / origem', character.origin)
+    + prose('Traços de personalidade', character.personality) + prose('Ideais e motivações', character.ideals)
+    + prose('Vínculos', character.bonds) + prose('Defeitos e medos', character.flaws);
+  c.innerHTML = html || '<div class="empty">Sem informações de biografia.</div>';
+}
+function renderGmInventario(c) {
+  const inventory = _gmViewInventory;
+  c.innerHTML = `
+    ${(sys && sys.equipmentSlots && sys.equipmentSlots.length) ? `
+    <div class="section-title">Equipamentos</div>
+    ${eqBoardHtml(sys.equipmentSlots, inventory.filter((it) => it.equipped && it.equipped_slot_id), true)}` : ''}
+
+    <div class="section-title" style="margin-top:14px">Mochila</div>
+    <div class="list gm-view-inv">${inventory.length ? inventory.map((it) => { const rarity = it.rarity || 'Comum'; return `
+      <div class="rar-frame" data-rarity="${esc(rarity)}">
+      <div class="list-row">
+        ${posterRarityLayers(rarity)}
+        <div class="rar-row-body">
+        <div class="grow"><div class="nm">${esc(it.name)}${it.equipped ? ' <span class="badge" style="border-color:var(--maq);color:var(--maq)">equipado</span>' : ''}</div>
+        ${it.description ? `<div class="sub">${esc(it.description)}</div>` : ''}
+        ${(it.modifiers || []).length ? `<div class="mods" style="margin-top:5px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : ''}</div>
+        <div class="sub">x${it.qty}</div>
+        <button class="btn sm auto" onclick="gmOpenInvItemDetail('${it.id}')">Detalhes</button>
+        </div>
+      </div></div>`; }).join('')
+      : '<div class="empty">Mochila vazia.</div>'}</div>
+    ${sys?.items?.length ? `<div class="inline-form" style="margin-top:10px">
+      <select id="gm-grant-item" class="fld-input">${sys.items.map((it) => `<option value="${it.id}">${esc(it.name)}</option>`).join('')}</select>
+      <button class="btn auto sm" onclick="gmGrantItem()">+ Dar item direto</button>
+    </div>` : ''}`;
+}
+function renderGmArvores(c) {
+  const userId = _gmViewUserId;
+  c.innerHTML = _gmViewTrees.length ? `
+    <div class="section-title">Pontos de árvore de habilidade</div>
+    <div class="list">${_gmViewTreeRows.map(({ tree, pts }) => `
+      <div class="list-row"><div class="grow"><div class="nm">${esc(tree.name)}</div></div>
+        <input type="number" min="0" id="gm-treepts-${tree.id}" value="${pts}" style="max-width:70px;background:var(--field);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-family:var(--mono);padding:7px">
+        <button class="btn sm auto" onclick="gmSetTreePoints('${tree.id}','${userId}')">Definir</button>
+      </div>`).join('')}</div>` : '<div class="empty">Este sistema não tem árvores de habilidade.</div>';
+}
+async function renderGmHabilidades(c) {
+  const userId = _gmViewUserId;
+  const abilities = await db.getUnlockedAbilities(campaignId, userId).catch(() => []);
+  if (!abilities.length) { c.innerHTML = '<div class="empty">Nenhuma habilidade desbloqueada ainda.</div>'; return; }
+  const byTree = new Map();
+  abilities.forEach((a) => { if (!byTree.has(a.tree_name)) byTree.set(a.tree_name, []); byTree.get(a.tree_name).push(a); });
+  // mesma abilityCardHtml() que a aba do próprio jogador usa — garante que Mestre e jogador nunca
+  // vejam listas diferentes pro mesmo personagem
+  c.innerHTML = [...byTree.entries()].map(([treeName, list]) => `
+    <div class="section-title">${esc(treeName)}</div>
+    <div class="list">${list.map(abilityCardHtml).join('')}</div>`).join('');
+}
+// concessão manual — não precisa de pedido do jogador, o Mestre já entrega direto (RLS permite
+// o Mestre inserir em inventory_items desde a policy inv_gm_insert)
+window.gmGrantItem = () => {
+  const id = $('gm-grant-item')?.value; if (!id || !_gmViewChar) return;
+  db.addInventoryItemFromSystem(_gmViewChar.id, id).then(() => {
+    showMsg('Item concedido.', 'ok');
+    viewPlayer(_gmViewUserId, _gmViewName);
+  }).catch((e) => showMsg(e.message));
+};
+// versão enxuta e somente-leitura de openInvItemDetail (mochila do próprio jogador) — mesmo modal
+// rico (imagem/raridade/descrição completa/modificadores), mas SEM rolar dano/equipar/excluir: o
+// pedido foi só "ver a descrição completa", não dar ao Mestre poder de mexer no equipamento de
+// outro jogador (isso ampliaria a autoridade dele sobre um dado que não é seu).
+window.gmOpenInvItemDetail = (id) => {
+  const it = _gmViewInventory.find((x) => x.id === id);
+  if (!it) return;
+  const hasProtection = it.protection != null && it.protection !== '';
+  const rarity = it.rarity || 'Comum';
+  const trigger = document.activeElement;
+  const w = document.createElement('div');
+  w.className = 'ui-modal';
+  w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'gm-idet-title');
+  w.innerHTML = `<div class="box guide item-detail">
+    <div class="ghead"><h3 id="gm-idet-title">${esc(it.name)}</h3><button class="x" aria-label="Fechar">×</button></div>
+    ${it.image_url ? `<img class="idet-img" src="${esc(it.image_url)}" alt="">` : ''}
+    <div class="idet-badges">
+      <span class="rar-pill" data-rarity="${esc(rarity)}">${esc(rarity)}</span>
+      ${it.weapon_damage ? `<span class="badge mod">Dano ${esc(it.weapon_damage)}${it.damage_scale ? ' + ' + esc(it.damage_scale) : ''}</span>` : ''}
+      ${hasProtection ? `<span class="badge mod">Proteção ${esc(String(it.protection))}${it.protection_scale ? ' + ' + esc(it.protection_scale) : ''}</span>` : ''}
+      ${it.equipped ? `<span class="badge" style="border-color:var(--maq);color:var(--maq)">Equipado</span>` : ''}
+    </div>
+    ${it.description ? `<p class="gintro">${esc(it.description)}</p>` : `<p class="gintro" style="color:var(--ink-faint)">Sem descrição.</p>`}
+    ${(it.modifiers && it.modifiers.length) ? `<div class="mods" style="margin-bottom:12px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : ''}
+    <div class="idet-creator">Quantidade: ${esc(String(it.qty))}</div>
+  </div>`;
+  const untrap = trapFocus(w);
+  const close = () => { untrap(); w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); };
+  const onEsc = (e) => { if (e.key === 'Escape') close(); };
+  w.addEventListener('click', (e) => { if (e.target === w) close(); });
+  w.querySelector('.x').onclick = close;
+  document.addEventListener('keydown', onEsc);
+  document.body.appendChild(w);
+  w.querySelector('.x').focus();
+};
 
 function gmStatRow(a) {
   if (a.kind === 'computed') {
@@ -496,8 +770,8 @@ function gmStatRow(a) {
     <div class="stat-val" id="gmval-${a.id}">${esc(val)}</div>
     <div class="stat-name">${esc(a.name)}</div>
     <div class="stat-ctl">
-      <button class="plus" title="Tira 1 e devolve o ponto pro jogador" onclick="gmAdjustStat('${a.id}', -1, true)">−</button>
-      <button class="plus" title="Sobe 1 direto (não gasta ponto)" onclick="gmAdjustStat('${a.id}', 1, false)">+</button>
+      <button class="plus" title="Desce 1 (ajuste direto, não mexe nos pontos)" onclick="gmAdjustStat('${a.id}', -1)">−</button>
+      <button class="plus" title="Sobe 1 (ajuste direto, não mexe nos pontos)" onclick="gmAdjustStat('${a.id}', 1)">+</button>
     </div>
   </div>`;
 }
@@ -538,20 +812,18 @@ window.gmAdjustLevel = (delta) => {
     viewPlayer(_gmViewUserId, _gmViewName);
   }).catch((e) => showMsg(e.message));
 };
-window.gmAdjustStat = (statId, delta, giveBackPoint) => {
+// ajuste direto do valor do status (não mexe em stat_points — pra isso existe o controle
+// dedicado "Pontos de status do jogador" logo abaixo, com gmAdjustPoints). Antes o "−" também
+// devolvia 1 ponto de status incondicionalmente: alternar +/− no mesmo status voltava o valor
+// ao normal mas gerava +1 ponto a cada ciclo, um jeito fácil de duplicar pontos.
+window.gmAdjustStat = (statId, delta) => {
   if (!_gmViewChar) return;
   const stat = _gmViewAttrs.find((a) => a.id === statId); if (!stat) return;
   const cur = Number(_gmViewValues[statId] ?? stat.default_value ?? 0) || 0;
   const next = Math.max(0, cur + delta);
-  const ops = [db.setCharacterAttribute(_gmViewChar.id, statId, next)];
-  if (giveBackPoint) ops.push(db.updateCharacter(_gmViewChar.id, { stat_points: (_gmViewChar.stat_points || 0) + 1 }));
-  Promise.all(ops).then(() => {
+  db.setCharacterAttribute(_gmViewChar.id, statId, next).then(() => {
     _gmViewValues[statId] = next;
     const el = $('gmval-' + statId); if (el) el.textContent = next;
-    if (giveBackPoint) {
-      _gmViewChar.stat_points = (_gmViewChar.stat_points || 0) + 1;
-      const b = $('gm-points-badge'); if (b) b.textContent = _gmViewChar.stat_points;
-    }
     showMsg('Status ajustado.', 'ok');
   }).catch((e) => showMsg(e.message));
 };
@@ -580,50 +852,119 @@ async function renderAtributos(c) {
 function attrRow(a) {
   return `<div class="list-row" data-id="${a.id}">
     <div class="grow"><input class="nm" style="background:transparent;border:0;color:var(--ink);font-family:var(--serif);font-size:15px;width:100%"
-        value="${esc(a.name)}" onchange="renameAttr('${a.id}', this.value)">
-      <div class="sub">tipo: ${a.data_type === 'text' ? 'texto' : 'número'}</div></div>
+        value="${esc(a.name)}" onchange="renameAttr('${a.id}', this.value)" title="Salva ao sair do campo">
+      <div class="sub">tipo: ${a.data_type === 'text' ? 'texto' : 'número'} · nome salva ao sair do campo</div></div>
     <button class="btn sm danger auto" onclick="delAttr('${a.id}')">Excluir</button>
   </div>`;
 }
 window.addAttr = (ev) => { ev.preventDefault(); const n = $('attr-name').value.trim(); if (!n) return false;
-  db.createAttribute(campaignId, { name: n, sort_order: Date.now() % 100000 }).then(() => openTab('atributos'))
-    .catch((e) => showMsg(e.message)); return false; };
+  db.createAttribute(campaignId, { name: n, sort_order: Date.now() % 100000 }).then((a) => {
+    $('attr-name').value = '';
+    const box = $('attr-list'); if (!box) return;
+    box.querySelectorAll(':scope > .empty').forEach((e) => e.remove());
+    box.insertAdjacentHTML('beforeend', attrRow(a));
+  }).catch((e) => showMsg(e.message)); return false; };
 window.renameAttr = (id, v) => { db.updateAttribute(id, { name: v.trim() }).catch((e) => showMsg(e.message)); };
-window.delAttr = (id) => { db.deleteAttribute(id).then(() => openTab('atributos')).catch((e) => showMsg(e.message)); };
+window.delAttr = async (id) => {
+  const ok = await confirmModal({ title: 'Excluir atributo', desc: 'Isto some da ficha de TODOS os jogadores da mesa. Qualquer fórmula que use este atributo passa a resolver como 0. Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteAttribute(id).then(() => {
+    const row = document.querySelector(`#attr-list [data-id="${id}"]`); if (row) row.remove();
+    const box = $('attr-list');
+    if (box && !box.children.length) box.innerHTML = '<div class="empty">Nenhum atributo ainda.</div>';
+  }).catch((e) => showMsg(e.message));
+};
 
+// id da "aba" de sistema.html sendo editada inline (embutida via iframe) — null = mostra as listas
+// somente-leitura. Mesmo padrão de _arvoreViewingId/viewTreeInline logo abaixo (renderArvores).
+let _sistemaEmbedTab = null;
+// checagem+cópia compartilhada por viewSistemaInline e viewTreeInline: se o sistema da mesa não é
+// do Mestre, edita-lo aqui dentro criaria uma edição sem dono claro — em vez disso, clonamos o
+// sistema inteiro (fork_system_for_campaign) pro Mestre na primeira tentativa de edição, e dali em
+// diante ele edita a cópia normalmente. null = usuário cancelou (nada deve prosseguir); { treeMap }
+// = pode seguir (treeMap vazio quando não precisou copiar).
+async function ensureOwnSystemForEdit() {
+  if (!sys || !sys.system) return null;
+  if (sys.system.owner_id === myId) return { treeMap: {} };
+  const ok = await confirmModal({
+    title: 'Criar uma cópia deste sistema?',
+    desc: 'Este sistema pertence a outro criador. Pra editar aqui dentro da mesa, criamos uma cópia independente — só sua e só desta mesa. O sistema original e qualquer outra mesa que o usa continuam intactos.',
+    confirmLabel: 'Criar cópia e editar', danger: false,
+  });
+  if (!ok) return null;
+  try {
+    const { newSystemId, treeMap } = await db.forkSystemForCampaign(campaignId, mesa.system_id);
+    mesa.system_id = newSystemId;
+    sys = await db.getSystemBundle(newSystemId);
+    return { treeMap };
+  } catch (e) { showMsg('Não foi possível criar a cópia: ' + e.message); return null; }
+}
+window.viewSistemaInline = async (tab) => {
+  const res = await ensureOwnSystemForEdit();
+  if (!res) return;
+  _sistemaEmbedTab = tab || 'geral';
+  openTab('atributos');
+};
+// `sys` só era buscado uma vez, no boot da mesa — sem refazer essa busca aqui, qualquer edição
+// feita dentro do construtor de sistema embutido não aparecia nas listas somente-leitura até a
+// página inteira recarregar (o ponto inteiro de editar sem sair da mesa seria perdido).
+window.backFromSistemaEmbed = async () => {
+  _sistemaEmbedTab = null;
+  try { sys = await db.getSystemBundle(mesa.system_id); } catch (_) {}
+  openTab('atributos');
+};
 // Visão do sistema usado pela mesa (Mestre): status, classes, árvores e itens — vindos do sistema.
 async function renderSistema(c) {
   const b = sys || (mesa.system_id ? await db.getSystemBundle(mesa.system_id) : null);
   if (!b || !b.system) { c.innerHTML = '<div class="empty">Esta mesa não tem um sistema, ou ele foi removido.</div>'; return; }
+  if (_sistemaEmbedTab) {
+    // embutido no mesmo documento da mesa (iframe, mesma origem) — igual à árvore logo abaixo: a
+    // música/chat da mesa continuam rodando por baixo, só o construtor de sistema mora dentro da
+    // caixa. &v=1: bump ao editar sistema.html (tree/system id não mudam entre reaberturas, então
+    // o navegador reaproveitaria uma cópia velha sem esse param).
+    c.innerHTML = `
+      <div class="arvore-embed-wrap">
+        <iframe class="arvore-embed-iframe" src="sistema.html?id=${mesa.system_id}&tab=${_sistemaEmbedTab}&embed=1&v=1"
+          title="Construtor de sistema"></iframe>
+      </div>`;
+    return;
+  }
   const roots = b.classes.filter((x) => !x.parent_id);
   const subs = (pid) => b.classes.filter((x) => x.parent_id === pid);
+  // título de seção com atalho "Editar" pra aba correspondente do construtor de sistema — evita
+  // repetir os mesmos cinco atributos inline em cada seção abaixo
+  const st = (label, tab) => `<div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <span>${label}</span>
+    <button class="btn sm auto" style="text-transform:none;letter-spacing:0;font-family:var(--serif)" onclick="viewSistemaInline('${tab}')">Editar</button>
+  </div>`;
   c.innerHTML = `
     <div class="section-title">Sistema da campanha: ${esc(b.system.name)}</div>
     <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 12px">
-      Tudo abaixo vem deste sistema. Para editar, use <b>Sistemas</b> na tela inicial.</p>
+      Tudo abaixo vem deste sistema.</p>
+    <button class="btn go auto" style="margin-bottom:16px" onclick="viewSistemaInline('geral')"><span class="ic">${ICONS.externalLink}</span>Editar sistema</button>
 
-    <div class="section-title">Status (${b.stats.filter((s) => !s.is_skill).length})</div>
+    ${st('Status (' + b.stats.filter((s) => !s.is_skill).length + ')', 'status')}
     <div class="list">${b.stats.filter((s) => !s.is_skill).length ? b.stats.filter((s) => !s.is_skill).map((s) => `
       <div class="list-row"><div class="grow"><div class="nm">${esc(s.name)}${s.formula_key ? ` <span style="color:var(--maq);font-family:var(--mono);font-size:11px">(${esc(s.formula_key)})</span>` : ''}</div>
         <div class="sub">${s.kind === 'computed' ? 'calculado: ' + esc(s.formula || '') : 'base' + (s.default_value ? ' · padrão ' + esc(s.default_value) : '')}</div></div></div>`).join('') : '<div class="empty">Sem status.</div>'}</div>
 
-    <div class="section-title">Perícias (${b.stats.filter((s) => s.is_skill).length})</div>
+    ${st('Perícias (' + b.stats.filter((s) => s.is_skill).length + ')', 'pericias')}
     <div class="list">${b.stats.filter((s) => s.is_skill).length ? b.stats.filter((s) => s.is_skill).map((s) => `
       <div class="list-row"><div class="grow"><div class="nm"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${esc(s.color || '#7ee6dc')};margin-right:7px;vertical-align:middle"></i>${esc(s.name)}${s.formula_key ? ` <span style="color:var(--maq);font-family:var(--mono);font-size:11px">(${esc(s.formula_key)})</span>` : ''}</div>
         <div class="sub">calculado: ${esc(s.formula || '')}</div></div></div>`).join('') : '<div class="empty">Sem perícias.</div>'}</div>
 
-    <div class="section-title">Proficiências (${(b.proficiencies || []).length})</div>
+    ${st('Proficiências (' + (b.proficiencies || []).length + ')', 'proficiencias')}
     <div class="list">${(b.proficiencies || []).length ? b.proficiencies.map((p) => `
       <div class="list-row"><div class="grow"><div class="nm">${esc(p.name)}</div>
         ${p.category ? `<div class="sub">${esc(p.category)}</div>` : ''}</div></div>`).join('') : '<div class="empty">Sem proficiências.</div>'}</div>
 
-    <div class="section-title">Classes e subclasses</div>
+    ${st('Classes e subclasses', 'classes')}
     <div class="list">${roots.length ? roots.map((cl) => `
       <div class="list-row" style="flex-direction:column;align-items:stretch;gap:4px">
         <div class="nm">${esc(cl.name)}</div>
         ${subs(cl.id).map((s) => `<div class="sub" style="margin-left:14px"><span class="ic">${ICONS.cornerDownRight}</span>${esc(s.name)}</div>`).join('')}</div>`).join('') : '<div class="empty">Sem classes.</div>'}</div>
 
-    <div class="section-title">Progressão de nível</div>
+    ${st('Progressão de nível', 'nivel')}
     <div class="list">
       <div class="list-row"><div class="grow"><div class="nm">Padrão por nível</div></div>
         <div class="sub">${[b.system.level_stat_points_default ? `+${b.system.level_stat_points_default} pontos de status` : ''].concat(
@@ -645,9 +986,9 @@ async function renderSistema(c) {
     <div class="section-title">Árvores de habilidade (${b.trees.length})</div>
     <div class="grid">${b.trees.length ? b.trees.map((t) => `
       <div class="card-tile glass" style="cursor:default"><h3>${esc(t.name)}</h3>
-        <a class="btn sm auto" style="margin-top:6px;text-decoration:none" href="arvore.html?t=${Date.now()}&tree=${t.id}&system=${mesa.system_id}"><span class="ic">${ICONS.externalLink}</span>Abrir/editar</a></div>`).join('') : '<div class="empty">Sem árvores.</div>'}</div>
+        <button class="btn sm auto" style="margin-top:6px" onclick="viewTreeInline('${t.id}')"><span class="ic">${ICONS.externalLink}</span>Abrir/editar</button></div>`).join('') : '<div class="empty">Sem árvores.</div>'}</div>
 
-    <div class="section-title">Itens (${b.items.length})</div>
+    ${st('Itens (' + b.items.length + ')', 'itens')}
     <div class="list">${b.items.length ? b.items.map((it) => `
       <div class="list-row"><div class="grow"><div class="nm">${esc(it.name)}</div>
         <div class="sub">${[it.category, it.rarity].filter(Boolean).map(esc).join(' · ')}${(it.modifiers && it.modifiers.length) ? ' · ' + it.modifiers.map((m) => esc(m.name + ' ' + m.value)).join(', ') : ''}</div></div></div>`).join('') : '<div class="empty">Sem itens.</div>'}</div>`;
@@ -655,38 +996,93 @@ async function renderSistema(c) {
 
 /* ============================ ÁRVORES (ambos) ============================ */
 
+// id da árvore sendo vista dentro da própria aba (embutida via iframe) — null = mostra a grade.
+// Guardado fora da renderArvores pra sobreviver a re-renders da aba (patchArvoresLive etc.)
+let _arvoreViewingId = null;
+// qual árvore está DE FATO renderizada em #content agora — usado só pra não recriar o iframe à toa
+// quando openTab('arvores') é chamado de novo pra exibir exatamente a mesma coisa (ex.: reclicar
+// na própria aba "Árvores" enquanto uma árvore já está aberta destruía e recarregava o iframe do
+// zero, perdendo pan/zoom, seleção e qualquer edição em andamento dentro dele)
+let _lastArvoreRenderedId; // sentinela: começa undefined, nunca é igual a um id real nem a null
+window.viewTreeInline = async (id) => {
+  // jogadores usam este mesmo botão pra "Ver árvore" somente-leitura — nunca disparam cópia
+  if (role !== 'gm') { _arvoreViewingId = id; openTab('arvores'); return; }
+  const res = await ensureOwnSystemForEdit();
+  if (!res) return;
+  _arvoreViewingId = res.treeMap[id] || id; // traduz id antigo -> novo, se acabou de copiar
+  openTab('arvores');
+};
+window.backToArvoreList = () => { _arvoreViewingId = null; openTab('arvores'); };
+
 async function renderArvores(c) {
   const gm = role === 'gm';
   if (mesa.system_id) {
     const b = sys || await db.getSystemBundle(mesa.system_id);
     const trees = b?.trees || [];
+    if (_arvoreViewingId && trees.some((t) => t.id === _arvoreViewingId)) {
+      // embutida num iframe (mesma origem, mesmo domínio) em vez de navegar pra arvore.html: o
+      // documento da mesa nunca descarrega, então a música do player continua tocando e o
+      // topbar/abas da mesa continuam visíveis por fora — só a árvore em si mora dentro da caixa.
+      // O botão de voltar mora DENTRO da própria página embutida (flutuando sobre o canvas), não
+      // aqui fora, pra árvore ocupar 100% da altura disponível sem nenhuma barra acima dela.
+      // &v=2 é cache-busting: como tree/system id não mudam entre re-aberturas da MESMA árvore,
+      // o navegador reaproveitaria uma cópia velha de arvore.html sem esse param. Bump ao editar
+      // arvore.html (aqui embaixo no href do link direto em sistema.html também).
+      c.innerHTML = `
+        <div class="arvore-embed-wrap">
+          <iframe class="arvore-embed-iframe" src="arvore.html?tree=${_arvoreViewingId}&system=${mesa.system_id}&embed=1&v=4"
+            title="Árvore de esferas"></iframe>
+        </div>`;
+      return;
+    }
     c.innerHTML = `
       <div class="section-title">Árvores do sistema (${trees.length})</div>
       <div class="grid">${trees.length ? trees.map((t) => `
         <div class="card-tile glass" style="cursor:default"><h3>${esc(t.name)}</h3>
-          <a class="btn sm auto" style="margin-top:6px;text-decoration:none" href="arvore.html?t=${Date.now()}&tree=${t.id}&system=${mesa.system_id}"><span class="ic">${ICONS.externalLink}</span>${gm ? 'Abrir/editar' : 'Ver árvore'}</a></div>`).join('') : '<div class="empty">Este sistema não tem árvores.</div>'}</div>
+          <button class="btn sm auto" style="margin-top:6px" onclick="viewTreeInline('${t.id}')"><span class="ic">${ICONS.externalLink}</span>${gm ? 'Abrir/editar' : 'Ver árvore'}</button></div>`).join('') : '<div class="empty">Este sistema não tem árvores.</div>'}</div>
       <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:18px 2px 0">
         As árvores vêm do sistema da mesa. ${gm ? 'Você edita direto no editor.' : 'Jogar/desbloquear as esferas com pontos entra numa próxima fase.'}</p>`;
     return;
   }
+  // esta mesa não tem sistema vinculado (só mesas bem antigas — hoje app.html exige um sistema
+  // pra criar mesa) — a árvore "clássica" daqui nunca ganhou editor/jogo de verdade (openTree()
+  // sempre foi um aviso de "vem na próxima fase"). Criar uma árvore nova aqui não levava a lugar
+  // nenhum, então o formulário de criação fica escondido; árvores antigas continuam listadas.
   const trees = await db.listTrees(campaignId);
   c.innerHTML = `
     <div class="section-title">Árvores de Esferas</div>
-    ${trees.length ? `<div class="grid">${trees.map((t) => `
-      <div class="card-tile glass" style="cursor:default">
-        <h3>${esc(t.name)}</h3>
-        <div class="meta">${t.default_points} pontos padrão</div>
-        <button class="btn sm auto" style="margin-top:6px" onclick="openTree('${t.id}')">${gm ? 'Editar' : 'Jogar'}</button>
-      </div>`).join('')}</div>` : '<div class="empty">Nenhuma árvore nesta mesa ainda.</div>'}
-    ${gm ? `<form class="inline-form" style="margin-top:16px" onsubmit="return addTree(event)">
-        <input id="tree-name" placeholder="Nova árvore (ex.: Caminho da Máquina)" required maxlength="60">
-        <button class="btn go auto" type="submit">+ Criar árvore</button>
-      </form>` : ''}
+    ${trees.length ? `<div class="grid" id="arvores-grid">${trees.map((t) => treeCardHtml(t, gm)).join('')}</div>` : ''}
     <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:18px 2px 0">
-      Obs.: a edição/jogo da árvore conectada ao banco entra na próxima fase. Por enquanto, criar a árvore já salva no Supabase.</p>`;
+      Esta mesa não está vinculada a um sistema, então o editor de árvores (com esferas, custos e desbloqueio por
+      pontos) não está disponível aqui. ${gm ? 'Vincule um sistema à mesa (ou crie uma mesa nova escolhendo um sistema) pra usar árvores de verdade.' : 'Fale com o Mestre sobre vincular um sistema à mesa.'}</p>`;
 }
-window.addTree = (ev) => { ev.preventDefault(); const n = $('tree-name').value.trim(); if (!n) return false;
-  db.createTree(campaignId, n).then(() => openTab('arvores')).catch((e) => showMsg(e.message)); return false; };
+function treeCardHtml(t, gm) {
+  return `<div class="card-tile glass" style="cursor:default" data-id="${t.id}">
+    <h3>${esc(t.name)}</h3>
+    <div class="meta">${t.default_points} pontos padrão</div>
+    <button class="btn sm auto" style="margin-top:6px" onclick="openTree('${t.id}')">${gm ? 'Editar' : 'Jogar'}</button>
+  </div>`;
+}
+// atualização leve da lista de árvores (só o create/delete de árvore mexe aqui — o jogo/edição de
+// verdade acontece em arvore.html, uma página à parte); se a lista estava vazia quando a aba abriu
+// (sem o #arvores-grid ainda existir), o próximo openTab natural resolve, sem forçar reload aqui.
+async function patchArvoresLive() {
+  if (currentTab !== 'arvores' || mesa.system_id) return;
+  const grid = $('arvores-grid'); if (!grid) return;
+  try {
+    const trees = await db.listTrees(campaignId);
+    const gm = role === 'gm';
+    const existing = new Map([...grid.querySelectorAll('[data-id]')].map((el) => [el.dataset.id, el]));
+    const seen = new Set();
+    trees.forEach((t) => {
+      seen.add(t.id);
+      const fresh = treeCardHtml(t, gm);
+      const old = existing.get(t.id);
+      if (old) old.outerHTML = fresh; else grid.insertAdjacentHTML('beforeend', fresh);
+    });
+    existing.forEach((el, id) => { if (!seen.has(id)) el.remove(); });
+  } catch (_) {}
+}
 window.openTree = () => showMsg('A árvore conectada ao banco vem na próxima fase.', 'ok');
 
 /* ============================ JOGADOR ============================ */
@@ -694,7 +1090,23 @@ window.openTree = () => showMsg('A árvore conectada ao banco vem na próxima fa
 let _fichaAttrs = [], _fichaValues = {}, _fichaResources = {}, _fichaProficiencies = {}, _fichaProfCtx = null;
 let _fichaInventory = [], _fichaFormulas = [], _builderTerms = [];
 let _fichaSkillBonus = {}; // {attribute_id: {total, sources:[{name,amount}]}} — bônus de esferas desbloqueadas
-let _gmViewChar = null, _gmViewAttrs = [], _gmViewValues = {}, _gmViewSkillBonus = {}, _gmViewProficiencies = {}, _gmViewProfCtx = null; // ficha do jogador que o Mestre está vendo/editando
+let _fichaProtection = 0; // soma da Proteção de todo item EQUIPADO (armadura/escudo), já escalada pelo status configurado
+let _gmViewChar = null, _gmViewAttrs = [], _gmViewValues = {}, _gmViewResources = {}, _gmViewSkillBonus = {}, _gmViewProficiencies = {}, _gmViewProfCtx = null, _gmViewProtection = 0,
+  _gmViewInventory = [], _gmViewTrees = [], _gmViewTreeRows = []; // ficha do jogador que o Mestre está vendo/editando (ver viewPlayer/gmViewTab)
+// soma a Proteção de todo item equipado — cada item soma seu valor fixo + (se tiver protection_scale)
+// o valor do status referenciado, do mesmo jeito que "escala com" já funciona pro dano da arma.
+function protectionTotalIn(items, attrs, values, bonuses, profCtx) {
+  let total = 0;
+  (items || []).forEach((it) => {
+    if (!it.equipped || it.protection == null || it.protection === '') return;
+    total += Number(it.protection) || 0;
+    if (it.protection_scale) {
+      const stat = attrs.find((a) => (a.formula_key || a.name) === it.protection_scale);
+      if (stat) total += Number(evalStatIn(attrs, values, stat, bonuses, new Set(), profCtx)) || 0;
+    }
+  });
+  return Math.max(0, Math.round(total));
+}
 // agrupa o catálogo de proficiências do sistema por categoria, preservando a ordem (sort_order já veio do banco)
 function groupProfsForFicha(catalog) {
   const map = new Map();
@@ -767,6 +1179,16 @@ function classSubclassChips(ch) {
   }
   return classHtml + subHtml;
 }
+function charTagsHtml(ch) {
+  const otherTags = [ch.age ? 'Idade: ' + esc(ch.age) : '', ch.gender ? esc(ch.gender) : ''].filter(Boolean);
+  return `<span class="char-tag" id="char-level-tag">Nível ${ch.level || 1}</span>` +
+    otherTags.map((t) => `<span class="char-tag">${t}</span>`).join('') + classSubclassChips(ch);
+}
+// repinta só a etiqueta de nível/idade/gênero/classe-subclasse (usado depois de escolher
+// classe/subclasse, que troca o <select> por uma etiqueta travada) — sem recarregar a ficha toda
+function refreshCharTags() {
+  const el = $('char-tags'); if (el && character) el.innerHTML = charTagsHtml(character);
+}
 async function renderFicha(c) {
   let sheet = await db.loadSheet(campaignId);
   // se o Mestre mudou os "Status base" da classe/subclasse depois que o jogador escolheu, isso
@@ -782,14 +1204,14 @@ async function renderFicha(c) {
   _fichaInventory = inv; _fichaFormulas = formulas;
   try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, ch.user_id)), equipBonusMap(inv, attributes)); }
   catch (_) { _fichaSkillBonus = equipBonusMap(inv, attributes); }
+  _fichaProtection = protectionTotalIn(inv, attributes, _fichaValues, _fichaSkillBonus, _fichaProfCtx);
 
   const primaries = attributes.filter((a) => a.is_resource);
   const skills = sys?.system?.skills_enabled ? attributes.filter((a) => a.is_skill) : [];
   const secondaries = attributes.filter((a) => !a.is_resource && !a.is_skill);
   const hasBaseSecondary = secondaries.some((a) => a.kind === 'base');
 
-  const tags = ['Nível ' + (ch.level || 1), ch.age ? 'Idade: ' + esc(ch.age) : '', ch.gender ? esc(ch.gender) : ''].filter(Boolean);
-  const tagsHtml = tags.map((t) => `<span class="char-tag">${t}</span>`).join('') + classSubclassChips(ch);
+  const tagsHtml = charTagsHtml(ch);
   const coverSrc = ch.cover_url || ch.avatar_url;
   const focalY = ch.cover_focal_y != null ? Number(ch.cover_focal_y) : 50;
 
@@ -812,7 +1234,7 @@ async function renderFicha(c) {
           </div>
           <div class="char-info">
             <h2>${esc(ch.name) || 'Sem nome'}</h2>
-            <div class="char-tags">${tagsHtml}</div>
+            <div class="char-tags" id="char-tags">${tagsHtml}</div>
           </div>
           <button class="btn sm auto overlay" onclick="openTab('biografia')"><span class="ic">${ICONS.pencil}</span>Editar biografia</button>
         </div>
@@ -823,7 +1245,7 @@ async function renderFicha(c) {
         <div class="char-portrait ph">${esc((ch.name || '?').trim().charAt(0).toUpperCase() || '?')}</div>
         <div class="char-info">
           <h2>${esc(ch.name) || 'Sem nome'}</h2>
-          <div class="char-tags">${tagsHtml}</div>
+          <div class="char-tags" id="char-tags">${tagsHtml}</div>
         </div>
         <button class="btn sm auto" onclick="openTab('biografia')"><span class="ic">${ICONS.pencil}</span>Editar biografia</button>
       </div>`}
@@ -920,7 +1342,14 @@ window.onCoverFile = (input) => {
   if (file.size > 3 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 3 MB).'); input.value = ''; return; }
   db.uploadImage(file, 'characters')
     .then((url) => db.updateCharacter(character.id, { cover_url: url, cover_focal_y: 50 }))
-    .then((updated) => { character = { ...character, ...updated }; input.value = ''; openTab('ficha'); })
+    .then((updated) => {
+      character = { ...character, ...updated }; input.value = '';
+      // já tinha capa: só troca a foto no lugar. Primeira capa da ficha muda a estrutura
+      // toda (bio-row vira char-cover), aí sim precisa reconstruir a seção.
+      const img = $('char-cover-img');
+      if (img) { img.src = updated.cover_url; img.dataset.focal = 50; img.style.objectPosition = 'center 50%'; }
+      else openTab('ficha');
+    })
     .catch((e) => showMsg(e.message));
 };
 window.onAvatarQuickFile = (input) => {
@@ -930,7 +1359,14 @@ window.onAvatarQuickFile = (input) => {
   db.uploadImage(file, 'characters').then((url) => {
     const gallery = [...(character.gallery || []), url];
     return db.updateCharacter(character.id, { avatar_url: url, gallery });
-  }).then((updated) => { character = { ...character, ...updated }; input.value = ''; openTab('ficha'); })
+  }).then((updated) => {
+    character = { ...character, ...updated }; input.value = '';
+    // mesma lógica da capa: só troca o src se já existir <img> (senão era um placeholder de
+    // iniciais, e virar foto de verdade muda a estrutura — aí precisa reconstruir)
+    const img = document.querySelector('img.char-portrait');
+    if (img) img.src = updated.avatar_url;
+    else openTab('ficha');
+  })
     .catch((e) => showMsg(e.message));
 };
 
@@ -948,11 +1384,23 @@ function evalFormula(f) { return evalFormulaIn(_fichaAttrs, _fichaValues, f, _fi
 function formulaRow(f) {
   const total = Math.round(evalFormula(f) * 100) / 100;
   const breakdown = (f.terms || []).map((t, i) => (i === 0 ? (t.sign < 0 ? '−' : '') : (t.sign < 0 ? ' − ' : ' + ')) + (t.label || '?')).join('');
-  return `<div class="formula-row"><div class="fn"><b>${esc(f.name)}</b><span class="fbreak">${esc(breakdown)}</span></div>
+  return `<div class="formula-row" data-id="${f.id}"><div class="fn"><b>${esc(f.name)}</b><span class="fbreak">${esc(breakdown)}</span></div>
     <div class="fresult">${total}</div>
-    <button class="btn sm danger auto" onclick="delFormula('${f.id}')"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>`;
+    <button class="btn sm danger auto" onclick="delFormula('${f.id}')" aria-label="Excluir fórmula"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>`;
 }
-window.delFormula = (id) => { db.deleteCharacterFormula(id).then(() => openTab('ficha')).catch((e) => showMsg(e.message)); };
+// insere/remove uma linha de fórmula direto no #formula-list, sem recarregar a ficha inteira
+function patchFormulaList() {
+  const box = $('formula-list'); if (!box) return;
+  box.innerHTML = _fichaFormulas.length ? _fichaFormulas.map(formulaRow).join('') : '<div class="empty">Nenhuma fórmula ainda.</div>';
+}
+window.delFormula = async (id) => {
+  const ok = await confirmModal({ title: 'Excluir fórmula', desc: 'Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteCharacterFormula(id).then(() => {
+    _fichaFormulas = _fichaFormulas.filter((f) => f.id !== id);
+    patchFormulaList();
+  }).catch((e) => showMsg(e.message));
+};
 
 window.openFormulaBuilder = () => { _builderTerms = [{ sign: 1, type: 'stat' }]; renderFormulaBuilder(); };
 window.closeFormulaBuilder = () => { const b = $('formula-builder'); if (b) b.innerHTML = ''; _builderTerms = []; };
@@ -963,8 +1411,8 @@ function renderFormulaBuilder() {
     <div id="fb-terms">${_builderTerms.map((t, i) => termRow(t, i)).join('')}</div>
     <button type="button" class="btn auto sm" onclick="addBuilderTerm()">+ Termo</button>
     <div class="full actions" style="margin-top:12px">
-      <button class="btn" onclick="closeFormulaBuilder()">Cancelar</button>
-      <button class="btn go" onclick="saveFormulaBuilder()">Salvar fórmula</button>
+      <button class="btn auto" onclick="closeFormulaBuilder()">Cancelar</button>
+      <button class="btn go auto" onclick="saveFormulaBuilder()">Salvar fórmula</button>
     </div>
   </div>`;
 }
@@ -989,7 +1437,7 @@ function termRow(t, i) {
     refSel = `<input class="fnum" type="number" step="0.1" value="${t.value ?? ''}" onchange="setTermField(${i},'value',parseFloat(this.value)||0)">`;
   }
   return `<div class="fterm-row">${signSel}${typeSel}${refSel}
-    ${_builderTerms.length > 1 ? `<button type="button" class="btn sm danger auto" onclick="rmBuilderTerm(${i})"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>` : ''}</div>`;
+    ${_builderTerms.length > 1 ? `<button type="button" class="btn sm danger auto" onclick="rmBuilderTerm(${i})" aria-label="Remover termo"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>` : ''}</div>`;
 }
 function termItemModSelect(t, i) {
   const item = _fichaInventory.find((it) => it.id === t.itemId);
@@ -1025,7 +1473,11 @@ window.saveFormulaBuilder = () => {
     return { type: 'number', sign: t.sign || 1, value: t.value || 0, label: String(t.value || 0) };
   }).filter(Boolean);
   if (!terms.length) { showMsg('Adicione pelo menos um termo válido.'); return; }
-  db.addCharacterFormula(character.id, name, terms).then(() => { closeFormulaBuilder(); openTab('ficha'); }).catch((e) => showMsg(e.message));
+  db.addCharacterFormula(character.id, name, terms).then((f) => {
+    closeFormulaBuilder();
+    _fichaFormulas = [..._fichaFormulas, f];
+    patchFormulaList();
+  }).catch((e) => showMsg(e.message));
 };
 /* status secundários: rascunho local — só grava no banco quando clica em "Salvar status" */
 let _pendingDelta = {}; // statId -> quantos pontos foram alocados no rascunho (ainda não salvos)
@@ -1096,10 +1548,10 @@ window.commitStatPoints = async () => {
     }
     _pendingDelta = {};
     showMsg('Status salvos!', 'ok');
-    openTab('ficha'); // recarrega fresco do banco
+    patchFichaLive(); // rebusca fresco do banco, só repinta os números/barras
   } catch (e) {
     showMsg(e.message);
-    openTab('ficha'); // ressincroniza com o servidor mesmo em erro parcial
+    patchFichaLive(); // ressincroniza com o servidor mesmo em erro parcial
   }
 };
 
@@ -1169,7 +1621,7 @@ function identitySection(ch, onboarding) {
     ${onboarding ? `<div class="full actions" style="margin-top:24px;display:flex;justify-content:flex-end">
       <button class="btn go auto" onclick="finishOnboarding()"><span class="spin"></span>Concluir e ir para a ficha</button>
     </div>` : `<div class="full actions" style="margin-top:24px;display:flex;justify-content:flex-end">
-      <button class="btn go" id="identity-save-btn" style="display:none" onclick="saveIdentity()"><span class="spin"></span>Salvar alterações</button>
+      <button class="btn go auto" id="identity-save-btn" style="display:none" onclick="saveIdentity()"><span class="spin"></span>Salvar alterações</button>
     </div>`}`;
 }
 function galleryThumb(url, i, avatarUrl) {
@@ -1185,7 +1637,7 @@ function galleryThumb(url, i, avatarUrl) {
 }
 function loreRow(lf, i) {
   return `<div class="list-row"><a class="grow nm" href="${esc(lf.url)}" target="_blank" rel="noopener" style="color:var(--maq);text-decoration:none">${esc(lf.name)}</a>
-    <button class="btn sm danger auto" onclick="rmLoreFile(${i})"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>`;
+    <button class="btn sm danger auto" onclick="rmLoreFile(${i})" aria-label="Remover arquivo"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>`;
 }
 function rerenderIdentity() {
   if (inOnboarding) { renderCharSetup($('content'), true); return; }
@@ -1209,7 +1661,9 @@ window.setMainPhoto = (i) => {
     .then((updated) => { character = { ...character, ...updated }; rerenderIdentity(); })
     .catch((e) => showMsg(e.message));
 };
-window.rmGalleryPhoto = (i) => {
+window.rmGalleryPhoto = async (i) => {
+  const ok = await confirmModal({ title: 'Remover foto', desc: 'Não dá pra desfazer.', confirmLabel: 'Remover' });
+  if (!ok) return;
   const gallery = [...(character.gallery || [])];
   const [removed] = gallery.splice(i, 1);
   const patch = { gallery };
@@ -1225,7 +1679,9 @@ window.onLoreFile = (input) => {
     .then((updated) => { character = { ...character, ...updated }; input.value = ''; rerenderIdentity(); })
     .catch((e) => showMsg(e.message));
 };
-window.rmLoreFile = (i) => {
+window.rmLoreFile = async (i) => {
+  const ok = await confirmModal({ title: 'Remover arquivo', desc: 'Não dá pra desfazer.', confirmLabel: 'Remover' });
+  if (!ok) return;
   const lore_files = [...(character.lore_files || [])];
   lore_files.splice(i, 1);
   db.updateCharacter(character.id, { lore_files })
@@ -1255,15 +1711,18 @@ function resBarHtml(cur, max) {
 function resourceRow(a) {
   const max = resMax(a);
   let cur = _fichaResources[a.id]; if (cur == null || cur === '') cur = max; cur = Number(cur);
+  const prot = _fichaProtection || 0;
+  const protPct = (prot > 0 && max > 0) ? Math.max(2, Math.min(100, (prot / max) * 100)) : 0;
   return `<div class="res-row" style="--res-color:${esc(a.color || '#7ee6dc')}">
     <div class="res-head">
       <span class="res-label"><i class="res-dot"></i>${esc(a.name)}</span>
-      <span class="res-amt-line"><b id="rescur-${a.id}">${cur}</b>&nbsp;/&nbsp;<span id="resmax-${a.id}">${max}</span></span>
+      <span class="res-amt-line"><b id="rescur-${a.id}">${cur}</b>&nbsp;/&nbsp;<span id="resmax-${a.id}">${max}</span>${prot > 0 ? ` <span class="res-shield-badge" title="Proteção somada dos itens equipados">+${prot} proteção</span>` : ''}</span>
     </div>
+    ${prot > 0 ? `<div class="res-shield-track" title="Proteção equipada: ${prot}"><div class="res-shield-fill" style="width:${protPct}%"></div></div>` : ''}
     <div class="res-bar-row">
       <div class="res-track" id="restrack-${a.id}">${resBarHtml(cur, max)}</div>
       <div class="res-step">
-        <button class="res-btn dmg" title="Sofrer dano" onclick="resDelta('${a.id}', -1)">−</button>
+        <button class="res-btn dmg" title="Sofrer dano" onclick="openDamagePopover(this, '${a.id}')">−</button>
         <button class="res-btn heal" title="Curar" onclick="resDelta('${a.id}', 1)">+</button>
       </div>
     </div></div>`;
@@ -1293,6 +1752,55 @@ window.resDelta = (id, delta) => {
   let cur = _fichaResources[id]; if (cur == null) cur = max;
   cur = Math.max(0, Math.min(max, Number(cur) + delta)); _fichaResources[id] = cur; refreshRes(id);
   db.setCharacterResource(character.id, id, cur).catch((e) => showMsg(e.message));
+};
+// popover de "sofrer dano": pergunta a quantidade e deixa escolher se o golpe passa pela Proteção
+// equipada (abate o total antes de descontar do recurso) ou se é dano direto (ignora a proteção).
+// só oferece a opção "com proteção" se o personagem tiver alguma proteção equipada de fato.
+let _dmgPop = null;
+function closeDamagePopover() {
+  if (!_dmgPop) return;
+  _dmgPop.remove(); _dmgPop = null;
+  document.removeEventListener('mousedown', _dmgOutside, true);
+  document.removeEventListener('keydown', _dmgEsc);
+}
+function _dmgOutside(e) { if (_dmgPop && !_dmgPop.contains(e.target)) closeDamagePopover(); }
+function _dmgEsc(e) { if (e.key === 'Escape') closeDamagePopover(); }
+window.openDamagePopover = (trigger, resourceId) => {
+  closeDamagePopover();
+  const prot = _fichaProtection || 0;
+  const pop = document.createElement('div');
+  pop.className = 'dmg-pop';
+  pop.innerHTML = `
+    <label class="sub" style="display:block;margin-bottom:6px">Quanto de dano?</label>
+    <input type="number" min="0" class="dmg-amount" placeholder="Ex.: 8">
+    <div class="dmg-actions">
+      ${prot > 0 ? `<button type="button" class="btn sm auto" data-mode="prot">Com proteção (−${prot})</button>` : ''}
+      <button type="button" class="btn sm danger auto" data-mode="raw">Dano direto</button>
+    </div>`;
+  document.body.appendChild(pop);
+  const r = trigger.getBoundingClientRect();
+  let left = r.left, top = r.bottom + 6;
+  if (left + pop.offsetWidth > window.innerWidth - 8) left = window.innerWidth - pop.offsetWidth - 8;
+  if (top + pop.offsetHeight > window.innerHeight - 8) top = r.top - pop.offsetHeight - 6;
+  pop.style.left = Math.max(8, left) + 'px';
+  pop.style.top = Math.max(8, top) + 'px';
+  _dmgPop = pop;
+  const amountInput = pop.querySelector('.dmg-amount');
+  amountInput.focus();
+  const apply = (mode) => {
+    const amount = Math.max(0, parseInt(amountInput.value) || 0);
+    if (!amount) { closeDamagePopover(); return; }
+    const final = mode === 'prot' ? Math.max(0, amount - prot) : amount;
+    resDelta(resourceId, -final);
+    showMsg(mode === 'prot' ? `Sofreu ${final} de dano (${amount} − ${prot} de proteção).` : `Sofreu ${final} de dano direto.`, 'ok');
+    closeDamagePopover();
+  };
+  pop.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => apply(b.dataset.mode); });
+  amountInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') apply(prot > 0 ? 'prot' : 'raw'); });
+  setTimeout(() => {
+    document.addEventListener('mousedown', _dmgOutside, true);
+    document.addEventListener('keydown', _dmgEsc);
+  }, 0);
 };
 
 /* avaliador de status calculados — parametrizado (usado na ficha própria e na visão do Mestre).
@@ -1368,6 +1876,28 @@ window.recalcComputed = () => {
   _fichaAttrs.forEach((a) => { if (a.is_resource) refreshRes(a.id); });
   _fichaAttrs.forEach((a) => { if (a.kind !== 'computed' && !a.is_resource) refreshSecRow(a.id); });
 };
+// atualização "leve" da ficha quando outro cliente (Mestre ou o próprio jogador em outra aba) muda
+// algo em tempo real — só rebusca os dados e repinta números/barras que já tinham patch dedicado
+// (recalcComputed → refreshRes/refreshSecRow/comp-*), sem reconstruir a tela toda. Cobre pontos de
+// status, recursos (HP), status calculados/perícias e bônus de equipamento; nível também é
+// repintado. Só reconstroi tudo (foto, itens, formulários) quando a aba é reaberta de verdade.
+async function patchFichaLive() {
+  if (currentTab !== 'ficha' || !character) return;
+  try {
+    const sheet = await db.loadSheet(campaignId);
+    const { character: ch, attributes, values, resources, proficiencies } = sheet;
+    character = ch;
+    _fichaAttrs = attributes; _fichaValues = { ...values }; _fichaResources = { ...(resources || {}) };
+    _fichaProficiencies = proficiencies || {}; _fichaProfCtx = profCtxFrom(_fichaProficiencies);
+    const inv = await db.listInventory(ch.id).catch(() => _fichaInventory);
+    _fichaInventory = inv;
+    try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, ch.user_id)), equipBonusMap(inv, attributes)); }
+    catch (_) { _fichaSkillBonus = equipBonusMap(inv, attributes); }
+    _fichaProtection = protectionTotalIn(inv, attributes, _fichaValues, _fichaSkillBonus, _fichaProfCtx);
+    const lvlTag = $('char-level-tag'); if (lvlTag) lvlTag.textContent = 'Nível ' + (ch.level || 1);
+    recalcComputed();
+  } catch (_) { /* silencioso — pior caso é só atualizar de verdade na próxima vez que a aba abrir */ }
+}
 // preenche/ressincroniza os "Status base" da classe e (se houver) da subclasse via RPC
 // (apply_class_defaults) — uma escrita direta em character_attributes é bloqueada pela RLS pra
 // status base não-recurso (só dá pra mudar via spend_stat_point), então isso precisa passar por
@@ -1396,26 +1926,41 @@ async function resyncClassDefaults(characterId, className, subName) {
 // classe/subclasse vivem na aba Ficha (não mais na Biografia — são ligadas ao sistema/status,
 // não à história do personagem), e por isso gravam direto ao trocar, sem passar pelo botão
 // "Salvar alterações" da identidade (esse botão só existe na Biografia).
-window.pickClass = (className) => {
+// escolher classe/subclasse é definitivo (não dá pra trocar depois pela ficha, só o Mestre edita
+// direto no banco) — antes o único aviso disso era um title= de tooltip, que nunca aparece em
+// touch; agora confirma de verdade antes de gravar, e desfaz a seleção visual do <select> se recusar
+window.pickClass = async (className) => {
+  if (!className) return;
+  const ok = await confirmModal({ title: 'Escolher classe', desc: `Escolher "${className}" é definitivo — não dá pra trocar de classe depois pela própria ficha. Os status base dela entram na hora.`, confirmLabel: 'Escolher', danger: false });
+  if (!ok) { refreshCharTags(); return; }
   character.char_class = className; character.subclass = '';
   db.updateCharacter(character.id, { char_class: className, subclass: '' }).then(async (updated) => {
     character = { ...character, ...updated };
     if (className) { try { await resyncClassDefaults(character.id, className, ''); } catch (_) {} }
-    if (currentTab === 'ficha') openTab('ficha');
+    refreshCharTags();
+    if (currentTab === 'ficha') patchFichaLive();
   }).catch((e) => showMsg(e.message));
 };
-window.pickSubclass = (subName) => {
+window.pickSubclass = async (subName) => {
+  if (!subName) return;
+  const ok = await confirmModal({ title: 'Escolher subclasse', desc: `Escolher "${subName}" é definitivo — não dá pra trocar de subclasse depois pela própria ficha.`, confirmLabel: 'Escolher', danger: false });
+  if (!ok) { refreshCharTags(); return; }
   character.subclass = subName;
   db.updateCharacter(character.id, { subclass: subName }).then(async (updated) => {
     character = { ...character, ...updated };
     if (character.char_class) { try { await resyncClassDefaults(character.id, character.char_class, subName); } catch (_) {} }
-    if (currentTab === 'ficha') openTab('ficha');
+    refreshCharTags();
+    if (currentTab === 'ficha') patchFichaLive();
   }).catch((e) => showMsg(e.message));
 };
 // classe/subclasse sem sistema vinculado (inputs de texto livre): grava ao sair do campo (blur/onchange)
-window.onClassTextChange = (key, value) => {
+window.onClassTextChange = async (key, value) => {
+  if (!value) return;
+  const label = key === 'char_class' ? 'classe' : 'subclasse';
+  const ok = await confirmModal({ title: 'Escolher ' + label, desc: `Escolher "${value}" é definitivo — não dá pra trocar depois pela própria ficha.`, confirmLabel: 'Escolher', danger: false });
+  if (!ok) { refreshCharTags(); return; }
   character[key] = value;
-  db.updateCharacter(character.id, { [key]: value }).then((updated) => { character = { ...character, ...updated }; })
+  db.updateCharacter(character.id, { [key]: value }).then((updated) => { character = { ...character, ...updated }; refreshCharTags(); })
     .catch((e) => showMsg(e.message));
 };
 window.onAgeInput = (input) => {
@@ -1442,50 +1987,344 @@ window.saveIdentity = () => {
 async function renderInventario(c) {
   character = character || await db.ensureCharacter(campaignId);
   const items = await db.listInventory(character.id);
+  _fichaInventory = items;
   const sysItems = (sys && sys.items) || [];
+  const eqSlots = (sys && sys.equipmentSlots) || [];
+  const hasSystem = !!mesa.system_id;
+  const requests = hasSystem ? await db.listMyItemRequests(character.id).catch(() => []) : [];
+  const slotIds = new Set(eqSlots.map((s) => s.id));
+  // com slots configurados, o que está "equipado" mora no tabuleiro; um item que ficou marcado
+  // equipped=true mas sem slot válido (equipo antigo, de antes dos slots existirem) some da mochila
+  // sem aparecer em lugar nenhum — então ele volta a contar como "órfão" e ganha uma lista própria
+  const boarded = eqSlots.length ? items.filter((it) => it.equipped && it.equipped_slot_id && slotIds.has(it.equipped_slot_id)) : [];
+  const orphanEquipped = eqSlots.length ? items.filter((it) => it.equipped && (!it.equipped_slot_id || !slotIds.has(it.equipped_slot_id))) : items.filter((it) => it.equipped);
+  const equipped = eqSlots.length ? [] : orphanEquipped;
+  const unequipped = items.filter((it) => !it.equipped);
   c.innerHTML = `
     <div class="section-title">Mochila</div>
-    <div class="list" id="inv-list">${items.length ? items.map(invRow).join('') : emptyState(ICONS.bag, 'Mochila vazia',
-      'Adicione itens no campo abaixo' + (sysItems.length ? ', ou puxe itens prontos do sistema da mesa (já vêm com os modificadores).' : '.'))}</div>
+    <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:0 0 14px">
+      ${eqSlots.length ? 'Arraste um item da mochila pra um espaço do boneco pra equipar (ou use o botão no card).'
+        : 'Arraste um item entre Mochila e Equipado pra trocar de estado (ou use o botão no card, se preferir).'}</p>
+
+    ${eqSlots.length ? `
+    <div class="section-title" style="font-size:12px">Equipamentos</div>
+    <div id="inv-eq-board">${eqBoardHtml(eqSlots, boarded)}</div>
+    <div id="inv-orphan-section" style="${orphanEquipped.length ? '' : 'display:none'}">
+      <div class="section-title" style="font-size:12px;margin-top:14px">Equipados sem espaço compatível <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(${orphanEquipped.length})</span></div>
+      <div class="item-grid" id="inv-orphan-grid">${orphanEquipped.map(invRow).join('')}</div>
+    </div>
+    ` : ''}
+
+    <div class="section-title" style="font-size:12px">Mochila <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0" id="inv-mochila-count">(${unequipped.length})</span></div>
+    <div class="item-grid inv-dropzone" id="inv-mochila-grid" ondragover="onInvDragOver(event)" ondragleave="onInvDragLeave(event)" ondrop="onInvDrop(event, false)">
+      ${unequipped.length ? unequipped.map(invRow).join('') : '<div class="empty" style="grid-column:1/-1">Nada aqui.</div>'}
+    </div>
+    ${!eqSlots.length ? `
+    <div class="section-title" style="font-size:12px;margin-top:14px">Equipado <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0" id="inv-equipado-count">(${equipped.length})</span></div>
+    <div class="item-grid inv-dropzone" id="inv-equipado-grid" ondragover="onInvDragOver(event)" ondragleave="onInvDragLeave(event)" ondrop="onInvDrop(event, true)">
+      ${equipped.length ? equipped.map(invRow).join('') : '<div class="empty" style="grid-column:1/-1">Arraste aqui um item com dano, proteção ou modificador pra equipar.</div>'}
+    </div>` : ''}
+
+    ${!items.length ? emptyState(ICONS.bag, 'Mochila vazia', hasSystem
+      ? (sysItems.length ? 'Adicione itens prontos do sistema da mesa abaixo — já vêm com dano, proteção e modificadores certos.' : 'O Mestre ainda não cadastrou itens neste sistema.')
+      : 'Adicione itens no campo abaixo.') : ''}
+
+    ${hasSystem ? (sysItems.length ? `
+    <div class="section-title" style="margin-top:18px">Solicitar item do sistema <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(o Mestre precisa aprovar antes de entrar na mochila)</span></div>
+    <div class="inline-form">
+      <select id="inv-sys-item" class="fld-input">${sysItems.map((it) => `<option value="${it.id}">${esc(it.name)}${(it.modifiers && it.modifiers.length) ? ' — ' + it.modifiers.map((m) => esc(m.name + ' ' + m.value)).join(', ') : ''}</option>`).join('')}</select>
+      <button class="btn auto" onclick="requestSysItem()">Solicitar</button>
+    </div>
+    <div id="inv-requests-section" style="${requests.length ? '' : 'display:none'}">
+      <div class="section-title" style="margin-top:18px;font-size:12px">Meus pedidos</div>
+      <div class="list" id="inv-requests-list">${requests.map(requestRow).join('')}</div>
+    </div>` : '') : `
     <form class="inline-form" style="margin-top:14px" onsubmit="return addInv(event)">
       <input id="inv-name" placeholder="Item" required maxlength="60">
       <input id="inv-qty" type="number" min="1" value="1" style="max-width:80px">
       <button class="btn go auto" type="submit">+ Adicionar</button>
-    </form>
-    ${sysItems.length ? `
-    <div class="section-title" style="margin-top:18px">Adicionar item do sistema <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(já traz os modificadores)</span></div>
-    <div class="inline-form">
-      <select id="inv-sys-item" class="fld-input">${sysItems.map((it) => `<option value="${it.id}">${esc(it.name)}${(it.modifiers && it.modifiers.length) ? ' — ' + it.modifiers.map((m) => esc(m.name + ' ' + m.value)).join(', ') : ''}</option>`).join('')}</select>
-      <button class="btn auto" onclick="addInvFromSystem()">+ Adicionar</button>
-    </div>` : ''}`;
+    </form>`}`;
 }
+// substitui/insere/remove cards de um grid de itens (por data-id), sem recriar o grid inteiro —
+// preserva os cards que não mudaram (scroll, animações em andamento etc.)
+function patchInvGrid(container, items, emptyHtml) {
+  if (!container) return;
+  const existing = new Map([...container.querySelectorAll('.poster-card[data-id]')].map((el) => [el.dataset.id, el.parentElement]));
+  if (!items.length) {
+    existing.forEach((frame) => frame.remove());
+    if (emptyHtml && !container.querySelector('.empty')) container.insertAdjacentHTML('beforeend', emptyHtml);
+    return;
+  }
+  container.querySelectorAll(':scope > .empty').forEach((e) => e.remove());
+  const seen = new Set();
+  items.forEach((it) => {
+    seen.add(it.id);
+    const fresh = invRow(it);
+    const oldFrame = existing.get(it.id);
+    if (oldFrame) oldFrame.outerHTML = fresh;
+    else container.insertAdjacentHTML('beforeend', fresh);
+  });
+  existing.forEach((frame, id) => { if (!seen.has(id)) frame.remove(); });
+}
+// atualização "leve" do inventário — mesmo espírito do patchFichaLive(): rebusca os dados e só
+// mexe nos cards/seções que realmente mudaram (equipar move o card de grid, editar troca só
+// aquele card, excluir remove só aquele), sem reconstruir a aba toda.
+async function patchInventarioLive() {
+  if (currentTab !== 'inventario' || !character) return;
+  try {
+    const items = await db.listInventory(character.id);
+    _fichaInventory = items;
+    const eqSlots = (sys && sys.equipmentSlots) || [];
+    const hasSystem = !!mesa.system_id;
+    const slotIds = new Set(eqSlots.map((s) => s.id));
+    const boarded = eqSlots.length ? items.filter((it) => it.equipped && it.equipped_slot_id && slotIds.has(it.equipped_slot_id)) : [];
+    const orphanEquipped = eqSlots.length ? items.filter((it) => it.equipped && (!it.equipped_slot_id || !slotIds.has(it.equipped_slot_id))) : items.filter((it) => it.equipped);
+    const equipped = eqSlots.length ? [] : orphanEquipped;
+    const unequipped = items.filter((it) => !it.equipped);
+
+    const board = $('inv-eq-board'); if (board) board.innerHTML = eqBoardHtml(eqSlots, boarded);
+    const orphanSection = $('inv-orphan-section');
+    if (orphanSection) { orphanSection.style.display = orphanEquipped.length ? '' : 'none'; patchInvGrid($('inv-orphan-grid'), orphanEquipped, ''); }
+
+    const mochilaCount = $('inv-mochila-count'); if (mochilaCount) mochilaCount.textContent = `(${unequipped.length})`;
+    patchInvGrid($('inv-mochila-grid'), unequipped, '<div class="empty" style="grid-column:1/-1">Nada aqui.</div>');
+
+    const eqCount = $('inv-equipado-count'); if (eqCount) eqCount.textContent = `(${equipped.length})`;
+    patchInvGrid($('inv-equipado-grid'), equipped, '<div class="empty" style="grid-column:1/-1">Arraste aqui um item com dano, proteção ou modificador pra equipar.</div>');
+
+    if (hasSystem) {
+      const requests = await db.listMyItemRequests(character.id).catch(() => []);
+      const reqSection = $('inv-requests-section'); const reqList = $('inv-requests-list');
+      if (reqSection) reqSection.style.display = requests.length ? '' : 'none';
+      if (reqList) reqList.innerHTML = requests.map(requestRow).join('');
+    }
+  } catch (_) { /* silencioso — pior caso é só atualizar de verdade na próxima vez que a aba abrir */ }
+}
+function requestRow(r) {
+  const label = r.status === 'pending' ? 'Pendente' : r.status === 'approved' ? 'Aprovado' : 'Negado';
+  const color = r.status === 'pending' ? 'var(--brass)' : r.status === 'approved' ? 'var(--maq)' : 'var(--escarlate)';
+  return `<div class="list-row"><div class="grow"><div class="nm">${esc(r.system_items?.name || 'item')}</div>
+    <div class="sub" style="color:${color}">${label}</div></div>
+    ${r.status === 'pending' ? `<button class="btn sm danger auto" onclick="cancelMyRequest('${r.id}')">Cancelar</button>` : ''}
+  </div>`;
+}
+window.requestSysItem = () => {
+  const id = $('inv-sys-item')?.value; if (!id) return;
+  db.requestItem(character.id, campaignId, id).then(() => { showMsg('Pedido enviado — aguarde o Mestre aprovar.', 'ok'); patchInventarioLive(); }).catch((e) => showMsg(e.message));
+};
+window.cancelMyRequest = (id) => {
+  db.cancelItemRequest(id).then(() => patchInventarioLive()).catch((e) => showMsg(e.message));
+};
+// guarda o item sendo arrastado num módulo-var — dataTransfer.getData() só é legível no
+// 'drop'/'dragstart', não durante 'dragover' (limitação da própria API), então é o único jeito
+// de saber, enquanto arrasta, se o item é compatível com o slot embaixo do cursor
+let _draggingItemId = null;
+window.onInvDragStart = (ev, id) => { ev.dataTransfer.setData('text/plain', id); ev.dataTransfer.effectAllowed = 'move'; _draggingItemId = id; };
+window.onInvDragEnd = () => { _draggingItemId = null; };
+window.onInvDragOver = (ev) => { ev.preventDefault(); ev.currentTarget.classList.add('drag-over'); };
+window.onInvDragLeave = (ev) => { ev.currentTarget.classList.remove('drag-over'); };
+window.onInvDrop = (ev, equip) => {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag-over');
+  const id = ev.dataTransfer.getData('text/plain');
+  if (!id) return;
+  // soltar de volta na mochila desfaz o equip — se o item tava num slot do tabuleiro, libera o slot também
+  if (!equip) {
+    const it = _fichaInventory.find((x) => x.id === id);
+    if (it && it.equipped_slot_id) { db.unequipFromSlot(id).then(() => patchInventarioLive()).catch((e) => showMsg(e.message)); return; }
+  }
+  toggleEquip(id, equip);
+};
+
+/* ---- tabuleiro "paper doll" (mesmo quadro montado em sistema.html, agora só pra jogar) ---- */
+// camadas de aura de raridade: poça de luz na base + ondas de choque (Raro+) + leque de raios
+// (Lendário/Único) + faíscas subindo tipo gêiser (Épico+) — mesmo esquema do app.html, duplicado
+// aqui de propósito (padrão do projeto de não compartilhar helpers de UI entre as páginas). O
+// slot em si não pode ter overflow:hidden (o botão de desequipar vaza da borda de propósito),
+// então essas camadas ficam livres pra "vazar" pra fora do slot, o que combina até melhor com o
+// visual de referência (aura se espalhando além do próprio item).
+function rarityFxLayers(rarity) {
+  const tier = { Comum: 0, Incomum: 1, Raro: 2, Épico: 3, Lendário: 4, Único: 5 }[rarity] || 0;
+  if (!tier) return '';
+  const sparkCount = tier >= 5 ? 9 : tier >= 4 ? 5 : tier >= 3 ? 3 : 0;
+  let sparks = '';
+  for (let i = 0; i < sparkCount; i++) {
+    const left = (25 + Math.random() * 50).toFixed(1);
+    const sx = (Math.random() * 44 - 22).toFixed(1);
+    const size = (2.5 + Math.random() * 2.5).toFixed(1);
+    const delay = (Math.random() * 2).toFixed(2);
+    const dur = (1.6 + Math.random() * 1.3).toFixed(2);
+    sparks += `<i class="rar-spark" style="left:${left}%;width:${size}px;height:${size}px;--sx:${sx}px;animation-delay:${delay}s;animation-duration:${dur}s"></i>`;
+  }
+  const rings = tier >= 2 ? '<i class="rar-ring r1"></i><i class="rar-ring r2"></i><i class="rar-ring r3"></i>' : '';
+  return `<span class="rar-ground"></span>${rings}<span class="rar-rays"></span>${sparks}`;
+}
+function eqBoardHtml(slots, boardedItems, readOnly = false) {
+  const byId = new Map(boardedItems.map((it) => [it.equipped_slot_id, it]));
+  const bgUrl = (sys && sys.system && sys.system.equipment_bg_url) || null;
+  // mesmas dimensões que o Mestre configurou no construtor do sistema (sistema.html) — sem isso o
+  // quadro sempre usava o tamanho padrão aqui, ficando diferente do que foi ajustado lá
+  const boardH = (sys && sys.system && sys.system.equipment_board_h) || 760;
+  const boardW = (sys && sys.system && sys.system.equipment_board_w) || 0;
+  return `<div class="eq-board${bgUrl ? ' has-bg' : ''}" style="min-height:${boardH}px${boardW ? `;width:${boardW}px` : ''}">
+    ${bgUrl ? `<div class="eq-board-bgimg" style="background-image:url('${esc(bgUrl)}')"></div>` : ''}
+    ${slots.map((s) => {
+      const it = byId.get(s.id);
+      const bg = it ? (it.image_url || '') : (s.silhouette_url || '');
+      const style = `left:${s.pos_x}%;top:${s.pos_y}%;width:${s.width}px;height:${s.height}px${bg ? `;background-image:url('${esc(bg)}')` : ''}`;
+      const rarity = it ? (it.rarity || 'Comum') : null;
+      return `<div class="eq-slot${it ? ' filled rarity-fx rarity-surface' : ''}" style="${style}" ${it ? `data-rarity="${esc(rarity)}"` : ''}
+        ${readOnly ? '' : `ondragover="onEqSlotDragOver(event,'${s.id}')" ondragleave="onEqSlotDragLeave(event)" ondrop="onEqSlotDrop(event,'${s.id}')"`}
+        ${it && !readOnly ? `draggable="true" ondragstart="onInvDragStart(event,'${it.id}')" ondragend="onInvDragEnd()"` : ''}
+        title="${esc(s.name)}${s.accepts_type ? ' — aceita: ' + esc(s.accepts_type) : ''}${it ? ' — ' + esc(it.name) : ''}">
+        ${it ? rarityFxLayers(rarity) : ''}
+        ${it && !bg ? `<div class="eq-slot-item-fallback">${esc(it.name)}</div>` : ''}
+        ${it && !readOnly ? `<button class="btn sm danger auto" style="position:absolute;top:-10px;right:-10px;padding:2px 5px;line-height:1" onclick="event.stopPropagation();unequipFromBoard('${it.id}')" title="Desequipar">×</button>` : ''}
+        <span class="eq-slot-label">${esc(s.name)}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+window.onEqSlotDragOver = (ev, slotId) => {
+  ev.preventDefault();
+  const item = _fichaInventory.find((x) => x.id === _draggingItemId);
+  const slot = ((sys && sys.equipmentSlots) || []).find((s) => s.id === slotId);
+  const incompatible = item && slot && slot.accepts_type && slot.accepts_type !== item.equipment_type;
+  ev.currentTarget.classList.toggle('drag-reject', !!incompatible);
+  ev.currentTarget.classList.toggle('drag-over', !incompatible);
+};
+window.onEqSlotDragLeave = (ev) => { ev.currentTarget.classList.remove('drag-over', 'drag-reject'); };
+window.onEqSlotDrop = (ev, slotId) => {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag-over', 'drag-reject');
+  const id = ev.dataTransfer.getData('text/plain'); if (!id) return;
+  const item = _fichaInventory.find((x) => x.id === id); if (!item) return;
+  const slot = ((sys && sys.equipmentSlots) || []).find((s) => s.id === slotId); if (!slot) return;
+  if (slot.accepts_type && slot.accepts_type !== item.equipment_type) { showMsg(`Esse espaço só aceita itens do tipo "${slot.accepts_type}".`); return; }
+  db.equipToSlot(character.id, id, slotId).then(() => patchInventarioLive()).catch((e) => showMsg(e.message));
+};
+window.unequipFromBoard = (id) => {
+  db.unequipFromSlot(id).then(() => patchInventarioLive()).catch((e) => showMsg(e.message));
+};
 let _invDrafts = {};
 function invDraft(id) { return _invDrafts[id] || (_invDrafts[id] = {}); }
 function invRow(it) {
-  const mods = (it.modifiers && it.modifiers.length) ? `<div class="mods" style="margin-top:5px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : '';
-  const canEquip = it.modifiers && it.modifiers.length; // sem modificador não tem o que aplicar — não faz sentido "equipar"
-  return `<div class="list-row" data-id="${it.id}">
-    <div class="grow"><div class="nm">${esc(it.name)}${it.equipped ? ' <span class="badge" style="border-color:var(--maq);color:var(--maq)">equipado</span>' : ''}</div>
-      <input class="sub" style="background:transparent;border:0;color:var(--ink-faint);font-family:var(--mono);font-size:11px;width:100%;margin-top:3px"
-        placeholder="descrição..." value="${esc(it.description)}" oninput="onInvFieldChange('${it.id}','description',this.value)">
-      ${mods}</div>
-    ${canEquip ? `<button class="btn sm auto" style="${it.equipped ? 'border-color:var(--maq);color:var(--maq)' : ''}" onclick="toggleEquip('${it.id}', ${!it.equipped})" title="Equipado aplica os modificadores automaticamente nos Status">${it.equipped ? 'Desequipar' : 'Equipar'}</button>` : ''}
-    <input type="number" min="0" value="${it.qty}" style="max-width:70px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);padding:7px"
-      oninput="onInvFieldChange('${it.id}','qty',this.value)">
-    <button class="btn sm go" id="inv-save-${it.id}" style="display:none" onclick="saveInvRow('${it.id}')"><span class="spin"></span>Salvar</button>
-    <button class="btn sm danger auto" onclick="delItem('${it.id}')"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  const hasProtection = it.protection != null && it.protection !== '';
+  const badges = `${it.weapon_damage ? `<span class="badge mod">Dano ${esc(it.weapon_damage)}${it.damage_scale ? ' + ' + esc(it.damage_scale) : ''}</span>` : ''}${hasProtection ? `<span class="badge mod">Proteção ${esc(String(it.protection))}${it.protection_scale ? ' + ' + esc(it.protection_scale) : ''}</span>` : ''}${(it.modifiers || []).map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}`;
+  const mods = badges ? `<div class="mods" style="justify-content:center">${badges}</div>` : '';
+  // equipar só faz sentido se o item tiver algum efeito pra aplicar (modificador, dano ou proteção)
+  const canEquip = (it.modifiers && it.modifiers.length) || it.weapon_damage || hasProtection;
+  // mesmo card-pôster da aba Itens/sistema — o "equipado" vira o selo verde do canto (era o
+  // poster-pub/"Publicado"), o excluir vira o botão do canto (era o favoritar), e os controles que
+  // só fazem sentido aqui (quantidade, equipar, rolar dano, salvar) moram numa fileira própria
+  // dentro do corpo do card, embaixo da descrição (que continua editável, só que centralizada).
+  const rarity = it.rarity || 'Comum';
+  const rarityKey = 'r-' + rarity.toLowerCase();
+  const initial = esc((it.name || '?').trim().charAt(0).toUpperCase() || '?');
+  const bgStyle = it.image_url ? ` style="background-image:url('${esc(it.image_url)}')"` : '';
+  return `<div class="rar-frame" data-rarity="${esc(rarity)}">
+    <div class="poster-card" data-id="${it.id}" ${canEquip ? `draggable="true" ondragstart="onInvDragStart(event,'${it.id}')" ondragend="onInvDragEnd()"` : ''}>
+      ${posterRarityLayers(rarity)}
+      ${it.equipped ? `<span class="poster-pub on">Equipado</span>` : ''}
+      <button class="poster-fav" onclick="delItem('${it.id}')" title="Remover da mochila" aria-label="Remover da mochila">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <div class="poster-icon ${it.image_url ? '' : 'ph ' + rarityKey}"${bgStyle}>${!it.image_url ? `<span class="poster-initial">${initial}</span>` : ''}</div>
+      <div class="poster-body">
+        <h4 class="poster-name">${esc(it.name)}</h4>
+        <span class="rar-pill" data-rarity="${esc(rarity)}">${esc(rarity)}</span>
+        ${mods}
+        <input class="poster-desc" style="background:transparent;border:0;text-align:center;width:100%;padding:0;font-family:var(--serif);font-size:11.5px;color:var(--ink-dim)"
+          placeholder="descrição..." value="${esc(it.description)}" oninput="onInvFieldChange('${it.id}','description',this.value)">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:2px">
+          <input type="number" min="0" value="${it.qty}" style="width:56px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);padding:6px;text-align:center"
+            oninput="onInvFieldChange('${it.id}','qty',this.value)">
+          <button class="btn sm auto" onclick="openInvItemDetail('${it.id}')" title="Ver o item por completo">Detalhes</button>
+          ${it.equipped && it.weapon_damage ? `<button class="btn sm go auto" onclick="rollWeaponDamage('${it.id}')" title="Rola a fórmula de dano da arma">Rolar dano</button>` : ''}
+          ${canEquip ? `<button class="btn sm auto" style="${it.equipped ? 'border-color:var(--maq);color:var(--maq)' : ''}" onclick="onEquipBtn('${it.id}', ${!it.equipped})" title="Equipado aplica os modificadores/dano/proteção automaticamente">${it.equipped ? 'Desequipar' : 'Equipar'}</button>` : ''}
+          <button class="btn sm go auto" id="inv-save-${it.id}" style="display:none" onclick="saveInvRow('${it.id}')"><span class="spin"></span>Salvar</button>
+        </div>
+      </div>
+    </div>
   </div>`;
 }
+// modal de detalhe completo do item da mochila — mesmo layout/classes .ui-modal .item-detail
+// que o modal de item da aba Itens (app.html), só que com as ações que fazem sentido aqui
+// (equipar/desequipar, rolar dano, excluir) em vez de favoritar/publicar.
+window.openInvItemDetail = (id) => {
+  const it = _fichaInventory.find((x) => x.id === id);
+  if (!it) return;
+  const hasProtection = it.protection != null && it.protection !== '';
+  const canEquip = (it.modifiers && it.modifiers.length) || it.weapon_damage || hasProtection;
+  const rarity = it.rarity || 'Comum';
+  const trigger = document.activeElement;
+  const w = document.createElement('div');
+  w.className = 'ui-modal';
+  w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'idet-title');
+  w.innerHTML = `<div class="box guide item-detail">
+    <div class="ghead"><h3 id="idet-title">${esc(it.name)}</h3><button class="x" aria-label="Fechar">×</button></div>
+    ${it.image_url ? `<img class="idet-img" src="${esc(it.image_url)}" alt="">` : ''}
+    <div class="idet-badges">
+      <span class="rar-pill" data-rarity="${esc(rarity)}">${esc(rarity)}</span>
+      ${it.weapon_damage ? `<span class="badge mod">Dano ${esc(it.weapon_damage)}${it.damage_scale ? ' + ' + esc(it.damage_scale) : ''}</span>` : ''}
+      ${hasProtection ? `<span class="badge mod">Proteção ${esc(String(it.protection))}${it.protection_scale ? ' + ' + esc(it.protection_scale) : ''}</span>` : ''}
+      ${it.equipped ? `<span class="badge" style="border-color:var(--maq);color:var(--maq)">Equipado</span>` : ''}
+    </div>
+    ${it.description ? `<p class="gintro">${esc(it.description)}</p>` : `<p class="gintro" style="color:var(--ink-faint)">Sem descrição.</p>`}
+    ${(it.modifiers && it.modifiers.length) ? `<div class="mods" style="margin-bottom:12px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : ''}
+    <div class="idet-creator">Quantidade: ${esc(String(it.qty))}</div>
+    <div class="idet-actions">
+      ${it.equipped && it.weapon_damage ? `<button class="btn auto" id="idet-roll">Rolar dano</button>` : ''}
+      ${canEquip ? `<button class="btn auto" id="idet-equip" style="${it.equipped ? 'border-color:var(--maq);color:var(--maq)' : ''}">${it.equipped ? 'Desequipar' : 'Equipar'}</button>` : ''}
+      <button class="btn danger auto" id="idet-del">Excluir</button>
+    </div>
+  </div>`;
+  const untrap = trapFocus(w);
+  const close = () => { untrap(); w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); };
+  const onEsc = (e) => { if (e.key === 'Escape') close(); };
+  w.addEventListener('click', (e) => { if (e.target === w) close(); });
+  w.querySelector('.x').onclick = close;
+  const rollBtn = w.querySelector('#idet-roll'); if (rollBtn) rollBtn.onclick = () => { close(); rollWeaponDamage(id); };
+  const equipBtn = w.querySelector('#idet-equip'); if (equipBtn) equipBtn.onclick = () => { close(); onEquipBtn(id, !it.equipped); };
+  w.querySelector('#idet-del').onclick = () => { close(); delItem(id); };
+  document.addEventListener('keydown', onEsc);
+  document.body.appendChild(w);
+  w.querySelector('.x').focus();
+};
+// reaproveita 100% o motor de rolagem já existente (rollFormula/doRoll) — weapon_damage já é uma
+// fórmula de dado (ex.: "1d8+2"); se tiver damage_scale, só concatena o apelido do status na
+// fórmula, e _statMap (o mesmo mapa que o rolador de dados usa) resolve o valor dele sozinho.
+window.rollWeaponDamage = async (id) => {
+  const it = _fichaInventory.find((x) => x.id === id); if (!it || !it.weapon_damage) return;
+  await loadStatMap(); // garante que _statMap reflete o equipamento/status mais recentes
+  const formula = it.weapon_damage + (it.damage_scale ? '+' + it.damage_scale : '');
+  doRoll(formula, it.name);
+};
 window.toggleEquip = (id, equipped) => {
-  db.updateItem(id, { equipped }).then(() => openTab('inventario')).catch((e) => showMsg(e.message));
+  db.updateItem(id, { equipped }).then(() => patchInventarioLive()).catch((e) => showMsg(e.message));
+};
+// quando o sistema tem tabuleiro configurado, equipar precisa escolher um slot compatível em vez
+// de só marcar equipped=true — sem isso o item ficaria "órfão" (equipado mas sem espaço no boneco)
+window.onEquipBtn = (id, equip) => {
+  const slots = (sys && sys.equipmentSlots) || [];
+  if (!slots.length) { toggleEquip(id, equip); return; }
+  if (!equip) {
+    const it = _fichaInventory.find((x) => x.id === id);
+    if (it && it.equipped_slot_id) { db.unequipFromSlot(id).then(() => patchInventarioLive()).catch((e) => showMsg(e.message)); return; }
+    toggleEquip(id, false); return;
+  }
+  const it = _fichaInventory.find((x) => x.id === id); if (!it) return;
+  const compatible = slots.filter((s) => !s.accepts_type || s.accepts_type === it.equipment_type);
+  if (!compatible.length) { showMsg('Nenhum espaço aceita esse item — arraste-o pra um espaço compatível ou peça ao Mestre pra criar um.'); return; }
+  // prefere um slot compatível ainda VAZIO — só cai pra troca automática (desequipar o que já
+  // estava lá) se todos os slots compatíveis já estiverem ocupados, igual o drag-and-drop já faz
+  const occupied = new Set(_fichaInventory.filter((x) => x.equipped_slot_id).map((x) => x.equipped_slot_id));
+  const slot = compatible.find((s) => !occupied.has(s.id)) || compatible[0];
+  db.equipToSlot(character.id, id, slot.id).then(() => patchInventarioLive()).catch((e) => showMsg(e.message));
 };
 window.addInv = (ev) => { ev.preventDefault(); const n = $('inv-name').value.trim(); if (!n) return false;
   const qty = parseInt($('inv-qty').value) || 1;
-  db.addItem(character.id, { name: n, qty }).then(() => openTab('inventario')).catch((e) => showMsg(e.message)); return false; };
-window.addInvFromSystem = () => {
-  const id = $('inv-sys-item')?.value; if (!id) return;
-  db.addInventoryItemFromSystem(character.id, id).then(() => openTab('inventario')).catch((e) => showMsg(e.message));
-};
+  db.addItem(character.id, { name: n, qty }).then(() => patchInventarioLive()).catch((e) => showMsg(e.message)); return false; };
 window.onInvFieldChange = (id, key, value) => {
   invDraft(id)[key] = value;
   const b = $('inv-save-' + id); if (b) b.style.display = '';
@@ -1500,8 +2339,38 @@ window.saveInvRow = (id) => {
     .catch((e) => showMsg(e.message))
     .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
 };
-window.delItem = (id) => { db.deleteItem(id).then(() => openTab('inventario')).catch((e) => showMsg(e.message)); };
+window.delItem = async (id) => {
+  const ok = await confirmModal({ title: 'Excluir item', desc: 'Remove este item da sua mochila. Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteItem(id).then(() => patchInventarioLive()).catch((e) => showMsg(e.message));
+};
 
+// cartão de uma habilidade já desbloqueada — compartilhado entre a aba do próprio jogador
+// (renderHabilidades) e a sub-aba do Mestre (renderGmHabilidades), pra garantir que os dois
+// nunca mostrem dados diferentes pro mesmo personagem (mesma função, mesmo dado).
+function abilityCardHtml(a) {
+  const kindLabel = a.kind === 'core' ? 'Núcleo' : a.kind === 'active' ? 'Ativa' : 'Passiva';
+  const color = a.via_color || '#7ee6dc';
+  const modLabel = (m) => { const s = (sys?.stats || []).find((x) => x.id === m.stat_id); return (s ? esc(s.name) : '(atributo removido)') + ': ' + (m.amount >= 0 ? '+' : '') + esc(String(m.amount)); };
+  return `<div class="list-row" style="border-left:3px solid ${esc(color)}">
+    <div class="grow">
+      <div class="nm">${esc(a.name || '(sem nome)')} <span class="badge" style="border-color:${esc(color)};color:${esc(color)}">${esc(kindLabel)}</span></div>
+      <div class="sub">${esc(a.tree_name)} · ${esc(a.via_name)}</div>
+      ${a.descr ? `<div class="sub" style="margin-top:4px">${esc(a.descr)}</div>` : ''}
+      ${(a.modifiers || []).length ? `<div class="mods" style="margin-top:5px">${a.modifiers.map((m) => `<span class="badge mod">${modLabel(m)}</span>`).join('')}</div>` : ''}
+    </div>
+  </div>`;
+}
+async function renderHabilidades(c) {
+  if (!mesa.system_id) { c.innerHTML = '<div class="empty">Esta mesa não tem sistema vinculado.</div>'; return; }
+  const abilities = await db.getUnlockedAbilities(campaignId, myId).catch(() => []);
+  if (!abilities.length) { c.innerHTML = '<div class="empty">Nenhuma habilidade desbloqueada ainda.</div>'; return; }
+  const byTree = new Map();
+  abilities.forEach((a) => { if (!byTree.has(a.tree_name)) byTree.set(a.tree_name, []); byTree.get(a.tree_name).push(a); });
+  c.innerHTML = [...byTree.entries()].map(([treeName, list]) => `
+    <div class="section-title">${esc(treeName)}</div>
+    <div class="list">${list.map(abilityCardHtml).join('')}</div>`).join('');
+}
 async function renderAnotacoes(c) {
   character = character || await db.ensureCharacter(campaignId);
   const notes = await db.listNotes(character.id);
@@ -1519,14 +2388,20 @@ function noteRow(n) {
     <div style="display:flex;gap:8px;align-items:center">
       <input style="flex:1;background:transparent;border:0;color:var(--bone);font-family:var(--disp);font-size:15px"
         placeholder="Título" value="${esc(n.title)}" oninput="onNoteFieldChange('${n.id}','title',this.value)">
-      <button class="btn sm go" id="note-save-${n.id}" style="display:none" onclick="saveNoteRow('${n.id}')"><span class="spin"></span>Salvar</button>
+      <button class="btn sm go auto" id="note-save-${n.id}" style="display:none" onclick="saveNoteRow('${n.id}')"><span class="spin"></span>Salvar</button>
       <button class="btn sm danger auto" onclick="delNote('${n.id}')">Excluir</button>
     </div>
     <textarea style="width:100%;min-height:70px;background:var(--field-2);border:1px solid var(--line);border-radius:10px;color:var(--ink-dim);font-family:var(--serif);font-size:14px;padding:10px 12px;line-height:1.55"
       placeholder="Escreva..." oninput="onNoteFieldChange('${n.id}','body',this.value)">${esc(n.body)}</textarea>
   </div>`;
 }
-window.addNote = () => { db.addNote(character.id, { title: '', body: '' }).then(() => openTab('anotacoes')).catch((e) => showMsg(e.message)); };
+window.addNote = () => {
+  db.addNote(character.id, { title: '', body: '' }).then((n) => {
+    const box = $('note-list'); if (!box) return;
+    box.querySelectorAll(':scope > .empty-cta').forEach((e) => e.remove());
+    box.insertAdjacentHTML('beforeend', noteRow(n));
+  }).catch((e) => showMsg(e.message));
+};
 window.onNoteFieldChange = (id, key, value) => {
   noteDraft(id)[key] = value;
   const b = $('note-save-' + id); if (b) b.style.display = '';
@@ -1538,7 +2413,17 @@ window.saveNoteRow = (id) => {
     .catch((e) => showMsg(e.message))
     .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
 };
-window.delNote = (id) => { db.deleteNote(id).then(() => openTab('anotacoes')).catch((e) => showMsg(e.message)); };
+window.delNote = async (id) => {
+  const ok = await confirmModal({ title: 'Excluir anotação', desc: 'Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteNote(id).then(() => {
+    const row = document.querySelector(`#note-list [data-id="${id}"]`); if (row) row.remove();
+    const box = $('note-list');
+    if (box && !box.children.length) box.innerHTML = emptyState(ICONS.pencil, 'Nenhuma anotação ainda',
+      'Um caderno só seu — segredos, planos, pistas. O Mestre nunca vê o que você escreve aqui.',
+      '<button class="btn go auto sm" onclick="addNote()">+ Criar primeira anotação</button>');
+  }).catch((e) => showMsg(e.message));
+};
 
 /* ============================ ROLADOR DE DADOS + CHAT ============================ */
 async function mountDice() {
@@ -1549,7 +2434,7 @@ async function mountDice() {
   panel.className = 'dice-panel'; panel.id = 'dice-panel';
   const diceOpts = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'];
   panel.innerHTML = `
-    <div class="dh"><b><span class="ic" id="dice-panel-icon">${ICONS.dice}</span><span id="dice-panel-label">Rolagens</span></b><button class="x" onclick="closeDice()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="dh"><b><span class="ic" id="dice-panel-icon">${ICONS.dice}</span><span id="dice-panel-label">Rolagens</span></b><button class="x" onclick="closeDice()" aria-label="Fechar rolagens"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="dice-builder">
       <input type="number" id="dice-qty" min="1" max="20" value="1" class="dice-qty" title="Quantidade de dados">
       <select id="dice-die">${diceOpts.map((d) => `<option ${d === 'd20' ? 'selected' : ''}>${d}</option>`).join('')}</select>
@@ -1581,6 +2466,35 @@ async function mountDice() {
 }
 window.toggleDice = () => { const p = $('dice-panel'); const open = !p.classList.contains('open'); p.classList.toggle('open'); if (open) loadStatMap(); };
 window.closeDice = () => $('dice-panel').classList.remove('open');
+
+/* ============================ PEDIDOS DE ITEM (só o Mestre) ============================ */
+// jogador não pega item do sistema direto — só solicita (ver requestSysItem em renderInventario).
+// isso morava num botão+painel flutuantes por cima do tabuleiro; virou uma lista fixa dentro da
+// barra lateral esquerda (junto com #party, o grupo online), sempre visível — não precisa mais de
+// "abrir" nada nem de rastrear quantos pedidos o Mestre "já viu" (mesma razão de #party não ter
+// indicador de não-visto: já está sempre na tela).
+async function mountItemRequests() {
+  if (role !== 'gm') return;
+  await refreshItemRequests();
+  _unsubItemReq = db.subscribeItemRequests(campaignId, refreshItemRequests);
+}
+async function refreshItemRequests() {
+  const box = $('mesa-requests'); if (!box) return;
+  const reqs = await db.listPendingItemRequests(campaignId).catch(() => []);
+  box.innerHTML = `<div class="party-label">Pedidos de item${reqs.length ? ' · ' + reqs.length : ''}</div>` +
+    `<div class="list" id="req-list">` + (reqs.length ? reqs.map((r) => `
+    <div class="list-row"><div class="grow"><div class="nm">${esc(r.characters?.name || 'Jogador')}</div>
+      <div class="sub">quer: ${esc(r.system_items?.name || 'item')}</div></div>
+      <button class="btn sm go auto" onclick="resolveRequest('${r.id}', true)">Aprovar</button>
+      <button class="btn sm danger auto" onclick="resolveRequest('${r.id}', false)">Negar</button>
+    </div>`).join('') : '<div class="empty" style="border:0">Nenhum pedido pendente.</div>') + `</div>`;
+}
+window.resolveRequest = (id, approve) => {
+  db.resolveItemRequest(id, approve).then(() => {
+    showMsg(approve ? 'Item concedido.' : 'Pedido negado.', 'ok');
+    refreshItemRequests();
+  }).catch((e) => showMsg(e.message));
+};
 window.selectRailTab = (tab) => {
   const isRolls = tab === 'rolls';
   document.querySelectorAll('#rail-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.rt === tab));
@@ -1590,7 +2504,16 @@ window.selectRailTab = (tab) => {
   if (icon) icon.innerHTML = isRolls ? ICONS.dice : ICONS.chat;
   if (label) label.textContent = isRolls ? 'Rolagens' : 'Conversa';
 };
-addEventListener('beforeunload', () => { if (_unsub) _unsub(); if (_unsubChat) _unsubChat(); });
+addEventListener('beforeunload', () => {
+  if (_unsub) _unsub();
+  if (_unsubChat) _unsubChat();
+  if (_unsubItemReq) _unsubItemReq();
+  if (_unsubCharLive) _unsubCharLive();
+  if (_unsubMembers) _unsubMembers();
+  if (_unsubCampaign) _unsubCampaign();
+  if (_unsubGmView) _unsubGmView();
+  if (_unsubPresence) _unsubPresence();
+});
 
 // mapa dos status do jogador (pra rolar 1d20+FORCA etc.) + listas pro montador interativo
 let _diceStats = [], _diceFormulas = [];

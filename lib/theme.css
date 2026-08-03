@@ -2,6 +2,20 @@
    Tema Vitality — tokens visuais reaproveitados do protótipo
    (liquid glass, fundo cósmico, fontes, botões e campos).
    ============================================================ */
+/* Escala de breakpoints em uso neste arquivo (CSS não permite var() dentro da condição de um
+   @media, então isso fica documentado aqui em vez de virar custom property):
+     420px  — cartões/formulários muito estreitos (ex.: login)
+     440px  — idem, telas de auth
+     560px  — barras de ação que precisam empilhar (ex.: .points-bar)
+     600px  — grades de 2 colunas que viram 1
+     680px  — painéis laterais que viram tela cheia
+     760px  — segunda coluna de formulário que empilha
+     821px (min-width) — liga o cockpit de 3 colunas da mesa (o único min-width; todos os outros
+                          daqui são max-width, "empilha abaixo de X")
+     900px  — .eq-layout (quadro + painel de edição) empilha
+   Cada um nasceu do componente que precisava dele, não de uma escala compartilhada — por isso os
+   valores não são redondos nem múltiplos entre si. Ao adicionar um breakpoint novo, prefira
+   reaproveitar um destes em vez de inventar mais um valor. */
 :root{
   color-scheme: dark;
   --bgA:138,104,214; --bgB:74,118,206; --bgC:196,132,224; --bgGlow:255,242,255; --bgDeep:#1b1536; --bgEdge:#080615;
@@ -142,6 +156,13 @@ body{font-family:var(--serif);color:var(--ink);-webkit-font-smoothing:antialiase
 .btn.auto{width:auto;display:inline-flex;padding:11px 18px}
 .btn.sm{padding:8px 12px;font-size:10px}
 
+/* linha de botões de ação (Cancelar/Salvar, Excluir/Salvar...) usada em vários formulários e
+   painéis (arvore.html, sistema.html, app.html, mesa.html) — sem essa regra a div não tinha
+   NENHUM display:flex próprio, então os .btn (que são display:flex + width:100% pra centralizar
+   o próprio conteúdo) ficavam se comportando como blocos cheios um embaixo do outro, colados
+   sem espaço nenhum entre eles */
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+
 /* grade de cards */
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 .card-tile{position:relative;border-radius:16px;padding:18px;cursor:pointer;transition:transform var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease);border:1px solid var(--line2);
@@ -183,6 +204,16 @@ body{font-family:var(--serif);color:var(--ink);-webkit-font-smoothing:antialiase
 .list-row .nm{font-family:var(--serif);font-size:15px;color:var(--ink)}
 .list-row .sub{font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:.04em;margin-top:2px}
 .empty{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-align:center;padding:28px;border:1px dashed var(--line2);border-radius:14px;letter-spacing:.03em}
+
+/* mochila: Mochila/Equipado empilhados (cada um ocupando a largura toda, pro grid de cards
+   caber mais colunas por linha) com arrastar-e-soltar pra trocar o estado — o item só fica
+   "draggable" se tiver algum efeito mecânico (senão não há o que "equipar" de verdade) */
+.inv-dropzone{min-height:70px;padding:2px;border-radius:12px;border:1px dashed transparent;transition:background-color .15s,border-color .15s}
+.inv-dropzone.drag-over{background:color-mix(in srgb,var(--brass) 8%,transparent);border-color:var(--brass)}
+.list-row[draggable="true"]{cursor:grab}
+.list-row[draggable="true"]:active{cursor:grabbing}
+.poster-card[draggable="true"]{cursor:grab}
+.poster-card[draggable="true"]:active{cursor:grabbing}
 /* estado vazio com convite (ícone + título + descrição + CTA) — primeira impressão de cada seção */
 .empty-cta{display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;padding:40px 26px;
   border:1px dashed var(--line2);border-radius:16px;background:var(--field-2);animation:fadeUp .3s var(--ease)}
@@ -284,21 +315,22 @@ select option{background:var(--panel);color:var(--ink)}
    Cards de item — pôster (Loja / Favoritos / Criar)
    ============================================================ */
 .item-subtabs{max-width:340px}
-.item-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:4px}
-.poster-card{position:relative;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;
-  border:1px solid var(--line2);background-size:cover;background-position:center;background-color:var(--field-2);
-  transition:transform var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
-.poster-card:hover,.poster-card:focus-visible{transform:translateY(-3px);border-color:var(--brass);
-  box-shadow:0 14px 34px rgba(0,0,0,.42),0 0 0 1px rgba(24,181,198,.25)}
+.item-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px;margin-top:4px}
+/* card-painel: ícone no centro, nome/raridade/descrição empilhados embaixo (igual à referência) */
+.poster-card{position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;
+  border-radius:13px;overflow:hidden;cursor:pointer;background:var(--field-2);padding:22px 12px 12px;
+  transition:box-shadow var(--dur-2) var(--ease)}
 .poster-card:focus-visible{outline:2px solid var(--maq);outline-offset:2px}
-.poster-card.ph{display:flex;align-items:center;justify-content:center}
-.poster-initial{font-family:var(--disp);font-size:44px;font-weight:700;color:var(--ink-faint);opacity:.55}
-.poster-card.ph.r-comum{background-image:linear-gradient(135deg,rgba(185,194,198,.22),var(--field-2))}
-.poster-card.ph.r-incomum{background-image:linear-gradient(135deg,rgba(143,230,160,.22),var(--field-2))}
-.poster-card.ph.r-raro{background-image:linear-gradient(135deg,rgba(122,184,255,.22),var(--field-2))}
-.poster-card.ph.r-épico{background-image:linear-gradient(135deg,rgba(199,156,255,.24),var(--field-2))}
-.poster-card.ph.r-lendário{background-image:linear-gradient(135deg,rgba(24,181,198,.26),var(--field-2))}
-.poster-card.ph.r-único{background-image:linear-gradient(135deg,rgba(242,88,94,.24),var(--field-2))}
+.poster-icon{position:relative;z-index:2;flex:0 0 auto;width:64px;height:64px;border-radius:16px;
+  border:1px solid var(--line2);background-size:cover;background-position:center;background-color:rgba(255,255,255,.04);
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+.poster-initial{font-family:var(--disp);font-size:26px;font-weight:700;color:var(--ink-faint);opacity:.7}
+.poster-icon.ph.r-comum{background-image:linear-gradient(135deg,rgba(185,194,198,.3),var(--field-2))}
+.poster-icon.ph.r-incomum{background-image:linear-gradient(135deg,rgba(143,230,160,.3),var(--field-2))}
+.poster-icon.ph.r-raro{background-image:linear-gradient(135deg,rgba(122,184,255,.32),var(--field-2))}
+.poster-icon.ph.r-épico{background-image:linear-gradient(135deg,rgba(199,156,255,.34),var(--field-2))}
+.poster-icon.ph.r-lendário{background-image:linear-gradient(135deg,rgba(24,181,198,.36),var(--field-2))}
+.poster-icon.ph.r-único{background-image:linear-gradient(135deg,rgba(242,88,94,.34),var(--field-2))}
 .poster-fav{position:absolute;top:8px;right:8px;z-index:3;width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.24);
   background:rgba(10,12,18,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:#fff;
   display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.82;
@@ -307,21 +339,18 @@ select option{background:var(--panel);color:var(--ink)}
 .poster-fav:hover,.poster-fav:focus-visible{opacity:1;transform:scale(1.08)}
 .poster-fav.on{opacity:1;background:rgba(10,12,18,.7)}
 .poster-fav.on svg{fill:var(--escarlate);stroke:var(--escarlate)}
-.poster-hover{position:absolute;inset:0;z-index:2;display:flex;align-items:flex-start;padding:34px 10px 0;
-  background:rgba(6,8,13,.55);opacity:0;transition:opacity var(--dur-2) var(--ease);pointer-events:none}
-.poster-card:hover .poster-hover,.poster-card:focus-visible .poster-hover{opacity:1}
-.poster-hover p{font-family:var(--mono);font-size:10.5px;line-height:1.5;color:var(--ink-dim);margin:0}
-.poster-scrim{position:absolute;left:0;right:0;bottom:0;z-index:1;padding:20px 9px 9px;
-  background:linear-gradient(180deg,transparent,rgba(4,5,9,.86) 65%)}
-.poster-badges{display:flex;gap:4px;margin-bottom:4px}
-.poster-name{font-family:var(--disp);font-size:13.5px;font-weight:600;color:#fff;margin:0;line-height:1.25;
-  text-shadow:0 1px 4px rgba(0,0,0,.6);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.poster-meta{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,.7);margin-top:3px;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.poster-body{position:relative;z-index:2;display:flex;flex:1;flex-direction:column;align-items:center;
+  text-align:center;gap:5px;width:100%;margin-top:12px;min-height:0}
+.poster-name{font-family:var(--disp);font-size:13.5px;font-weight:600;color:var(--ink);margin:0;line-height:1.25;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.poster-desc{font-family:var(--serif);font-size:11.5px;line-height:1.45;color:var(--ink-dim);margin:0;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.poster-meta{font-family:var(--mono);font-size:9px;color:var(--ink-faint);margin-top:auto;padding-top:6px}
 /* selo de publicação — só aparece nos seus próprios itens/sistemas */
 .poster-pub{position:absolute;top:8px;left:8px;z-index:3;font-family:var(--mono);font-size:8px;letter-spacing:.08em;text-transform:uppercase;
   padding:3px 7px;border-radius:6px;color:rgba(255,255,255,.85);background:rgba(10,12,18,.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .poster-pub.on{color:var(--maq)}
-@media (prefers-reduced-motion:reduce){.poster-card:hover,.poster-card:focus-visible{transform:none}}
+@media (prefers-reduced-motion:reduce){.rar-frame{animation:none !important;transform:none !important}}
 
 /* checkbox de publicar (item/sistema na loja) */
 .check-row{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
@@ -346,6 +375,267 @@ select option{background:var(--panel);color:var(--ink)}
 .badge.r-épico{color:#c79cff;border-color:rgba(199,156,255,.45)}
 .badge.r-lendário{color:var(--brass);border-color:rgba(24,181,198,.5)}
 .badge.r-único{color:var(--escarlate);border-color:rgba(242,88,94,.5)}
+
+/* ============================================================
+   MOLDURA DE RARIDADE PREMIUM — só os cards da grade de itens (Loja/
+   Favoritos/Criar em app.html). Padrão: wrapper .rar-frame com padding
+   = espessura da borda e um fundo em degradê animado (truque clássico
+   de "borda gradiente"; o .poster-card por dentro tem fundo sólido e
+   corta as decorações com overflow:hidden). Comum fica completamente
+   estático/fosco; a cada tier entra uma técnica nova (pulso → degradê
+   fluido → flutuação → vórtice/núcleo do Único) em vez de só aumentar
+   números do mesmo efeito. Camadas internas vêm do JS posterRarityLayers().
+   ============================================================ */
+.rar-frame{position:relative;border-radius:15px;box-sizing:border-box;--glow:1;
+  transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .3s ease,box-shadow .3s ease}
+/* .rar-frame também é usado como moldura de linhas de lista (sistema.html, mochila vista pelo
+   Mestre em mesa.html) — a .list-row por dentro perde a borda própria (o frame já é a borda) e
+   preenche o frame por completo, senão sobra um respiro sem cobertura em linhas mais altas que
+   as vizinhas (mesmo bug que o card já teve corrigido) */
+.rar-frame > .list-row{width:100%;height:100%;box-sizing:border-box;position:relative;overflow:hidden;border:none;background:var(--field-2)}
+/* o conteúdo de verdade (miniatura/nome/botões) precisa de z-index próprio, senão fica atrás das
+   camadas decorativas absolutas (que têm z-index explícito e "furam" na frente de irmãos sem
+   posicionamento, não importa a ordem no DOM) */
+.rar-frame > .list-row > .rar-row-body{position:relative;z-index:2;display:flex;align-items:center;gap:12px;width:100%;min-width:0}
+
+.rar-frame[data-rarity="Comum"]{padding:1.5px;background:#78829a}
+.rar-frame[data-rarity="Comum"]:hover{transform:translateY(-5px)}
+
+.rar-frame[data-rarity="Incomum"]{padding:1.5px;background:#2fae5f;
+  box-shadow:0 0 calc(16px * var(--glow)) rgba(61,200,110,.36)}
+.rar-frame[data-rarity="Incomum"]:hover{transform:translateY(-5px);
+  box-shadow:0 0 calc(22px * var(--glow)) rgba(61,200,110,.5)}
+
+.rar-frame[data-rarity="Raro"]{padding:2px;background:linear-gradient(135deg,#2f6bff,#37b6ff);
+  animation:pc-rare-pulse 2.6s ease-in-out infinite}
+.rar-frame[data-rarity="Raro"]:hover{transform:translateY(-5px);filter:brightness(1.1)}
+
+.rar-frame[data-rarity="Épico"]{padding:2.5px;
+  background:linear-gradient(120deg,#7c3aed,#c026d3,#9333ea,#c026d3,#7c3aed);background-size:240% 240%;
+  animation:pc-border-flow 6s linear infinite,pc-epic-glow 3.2s ease-in-out infinite}
+.rar-frame[data-rarity="Épico"]:hover{transform:translateY(-5px);filter:brightness(1.1)}
+
+.rar-frame[data-rarity="Lendário"]{padding:3px;--hover-lift:0px;
+  background:linear-gradient(120deg,#b7791f,#f6c447,#ffe9a8,#f0a92b,#b7791f);background-size:260% 260%;
+  animation:pc-border-flow 7s linear infinite,pc-aura-breathe 3.6s ease-in-out infinite,pc-float-bob 4.4s ease-in-out infinite}
+/* já flutua sozinho (pc-float-bob) — hover não pode simplesmente setar transform (a animação
+   ganharia todo frame e ignoraria essa regra); em vez disso desloca --hover-lift, que o próprio
+   keyframe soma na oscilação, dando o mesmo "levantadinha" sem travar/cortar o flutuar */
+.rar-frame[data-rarity="Lendário"]:hover{--hover-lift:-5px;filter:brightness(1.14) saturate(1.08)}
+
+.rar-frame[data-rarity="Único"]{padding:4px;--hover-lift:0px;
+  background:linear-gradient(120deg,#7a0010,#ff2d3f,#ff8a94,#ff1436,#7a0010);background-size:280% 280%;
+  animation:pc-border-flow 4.5s linear infinite,pc-unique-aura 2.4s ease-in-out infinite,pc-power-pulse 4s ease-in-out infinite}
+.rar-frame[data-rarity="Único"]:hover{--hover-lift:-5px;filter:brightness(1.16) saturate(1.12)}
+
+/* mochila que o Mestre vê na ficha do jogador (viewPlayer, mesa.html): mantém a cor/degradê da
+   borda e o brilho pulsando, só tira o "flutuar" (translateY) do Lendário/Único — numa lista
+   compacta de várias linhas, item subindo e descendo fica poluído; nos cards (Itens/sistema/
+   mochila do próprio jogador) o flutuar continua normal. */
+.gm-view-inv .rar-frame[data-rarity="Lendário"]{animation:pc-border-flow 7s linear infinite,pc-aura-breathe 3.6s ease-in-out infinite}
+.gm-view-inv .rar-frame[data-rarity="Único"]{animation:pc-border-flow 4.5s linear infinite,pc-unique-aura 2.4s ease-in-out infinite}
+/* sem o flutuar disputando a propriedade transform aqui, a levantadinha de hover funciona direto —
+   mesmo comportamento dos outros tiers, só que sem competir com nenhuma animação */
+.gm-view-inv .rar-frame[data-rarity="Lendário"]:hover,
+.gm-view-inv .rar-frame[data-rarity="Único"]:hover{transform:translateY(-5px)}
+
+@keyframes pc-border-flow{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+@keyframes pc-rare-pulse{
+  0%,100%{box-shadow:0 0 calc(14px * var(--glow)) rgba(56,140,255,.35)}
+  50%{box-shadow:0 0 calc(30px * var(--glow)) rgba(56,140,255,.62)}
+}
+@keyframes pc-epic-glow{
+  0%,100%{box-shadow:0 0 calc(18px * var(--glow)) rgba(168,85,247,.40),0 0 calc(40px * var(--glow)) rgba(192,38,211,.22)}
+  50%{box-shadow:0 0 calc(30px * var(--glow)) rgba(168,85,247,.62),0 0 calc(62px * var(--glow)) rgba(192,38,211,.34)}
+}
+/* mesma intensidade de brilho do épico, só muda a cor por tier */
+@keyframes pc-aura-breathe{
+  0%,100%{box-shadow:0 0 calc(18px * var(--glow)) rgba(245,185,70,.40),0 0 calc(40px * var(--glow)) rgba(255,150,40,.22)}
+  50%{box-shadow:0 0 calc(30px * var(--glow)) rgba(245,185,70,.62),0 0 calc(62px * var(--glow)) rgba(255,150,40,.34)}
+}
+@keyframes pc-unique-aura{
+  0%,100%{box-shadow:0 0 calc(18px * var(--glow)) rgba(255,45,63,.40),0 0 calc(40px * var(--glow)) rgba(230,0,40,.22)}
+  50%{box-shadow:0 0 calc(30px * var(--glow)) rgba(255,45,63,.62),0 0 calc(62px * var(--glow)) rgba(230,0,40,.34)}
+}
+@keyframes pc-float-bob{0%,100%{transform:translateY(var(--hover-lift,0px))}50%{transform:translateY(calc(-9px + var(--hover-lift,0px)))}}
+@keyframes pc-power-pulse{0%,100%{transform:translateY(var(--hover-lift,0px)) scale(1)}50%{transform:translateY(calc(-7px + var(--hover-lift,0px))) scale(1.02)}}
+/* os dois extremos (-170%/230%) ficam fora da caixa dos dois lados, então o "salto" do loop
+   reiniciando acontece com o elemento invisível — sem reset visível no meio do caminho */
+@keyframes pc-shine-sweep{0%{transform:translateX(-170%) skewX(-18deg)}35%,100%{transform:translateX(230%) skewX(-18deg)}}
+@keyframes pc-highlight-pulse{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes pc-twinkle{0%,100%{opacity:0;transform:scale(.35) rotate(0deg)}50%{opacity:1;transform:scale(1) rotate(45deg)}}
+@keyframes pc-conic-spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+@keyframes pc-conic-spin-rev{to{transform:translate(-50%,-50%) rotate(-360deg)}}
+@keyframes pc-core-throb{0%,100%{opacity:.28;transform:translate(-50%,-50%) scale(.82)}50%{opacity:.6;transform:translate(-50%,-50%) scale(1.18)}}
+
+/* decorações internas — vivem dentro do .poster-card (que corta com overflow:hidden) */
+.pc-sweep{position:absolute;top:0;left:-10%;width:65%;height:100%;z-index:2;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.22),transparent);filter:blur(2px);
+  animation:pc-shine-sweep 5s ease-in-out infinite}
+.pc-sweep.pc-sweep2{width:55%;background:linear-gradient(100deg,transparent,rgba(255,190,196,.26),transparent);
+  filter:blur(3px);animation:pc-shine-sweep 4.2s ease-in-out 2.1s infinite}
+.pc-highlight{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(120% 80% at 50% 0%,rgba(255,210,120,.18),transparent 60%);
+  animation:pc-highlight-pulse 3.6s ease-in-out infinite}
+[data-rarity="Único"] .pc-highlight{background:radial-gradient(120% 80% at 50% 0%,rgba(255,95,110,.13),transparent 62%);
+  animation-duration:2.8s}
+.pc-topline{position:absolute;top:0;left:0;right:0;height:1px;z-index:1;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,230,170,.6),transparent)}
+[data-rarity="Único"] .pc-topline{background:linear-gradient(90deg,transparent,rgba(255,190,200,.75),transparent)}
+/* vórtice duplo do Único — dois conic-gradient girando em sentidos opostos + núcleo latejante.
+   Bem borrado e com pouca opacidade de propósito: é uma aura ambiente atrás do conteúdo, não
+   pode competir com o ícone/texto por atenção nem virar um "disco" com aresta dura. */
+.pc-ring{position:absolute;top:50%;left:50%;width:180%;height:180%;z-index:0;pointer-events:none;
+  transform:translate(-50%,-50%);filter:blur(9px);
+  background:conic-gradient(from 0deg,rgba(255,45,63,0),rgba(255,45,63,.16),rgba(255,150,160,.04),rgba(255,45,63,.16),rgba(255,45,63,0));
+  animation:pc-conic-spin 11s linear infinite}
+.pc-ring.pc-ring2{width:150%;height:150%;
+  background:conic-gradient(from 90deg,rgba(255,60,80,0),rgba(255,90,110,.16),rgba(255,180,190,.04),rgba(255,60,80,.16),rgba(255,60,80,0));
+  animation:pc-conic-spin-rev 9s linear infinite}
+.pc-core{position:absolute;top:34%;left:50%;width:46%;height:46%;z-index:1;pointer-events:none;
+  transform:translate(-50%,-50%);filter:blur(6px);animation:pc-core-throb 2.4s ease-in-out infinite}
+[data-rarity="Único"] .pc-core{background:radial-gradient(circle,rgba(255,80,95,.30),rgba(255,40,60,.07) 45%,transparent 70%)}
+/* mesmo núcleo latejante do Único, mas mais fraco — perceptível sem competir com o texto */
+[data-rarity="Lendário"] .pc-core{width:43%;height:43%;filter:blur(7px);
+  background:radial-gradient(circle,rgba(255,205,120,.19),rgba(255,170,60,.045) 45%,transparent 70%);
+  animation:pc-core-throb 3s ease-in-out infinite}
+/* estrelas de 8 pontas via clip-path (não círculos) — posições fixas vindas do JS, cor por tier */
+.pc-glint{position:absolute;z-index:3;pointer-events:none;
+  background:linear-gradient(#fff,#e9c8ff);
+  clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%);
+  opacity:0;animation-name:pc-twinkle;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+[data-rarity="Épico"] .pc-glint{background:linear-gradient(#c88cff,#7c3aed);filter:drop-shadow(0 0 4px rgba(168,85,247,.8))}
+[data-rarity="Lendário"] .pc-glint{background:linear-gradient(#ffe19a,#f0b429);filter:drop-shadow(0 0 5px rgba(255,190,70,.9))}
+[data-rarity="Único"] .pc-glint{background:linear-gradient(#ff9aa4,#ff2d3f);filter:drop-shadow(0 0 6px rgba(255,60,80,.95))}
+
+/* selo de raridade nos cards — pílula preenchida, cor por tier */
+.rar-pill{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  padding:4px 8px;border-radius:999px;white-space:nowrap}
+.rar-pill[data-rarity="Comum"]{color:#c3c9d3;background:rgba(174,180,192,.14);border:1px solid rgba(174,180,192,.30)}
+.rar-pill[data-rarity="Incomum"]{color:#5fe0a0;background:rgba(95,224,160,.14);border:1px solid rgba(95,224,160,.30)}
+.rar-pill[data-rarity="Raro"]{color:#6fb2ff;background:rgba(111,178,255,.14);border:1px solid rgba(111,178,255,.32)}
+.rar-pill[data-rarity="Épico"]{color:#d59cff;background:rgba(213,156,255,.14);border:1px solid rgba(213,156,255,.32)}
+.rar-pill[data-rarity="Lendário"]{color:#ffd47a;background:rgba(255,212,122,.14);border:1px solid rgba(255,212,122,.34)}
+.rar-pill[data-rarity="Único"]{color:#ff6773;background:rgba(255,45,63,.16);border:1px solid rgba(255,80,95,.42)}
+
+@media (prefers-reduced-motion:reduce){
+  .rar-frame{animation:none !important}
+  .pc-sweep,.pc-ring,.pc-core,.pc-glint,.pc-highlight{animation:none !important;display:none}
+}
+
+/* ============================================================
+   RARIDADE — sistema visual único, usado por QUALQUER lugar que mostre
+   ou equipe um item com qualidade (card da grade, linha de item, slot
+   equipado no boneco). Cor sobe: Comum(cinza) → Incomum(verde) →
+   Raro(azul) → Épico(roxo) → Lendário(dourado) → Único(vermelho).
+   Referência visual: poça de luz na base do item, que cresce a cada
+   tier; ondas de choque expandindo; faíscas subindo tipo gêiser; e no
+   topo (Lendário/Único) um leque de raios de luz saindo de trás do
+   item, como uma auréola/coroa — igual ao efeito de "essência" que
+   sobe de tier em jogos de loot (esfera comum quase sem nada até a
+   esfera única exalando uma coluna de luz e partículas).
+   Uso: "rarity-fx rarity-surface" (cards/slots — caixas com espaço
+   ao redor pra aura se espalhar) ou "rarity-fx rarity-line" (linhas
+   de lista — efeito mais discreto) + data-rarity="Comum|Incomum|Raro|
+   Épico|Lendário|Único". As camadas de aura (poça/anéis/raios/faíscas)
+   vêm do helper JS rarityFxLayers(rarity), duplicado em cada página.
+   ============================================================ */
+:root{
+  --rar-comum:#b9c2c6; --rar-incomum:#8fe6a0; --rar-raro:#7ab8ff;
+  --rar-epico:#c79cff; --rar-lendario:var(--brass); --rar-unico:var(--escarlate);
+}
+.rarity-fx{ --rc:var(--rar-comum); position:relative }
+.rarity-fx[data-rarity="Comum"]{ --rc:var(--rar-comum) }
+.rarity-fx[data-rarity="Incomum"]{ --rc:var(--rar-incomum) }
+.rarity-fx[data-rarity="Raro"]{ --rc:var(--rar-raro) }
+.rarity-fx[data-rarity="Épico"]{ --rc:var(--rar-epico) }
+.rarity-fx[data-rarity="Lendário"]{ --rc:var(--rar-lendario) }
+.rarity-fx[data-rarity="Único"]{ --rc:var(--rar-unico) }
+
+@keyframes rarPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3)}}
+@keyframes rarPulseBig{0%,100%{filter:brightness(1)}50%{filter:brightness(1.55)}}
+@keyframes rarGroundPulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.12)}}
+@keyframes rarRing{0%{transform:translateX(-50%) scale(.5);opacity:.7}100%{transform:translateX(-50%) scale(2.5);opacity:0}}
+@keyframes rarRaysSpin{from{transform:translateX(-50%) rotate(0deg)}to{transform:translateX(-50%) rotate(360deg)}}
+@keyframes rarRaysPulse{0%,100%{opacity:.45}50%{opacity:.9}}
+/* sobe do centro pra fora da caixa e some — "bottom" em % acompanha o tamanho do card/slot */
+@keyframes rarSparkRise{
+  0%{bottom:15%;transform:translateX(0) scale(.25);opacity:0}
+  18%{opacity:1}
+  75%{opacity:.85}
+  100%{bottom:100%;transform:translateX(var(--sx,0px)) scale(.9);opacity:0}
+}
+
+/* halo de contato — box-shadow não é cortado mesmo com overflow:hidden no elemento (sombra é
+   desenhada fora da caixa), sobe de "nenhum" no Comum até bem forte e pulsando rápido no Único */
+.rarity-fx.rarity-surface{border-color:var(--rc) !important;transition:box-shadow .3s,border-color .3s}
+.rarity-fx.rarity-surface[data-rarity="Comum"]{box-shadow:none}
+.rarity-fx.rarity-surface[data-rarity="Incomum"]{box-shadow:0 0 9px color-mix(in srgb, var(--rc) 40%, transparent)}
+.rarity-fx.rarity-surface[data-rarity="Raro"]{box-shadow:0 0 8px color-mix(in srgb, var(--rc) 55%, transparent),0 0 18px color-mix(in srgb, var(--rc) 30%, transparent);animation:rarPulse 3s ease-in-out infinite}
+.rarity-fx.rarity-surface[data-rarity="Épico"]{box-shadow:0 0 10px color-mix(in srgb, var(--rc) 65%, transparent),0 0 26px color-mix(in srgb, var(--rc) 40%, transparent);animation:rarPulse 2.3s ease-in-out infinite}
+.rarity-fx.rarity-surface[data-rarity="Lendário"]{box-shadow:0 0 12px color-mix(in srgb, var(--rc) 75%, transparent),0 0 32px color-mix(in srgb, var(--rc) 50%, transparent),0 0 54px color-mix(in srgb, var(--rc) 25%, transparent);animation:rarPulseBig 1.9s ease-in-out infinite}
+.rarity-fx.rarity-surface[data-rarity="Único"]{box-shadow:0 0 10px color-mix(in srgb, var(--rc) 90%, transparent),0 0 26px color-mix(in srgb, var(--rc) 70%, transparent),0 0 50px color-mix(in srgb, var(--rc) 50%, transparent),0 0 84px color-mix(in srgb, var(--rc) 35%, transparent),0 0 120px color-mix(in srgb, var(--rc) 20%, transparent);animation:rarPulseBig 1.15s ease-in-out infinite}
+
+/* poça de luz na base do item — some no Comum, cresce e fica mais opaca a cada tier */
+.rar-ground{position:absolute;left:50%;bottom:4%;pointer-events:none;border-radius:50%;
+  transform:translateX(-50%);filter:blur(5px);opacity:0}
+[data-rarity="Incomum"] .rar-ground{width:42%;height:16%;opacity:.5;
+  background:radial-gradient(ellipse at center,var(--rc) 0%,color-mix(in srgb,var(--rc) 55%,transparent) 45%,transparent 75%)}
+[data-rarity="Raro"] .rar-ground{width:56%;height:19%;opacity:.6;animation:rarGroundPulse 3s ease-in-out infinite;
+  background:radial-gradient(ellipse at center,var(--rc) 0%,color-mix(in srgb,var(--rc) 55%,transparent) 45%,transparent 75%)}
+[data-rarity="Épico"] .rar-ground{width:74%;height:24%;opacity:.68;animation:rarGroundPulse 2.4s ease-in-out infinite;
+  background:radial-gradient(ellipse at center,var(--rc) 0%,color-mix(in srgb,var(--rc) 60%,transparent) 45%,transparent 76%)}
+[data-rarity="Lendário"] .rar-ground{width:92%;height:30%;opacity:.75;animation:rarGroundPulse 2s ease-in-out infinite;
+  background:radial-gradient(ellipse at center,var(--rc) 0%,color-mix(in srgb,var(--rc) 65%,transparent) 45%,transparent 78%)}
+[data-rarity="Único"] .rar-ground{width:112%;height:36%;opacity:.85;animation:rarGroundPulse 1.3s ease-in-out infinite;
+  background:radial-gradient(ellipse at center,var(--rc) 0%,color-mix(in srgb,var(--rc) 70%,transparent) 45%,transparent 80%)}
+
+/* ondas de choque expandindo da base — só a partir de Raro; 3 anéis com atraso escalonado formam
+   um pulso contínuo em vez de um "blip" só */
+.rar-ring{position:absolute;left:50%;bottom:8%;width:26%;aspect-ratio:2.4/1;border-radius:50%;
+  transform:translateX(-50%);border:1.5px solid var(--rc);opacity:0;pointer-events:none}
+.rar-ring.r2{animation-delay:.7s !important}
+.rar-ring.r3{animation-delay:1.4s !important}
+[data-rarity="Raro"] .rar-ring{animation:rarRing 3.2s ease-out infinite}
+[data-rarity="Épico"] .rar-ring{animation:rarRing 2.6s ease-out infinite;width:32%}
+[data-rarity="Lendário"] .rar-ring{animation:rarRing 2.1s ease-out infinite;width:38%}
+[data-rarity="Único"] .rar-ring{animation:rarRing 1.5s ease-out infinite;width:44%}
+
+/* leque de raios de luz saindo de trás do item — só Lendário/Único, tipo uma coroa/auréola */
+.rar-rays{display:none}
+[data-rarity="Lendário"] .rar-rays,[data-rarity="Único"] .rar-rays{
+  display:block;position:absolute;left:50%;bottom:30%;width:240%;height:240%;pointer-events:none;
+  transform:translateX(-50%);
+  background:repeating-conic-gradient(from -90deg at 50% 100%,
+    color-mix(in srgb,var(--rc) 50%,transparent) 0deg 3deg,transparent 3deg 15deg);
+  -webkit-mask-image:radial-gradient(circle at 50% 100%,black 0%,black 32%,transparent 65%);
+  mask-image:radial-gradient(circle at 50% 100%,black 0%,black 32%,transparent 65%);
+  animation:rarRaysSpin 16s linear infinite,rarRaysPulse 2.6s ease-in-out infinite}
+[data-rarity="Único"] .rar-rays{animation:rarRaysSpin 10s linear infinite,rarRaysPulse 1.5s ease-in-out infinite}
+
+/* faíscas subindo tipo gêiser (elementos reais, não 1 gradiente só) — cada uma sobe/some no seu
+   próprio horário/duração/deriva horizontal (definidos inline no JS via --sx), parecem um jorro
+   orgânico de partículas em vez de pontos piscando parados. Só a partir de Épico. */
+.rar-spark{position:absolute;z-index:5;pointer-events:none;border-radius:50%;background:#fff;
+  box-shadow:0 0 5px 1.5px #fff;opacity:0;
+  animation-name:rarSparkRise;animation-timing-function:ease-out;animation-iteration-count:infinite}
+[data-rarity="Lendário"] .rar-spark{background:color-mix(in srgb, var(--rc) 45%, white);box-shadow:0 0 6px 1.5px color-mix(in srgb, var(--rc) 60%, white)}
+[data-rarity="Único"] .rar-spark{background:color-mix(in srgb, var(--rc) 35%, white);box-shadow:0 0 7px 2px color-mix(in srgb, var(--rc) 50%, white)}
+
+/* linhas de lista — efeito mais discreto (acento colorido na borda), sem sobreposição visual
+   pra não atrapalhar botões/inputs que moram dentro da própria linha */
+.rarity-fx.rarity-line{border-left:3px solid var(--rc) !important}
+.rarity-fx.rarity-line[data-rarity="Raro"],
+.rarity-fx.rarity-line[data-rarity="Épico"],
+.rarity-fx.rarity-line[data-rarity="Lendário"],
+.rarity-fx.rarity-line[data-rarity="Único"]{box-shadow:inset 3px 0 8px -2px color-mix(in srgb, var(--rc) 55%, transparent)}
+.rarity-fx.rarity-line[data-rarity="Lendário"]{animation:rarPulse 2.2s ease-in-out infinite}
+.rarity-fx.rarity-line[data-rarity="Único"]{animation:rarPulseBig 1.4s ease-in-out infinite}
+
+@media (prefers-reduced-motion:reduce){
+  .rarity-fx{animation:none !important}
+  .rar-ground,.rar-ring,.rar-rays,.rar-spark{animation:none !important;display:none}
+}
 
 @media (max-width:680px){ .item-form{grid-template-columns:1fr} .home{padding:20px 14px 60px} .nav{padding:11px 14px} }
 
@@ -377,11 +667,17 @@ select option{background:var(--panel);color:var(--ink)}
 /* ícones nas abas */
 .ic{margin-right:7px;opacity:.95;display:inline-flex;vertical-align:-3px}
 .ic svg{width:15px;height:15px}
+/* .ic sozinho (sem texto do lado) dentro de um botão — ex.: os "×" de excluir linha — não deve
+   herdar a margem pensada pro par ícone+texto, senão o ícone sai do centro visual do botão */
+.btn > .ic:only-child{margin-right:0}
 
 /* campo de busca com ícone embutido */
 .search-field{position:relative;flex:1;min-width:180px}
 .search-field svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--ink-faint);pointer-events:none}
-.search-field input{padding-left:34px}
+/* especificidade maior que ".toolbar input" (mesma classe+elemento, mas essa vem depois no
+   arquivo) de propósito — senão o padding:10px 12px do toolbar sobrescreve o padding-left daqui
+   e o texto digitado fica em cima do ícone da lupa */
+.toolbar .search-field input,.search-field input{padding-left:34px}
 
 /* toast — o antigo #msg agora flutua no topo */
 .msg{position:fixed;top:74px;left:50%;transform:translate(-50%,-10px);z-index:90;display:block;margin:0!important;
@@ -454,6 +750,7 @@ select option{background:var(--panel);color:var(--ink)}
 .dice-panel .dh{display:flex;align-items:center;gap:8px;padding:16px;border-bottom:1px solid var(--line)}
 .dice-panel .dh b{font-family:var(--disp);font-size:14px;color:var(--bone);flex:1}
 .dice-panel .dh .x{background:transparent;border:0;color:var(--ink-faint);font-size:20px;cursor:pointer;line-height:1}
+
 .dice-log{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column-reverse;gap:8px;min-height:120px}
 .roll{border:1px solid var(--line);border-radius:10px;padding:8px 10px;animation:fadeUp .25s var(--ease)}
 .roll.mine{border-color:rgba(24,181,198,.4);background:rgba(24,181,198,.05)}
@@ -732,16 +1029,29 @@ button.prof-chip:hover{border-color:var(--pcc,var(--brass));transform:translateY
 #yt-bar .yt-progress-bar .yt-fill{display:block;height:100%;width:100%;border-radius:5px;
   background:var(--brass);transform:scaleX(0);transform-origin:left;transition:transform .2s linear}
 
-/* ---- painel de busca/fila — sobe ancorado acima da barra, centralizado ---- */
-#yt-panel{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:72;
-  width:400px;max-width:calc(100vw - 32px);max-height:60vh;
-  display:none;flex-direction:column;border-radius:16px;overflow:hidden;background:var(--panel);border:1px solid var(--line2);
-  box-shadow:0 20px 55px rgba(0,0,0,.55);animation:popIn .2s var(--ease);font-family:var(--serif)}
+/* igual às janelas de confirmação/guia (.ui-modal): fundo inteiro escurecido, foco na janela —
+   não é mais um popup pequeno no canto (que ficava minúsculo demais pra uma playlist inteira,
+   forçando rolar de lado). Estrutura: #yt-panel é o fundo em tela cheia, .yt-panel-box é a janela
+   de verdade (bem maior que o antigo popup, cabe muito mais coisa sem apertar). */
+#yt-panel{position:fixed;inset:0;z-index:95;display:none;align-items:center;justify-content:center;
+  padding:20px;background:rgba(5,7,12,.72);animation:fadeIn .18s var(--ease)}
 #yt-panel.open{display:flex}
-#yt-panel .yt-panel-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
-#yt-panel .yt-panel-head b{font-family:var(--disp);font-size:14px;color:var(--bone);flex:1}
-#yt-panel .yt-panel-head .x{background:transparent;border:0;color:var(--ink-faint);font-size:20px;cursor:pointer;line-height:1}
-#yt-panel .yt-panel-body{padding:14px 16px;overflow-y:auto}
+#yt-panel .yt-panel-box{width:100%;max-width:1180px;max-height:88vh;display:flex;flex-direction:column;
+  border-radius:18px;overflow:hidden;background:var(--panel);border:1px solid var(--line2);
+  box-shadow:0 22px 60px rgba(0,0,0,.55);animation:popIn .22s var(--ease);font-family:var(--serif)}
+#yt-panel .yt-panel-head{display:flex;align-items:center;gap:8px;padding:16px 20px;border-bottom:1px solid var(--line);flex:0 0 auto}
+#yt-panel .yt-panel-head b{font-family:var(--disp);font-size:16px;color:var(--bone);flex:1}
+#yt-panel .yt-panel-head .x{background:transparent;border:0;color:var(--ink-faint);font-size:22px;cursor:pointer;line-height:1}
+/* pesquisa e fila lado a lado (2 colunas) em vez de empilhadas — cada uma rola por conta própria
+   se o conteúdo passar da altura do painel; em telas estreitas volta a empilhar (ver media query) */
+/* min-width:0 espalhado abaixo (aqui, .yt-section, .card, .list, .row, .qrow) é de propósito: sem
+   isso, flex/grid não encolhe um item abaixo do "conteúdo mínimo" dele — e um nome de música sem
+   quebra de linha (white-space:nowrap lá embaixo em .rt/.qt) conta como um conteúdo mínimo enorme,
+   o que alargava a coluna inteira (e a janela) em vez de só cortar o nome com "...". Com min-width:0
+   em toda essa cadeia, quem trava o tamanho vira só o layout — o texto comprido corta certinho. */
+#yt-panel .yt-panel-body{padding:20px 22px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;
+  align-items:start;gap:20px;min-width:0}
+#yt-panel .yt-panel-body .hint{grid-column:1 / -1}
 #yt-panel .yt-panel-body::-webkit-scrollbar{width:8px}
 #yt-panel .yt-panel-body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px}
 
@@ -763,7 +1073,7 @@ button.prof-chip:hover{border-color:var(--pcc,var(--brass));transform:translateY
 
 #yt-panel #yt-result{margin-bottom:12px}
 #yt-panel #yt-result:empty{margin-bottom:0}
-#yt-panel .card{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px}
+#yt-panel .card{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px;min-width:0}
 #yt-panel .card img{width:72px;height:54px;object-fit:cover;border-radius:8px;flex-shrink:0}
 #yt-panel .card .meta{min-width:0;display:flex;flex-direction:column;justify-content:center}
 #yt-panel .card .meta .t{font-family:var(--serif);font-size:14px;font-weight:600;color:var(--ink);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -776,10 +1086,10 @@ button.prof-chip:hover{border-color:var(--pcc,var(--brass));transform:translateY
   color:var(--ink-dim);background:var(--field);border:1px solid var(--line2)!important;border-radius:7px}
 #yt-panel #pl-all:hover{color:var(--ink)}
 
-#yt-panel .list{max-height:172px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.15)}
+#yt-panel .list{max-height:min(420px,50vh);overflow-y:auto;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.15);min-width:0}
 #yt-panel .list::-webkit-scrollbar{width:8px}
 #yt-panel .list::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px}
-#yt-panel .row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+#yt-panel .row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);min-width:0}
 #yt-panel .row:last-child{border-bottom:none}
 #yt-panel .row .rt{flex:1;min-width:0;font-family:var(--serif);font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
@@ -800,7 +1110,11 @@ button.prof-chip:hover{border-color:var(--pcc,var(--brass));transform:translateY
 #yt-panel .rowbtn.play{background:var(--brass);color:var(--on-primary);border:none;box-shadow:var(--cta-glow);font-weight:700}
 #yt-panel .rowbtn.play:hover{color:var(--on-primary);box-shadow:var(--cta-glow-h)}
 
-#yt-panel .sep{height:1px;background:var(--line);margin:14px 0}
+/* pesquisa e fila viram dois "cartões" bem separados em vez de uma lista contínua com só uma
+   linha fina dividindo — fica claro visualmente onde termina uma coisa e começa a outra */
+#yt-panel .yt-section{background:var(--field-2);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;min-width:0}
+#yt-panel .yt-section:last-of-type{margin-bottom:0}
+#yt-panel .yt-section-label{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px}
 
 #yt-panel .queue-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 #yt-panel .queue-head .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)}
@@ -809,11 +1123,13 @@ button.prof-chip:hover{border-color:var(--pcc,var(--brass));transform:translateY
   padding:4px 8px;border-radius:6px;transition:all var(--dur-1) var(--ease)}
 #yt-panel #yt-clear:hover{background:var(--escarlate);color:#fff}
 #yt-panel #yt-queue-empty{font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-faint);padding:6px 2px}
-#yt-panel .qrow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+#yt-panel .qrow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);min-width:0}
 #yt-panel .qrow:last-child{border-bottom:none}
 #yt-panel .qrow.current{background:linear-gradient(90deg,rgba(24,181,198,.14),transparent);box-shadow:inset 2px 0 0 var(--brass)}
 #yt-panel .qrow .idx{font-family:var(--mono);font-size:10px;color:var(--ink-faint);min-width:18px;cursor:pointer}
 #yt-panel .qrow.current .idx{color:var(--brass)}
+#yt-panel .src-tag{font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--ink-faint);
+  border:1px solid var(--line2);border-radius:4px;padding:1px 4px;flex:0 0 auto}
 #yt-panel .qrow .qt{flex:1;min-width:0;font-family:var(--serif);font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 #yt-panel .qrow .x{width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:var(--ink-faint);cursor:pointer;font-size:12px}
 #yt-panel .qrow .x:hover{background:rgba(242,88,94,.15);color:var(--escarlate)}
@@ -821,17 +1137,19 @@ button.prof-chip:hover{border-color:var(--pcc,var(--brass));transform:translateY
 #yt-panel .hint{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:12px;line-height:1.7;text-align:center}
 
 #yt-player-host{position:fixed;left:-9999px;top:-9999px;width:320px;height:180px;overflow:hidden}
+#sc-player-host{position:fixed;left:-9999px;top:-9999px;width:300px;height:166px;overflow:hidden}
+#sc-player-host iframe{width:100%;height:100%;border:0}
 
 /* botão de desbloqueio quando o navegador bloqueia autoplay (Jogador entrando com música já tocando) */
 .yt-unlock-fab{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:73;height:36px;padding:0 14px;border-radius:999px;border:0;
   cursor:pointer;background:var(--brass);color:var(--on-primary);font-family:var(--mono);font-weight:700;
   font-size:11px;box-shadow:0 8px 20px rgba(0,0,0,.4);display:flex;align-items:center;gap:6px}
 
-/* barra fixa embaixo empurra o conteúdo e os fabs pra não sobrepor */
+/* barra fixa embaixo empurra o conteúdo pra não sobrepor — .help-fab/.theme-fab/.req-fab não
+   existem mais em mesa.html (única página que já teve body.has-ytbar), então não têm mais regra
+   equivalente aqui: só o dice-fab (abaixo) continua flutuando por cima do tabuleiro na mesa. */
 body.has-ytbar{padding-bottom:0}
 body.has-ytbar .page{padding-bottom:126px}
-body.has-ytbar .help-fab{bottom:70px}
-body.has-ytbar .theme-fab{bottom:70px}
 
 @media (prefers-reduced-motion:reduce){
   #yt-bar *,#yt-panel *{transition:none!important;animation:none!important}
@@ -875,8 +1193,6 @@ body.has-ytbar .theme-fab{bottom:70px}
   .theme-fab{left:12px;bottom:14px}
   .msg{top:64px;min-width:0;max-width:92vw}
   body.has-ytbar .page{padding-bottom:118px}
-  body.has-ytbar .help-fab{bottom:62px}
-  body.has-ytbar .theme-fab{bottom:62px}
   #yt-bar{height:44px;padding:0 10px;gap:6px}
   #yt-bar .yt-controls{gap:2px}
   #yt-bar .yt-btn{width:26px;height:26px;font-size:10px}
@@ -885,7 +1201,9 @@ body.has-ytbar .theme-fab{bottom:70px}
   #yt-bar .yt-btn.play svg{width:14px;height:14px}
   #yt-bar .yt-track{flex-basis:70px;font-size:11px}
   #yt-bar .yt-vol{display:none}
-  #yt-panel{left:8px;right:8px;bottom:62px;transform:none;width:auto;max-width:none;max-height:70vh}
+  #yt-panel{padding:10px}
+  #yt-panel .yt-panel-box{max-width:none;max-height:92vh}
+  #yt-panel .yt-panel-body{grid-template-columns:1fr}
 }
 @media (max-width:420px){
   .home-head h1{font-size:20px}
@@ -906,6 +1224,64 @@ body.has-ytbar .theme-fab{bottom:70px}
   background:var(--brass)}
 .mesa-av.sm{width:30px;height:30px;border-radius:9px;font-size:14px;border-color:var(--line2)}
 .tile-head{display:flex;align-items:center;gap:12px}
+
+/* ============================================================
+   Equipamento — quadro "paper doll" (montagem no sistema + ficha)
+   ============================================================ */
+/* essa aba inteira (título, texto de instrução, barra de botões e o quadro) "estoura" a largura
+   de 920px do resto das abas (.page) pra caber um quadro grande de verdade + um painel de edição
+   confortável, sem mexer na largura do menu/resto do conteúdo — só o conteúdo dessa aba fica largo */
+.eq-wide{position:relative;left:50%;transform:translateX(-50%);width:calc(100vw - 36px);max-width:1920px}
+/* título e texto de instrução continuam com a margem lateral do menu de abas (.home-tabs, dentro
+   de .page{max-width:920px;padding:0 18px}) — só o quadro+painel (.eq-layout) usa a largura extra
+   do .eq-wide. 884px = 920 - 18*2, a largura de conteúdo real do .page/.home-tabs; como .eq-wide
+   fica centralizado no mesmo eixo do .page, um max-width+margin:auto aqui alinha as bordas certinho. */
+.eq-text{max-width:884px;margin:0 auto}
+/* dentro do wrapper largo, o quadro fica ao lado do painel de edição do slot (sempre visível —
+   nunca "some"); na ficha do jogador/mestre (mesa.html) essa classe não é usada, só o .eq-board
+   sozinho. Flex (não grid) de propósito: com grid de 2 colunas (1fr 380px), um quadro com largura
+   customizada MENOR que a coluna "1fr" não estica — ele encolhe pro tamanho pedido mas fica
+   grudado na ESQUERDA da coluna, sobrando um vão até o painel de edição (que mora na coluna fixa
+   lá na direita). Com flex + justify-content:center, o par quadro+painel vira um bloco só, que
+   fica centralizado dentro do wrapper largo — e só cresce/empurra o painel quando o quadro cresce. */
+.eq-layout{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;justify-content:center}
+@media (max-width:900px){.eq-layout{flex-direction:column;align-items:stretch}}
+/* top:68px (não 16px) — a topbar sticky tem 52px de altura; um offset menor que ela deixava o
+   topo do painel (título "Editar slot") coberto ao rolar a página */
+.eq-side-editor{position:sticky;top:68px;min-width:0;flex:0 0 380px}
+@media (max-width:900px){.eq-side-editor{flex:1 1 auto}}
+.eq-board{position:relative;flex:1 1 auto;min-width:0;min-height:min(74vh,760px);margin-top:14px;border-radius:16px;
+  border:1px dashed var(--line2);background:var(--field-2);overflow:hidden}
+.eq-layout .eq-board{margin-top:0}
+/* grade de alinhamento, mesmo espírito visual dos anéis-guia do editor de árvore — ajuda a
+   posicionar os slots a olho; some quase totalmente quando o Mestre sobe uma imagem de fundo,
+   já que a imagem passa a ser a própria referência visual */
+.eq-board::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--line2) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--line2) 55%, transparent) 1px, transparent 1px);
+  background-size:32px 32px;background-position:center;opacity:.55}
+.eq-board.has-bg::before{opacity:.14}
+.eq-board-bgimg{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-size:contain;background-repeat:no-repeat;background-position:center}
+.eq-board-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;
+  font-family:var(--mono);font-size:12px;color:var(--ink-faint);text-align:center;padding:20px}
+.eq-slot{position:absolute;z-index:1;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;
+  border-radius:12px;border:2px solid var(--line2);background:var(--field) center/60% no-repeat;
+  cursor:grab;touch-action:none;transition:border-color .15s,box-shadow .15s}
+.eq-slot:hover{border-color:var(--brass);box-shadow:0 0 0 3px color-mix(in srgb, var(--brass) 18%, transparent)}
+.eq-slot:active{cursor:grabbing}
+.eq-slot-label{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);pointer-events:none}
+.eq-slot.filled{border-color:var(--maq);background-size:cover}
+.eq-slot.drag-over{border-color:var(--brass);box-shadow:0 0 0 3px color-mix(in srgb, var(--brass) 30%, transparent)}
+.eq-slot.drag-reject{border-color:var(--escarlate);box-shadow:0 0 0 3px color-mix(in srgb, var(--escarlate) 30%, transparent)}
+/* slot(s) selecionado(s) no editor do Mestre — pisca pra ficar óbvio qual(is) o painel lateral tá mostrando */
+@keyframes eqSlotPulse{0%,100%{box-shadow:0 0 0 3px color-mix(in srgb, var(--brass) 60%, transparent)}50%{box-shadow:0 0 0 8px color-mix(in srgb, var(--brass) 10%, transparent)}}
+.eq-slot.selected{border-color:var(--brass);animation:eqSlotPulse 1.3s ease-in-out infinite}
+.eq-slot .eq-slot-item{width:100%;height:100%;border-radius:10px;object-fit:cover;pointer-events:none}
+.eq-slot .eq-slot-item-fallback{font-family:var(--disp);font-size:11px;text-align:center;color:var(--bone);
+  padding:4px;line-height:1.2;pointer-events:none}
 
 /* ============================================================
    Ficha do personagem — cartão de perfil, galeria e lore
@@ -1033,6 +1409,21 @@ body.has-ytbar .theme-fab{bottom:70px}
 @keyframes resFillHeal{0%{filter:brightness(1)}40%{filter:brightness(1.55);box-shadow:0 0 10px 1px var(--res-color,var(--maq))}100%{filter:brightness(1)}}
 @keyframes resFillDmg{0%{filter:brightness(1)}40%{filter:brightness(.55);box-shadow:0 0 10px 1px var(--escarlate)}100%{filter:brightness(1)}}
 
+/* barra de Proteção — mais fina, sempre acima da barra do recurso, soma a Proteção de todo item
+   equipado (armadura/escudo). Cor fixa (--maq) em vez de --res-color: é um valor à parte da vida,
+   não do recurso em si — fica claro que "isso aqui é escudo", igual em qualquer recurso da ficha. */
+.res-shield-badge{font-family:var(--mono);font-size:10px;color:var(--maq)}
+.res-shield-track{position:relative;height:5px;border-radius:999px;background:var(--field-2);
+  border:1px solid var(--line2);overflow:hidden;margin-bottom:6px}
+.res-shield-fill{position:absolute;inset:0;width:0%;border-radius:999px;background:var(--maq);opacity:.85;transition:width .35s var(--ease)}
+
+/* popover de "sofrer dano" — pergunta a quantidade, aplica com ou sem a Proteção equipada abatendo */
+.dmg-pop{position:fixed;z-index:120;background:var(--surface);border:1px solid var(--line2);border-radius:14px;
+  padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.5);width:220px;animation:popIn .16s var(--ease)}
+.dmg-pop .dmg-amount{width:100%;background:var(--field);border:1px solid var(--line2);border-radius:8px;
+  color:var(--ink);font-family:var(--mono);font-size:14px;padding:8px 10px}
+.dmg-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+
 /* ---------- ajustes finos do tema claro ---------- */
 :root[data-theme="light"] *{scrollbar-color:rgba(20,28,45,.28) transparent}
 :root[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(20,28,45,.24)}
@@ -1041,9 +1432,12 @@ body.has-ytbar .theme-fab{bottom:70px}
 :root[data-theme="light"] .gtips{border-color:rgba(14,143,131,.3);background:rgba(14,143,131,.06)}
 :root[data-theme="light"] .role.player{border-color:rgba(14,143,131,.4)}
 
-/* reskin: fundo sólido plano, sem partículas cósmicas */
-#fallback{background:var(--app-bg)!important}
-#fx{display:none!important}
+/* reskin: fundo sólido plano, sem partículas cósmicas — exceto na árvore de esferas (arvore.html),
+   que reaproveita os MESMOS ids #fallback/#fx pra própria feature de cor de fundo customizável e
+   poeira cósmica (não é decoração de página, é conteúdo que o Mestre configura); sem o :not() aqui,
+   esse !important vence a cor escolhida pelo Mestre e esconde o canvas de partículas por completo */
+body:not(.arvore-page) #fallback{background:var(--app-bg)!important}
+body:not(.arvore-page) #fx{display:none!important}
 
 /* ============================================================
    MESA — cockpit de 3 colunas (trilho nav · ficha · dados)
@@ -1056,20 +1450,70 @@ body.has-ytbar .theme-fab{bottom:70px}
 .mesa-nav .divider{height:1px;background:var(--line);margin:7px 6px}
 .mesa-rail-left{padding:16px}
 .mesa-main{padding:16px 16px 44px}
+/* árvore embutida (mesa.html): margem negativa igual ao padding do .mesa-main pra sangrar até a
+   borda de verdade em vez de ficar com uma moldura de respiro/cantos arredondados — o valor muda
+   junto com o padding em cada breakpoint (ver dentro da media query do cockpit, embaixo) */
+.arvore-embed-wrap{margin:-16px -16px -44px -16px}
+/* altura do iframe da árvore embutida: no mobile o layout não é fixed-position (o trilho esquerdo
+   empilha em fluxo normal, a página inteira rola), então uma altura em vh fixa faz mais sentido
+   que tentar calcular o "resto exato da viewport" como no desktop (onde .mesa-body É fixed) */
+.arvore-embed-iframe{width:100%;border:0;background:#050608;display:block;height:70vh;min-height:420px}
+/* só existe no cockpit de 3 colunas do desktop — no mobile os trilhos já têm seu próprio jeito de
+   abrir/fechar (hambúrguer / dice-fab), então o botão fica escondido por padrão */
+.rail-toggle{display:none}
+/* recolher o trilho esquerdo no mobile (abaixo de 821px não existe o cockpit fixo nem os
+   .rail-toggle de borda) — sem isso, a lista de jogadores + código/sair da mesa sempre empilhavam
+   acima do conteúdo da aba escolhida, sem nenhuma forma de encolher, obrigando a rolar por tudo
+   isso toda vez no celular */
+.rail-mobile-toggle{display:none}
+@media (max-width:820px){
+  .rail-mobile-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;
+    background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--ink-dim);
+    font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+    padding:10px 2px;margin-bottom:10px;cursor:pointer}
+  .rail-mobile-toggle svg{transition:transform .2s var(--ease)}
+  body.mobile-rail-collapsed .rail-mobile-toggle svg{transform:rotate(-90deg)}
+  body.mobile-rail-collapsed #rail-left-body{display:none}
+}
+@media (min-width:821px){.rail-mobile-toggle{display:none!important}}
 @media (min-width:821px){
   .mesa-page{overflow:hidden}
   .mesa-page .topbar{position:fixed;top:0;left:0;right:0;z-index:30}
   .mesa-page .mesa-menu .hamburger{display:none}
   .mesa-page .mesa-body{position:fixed;top:52px;bottom:50px;left:0;right:340px;display:grid;grid-template-columns:340px 1fr}
+  .arvore-embed-wrap{margin:-24px -32px -48px -32px}
+  /* aqui .mesa-body É fixed (top:52px;bottom:50px), então dá pra calcular a altura exata restante */
+  .arvore-embed-iframe{height:calc(100vh - 102px);min-height:0}
   .mesa-page .mesa-rail-left{border-right:1px solid var(--line2);overflow:auto;background:var(--panel)}
   .mesa-page .mesa-main{overflow:auto;padding:24px 32px 48px;min-width:0}
   .mesa-page .dice-fab{display:none!important}
   .mesa-page .dice-panel{display:flex!important;position:fixed;top:52px;bottom:50px;right:0;left:auto;width:340px;max-width:340px;max-height:none;transform:none;border:0;border-left:1px solid var(--line2);border-radius:0;box-shadow:none;z-index:20;animation:none}
   .mesa-page .dice-panel .dh .x{display:none}
-  /* o canto direito agora tem o rodapé de chat (botão de enviar) fixo dentro do trilho de dados —
-     a aba de dicas (?) migra pro canto esquerdo, ao lado do alternador de tema, pra não ficar
-     flutuando em cima do botão de enviar mensagem */
-  .mesa-page .help-fab{left:68px;right:auto}
+  /* mesa.html não tem mais .help-fab/.req-fab (removidos — ver comentário grande perto de
+     .has-ytbar acima), então não sobra nada flutuante no canto esquerdo aqui pra reposicionar. */
+
+  /* esconder/mostrar os trilhos laterais (jogadores à esquerda, dados à direita) sem mudar o
+     visual deles — só desliza pra fora e devolve o espaço pro conteúdo do meio. Visual dos
+     trilhos em si (cor, borda, conteúdo) fica 100% igual; só a posição/visibilidade muda. */
+  .mesa-page .mesa-body{transition:right .25s var(--ease),grid-template-columns .25s var(--ease)}
+  .mesa-page.rail-collapsed .mesa-body{grid-template-columns:0px 1fr}
+  .mesa-page .mesa-rail-left{transition:transform .25s var(--ease),opacity .2s var(--ease)}
+  .mesa-page.rail-collapsed .mesa-rail-left{transform:translateX(-100%);opacity:0;pointer-events:none}
+  .mesa-page.dice-collapsed .mesa-body{right:0}
+  .mesa-page .dice-panel{transition:transform .25s var(--ease)}
+  .mesa-page.dice-collapsed .dice-panel{transform:translateX(100%)}
+
+  .rail-toggle{position:fixed;top:50%;transform:translateY(-50%);z-index:25;width:18px;height:56px;
+    border:1px solid var(--line2);background:var(--panel);color:var(--ink-faint);cursor:pointer;padding:0;
+    display:flex;align-items:center;justify-content:center;transition:left .25s var(--ease),right .25s var(--ease)}
+  .rail-toggle:hover{color:var(--ink)}
+  .rail-toggle svg{width:11px;height:11px;transition:transform .25s var(--ease)}
+  .rail-toggle.left{left:340px;border-radius:0 8px 8px 0;border-left:0}
+  .mesa-page.rail-collapsed .rail-toggle.left{left:0}
+  .mesa-page.rail-collapsed .rail-toggle.left svg{transform:rotate(180deg)}
+  .rail-toggle.right{right:340px;border-radius:8px 0 0 8px;border-right:0}
+  .mesa-page.dice-collapsed .rail-toggle.right{right:0}
+  .mesa-page.dice-collapsed .rail-toggle.right svg{transform:rotate(180deg)}
 }
 
 /* ============================================================
@@ -1107,11 +1551,22 @@ body.home-page .action-card h4{font-family:var(--disp);font-size:16px;color:var(
 .party-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin:0 2px 12px}
 .party-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;border:1px solid var(--line);margin-bottom:7px;background:var(--field-2)}
 .party-row.me{border-color:color-mix(in srgb,var(--brass) 45%,transparent);background:color-mix(in srgb,var(--brass) 10%,transparent)}
-.party-av{width:32px;height:32px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:700;font-size:14px;background:var(--field);border:1px solid var(--line2);color:var(--ink-dim)}
+.party-av{position:relative;width:32px;height:32px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:700;font-size:14px;background:var(--field);border:1px solid var(--line2);color:var(--ink-dim)}
 .party-row.me .party-av{background:var(--brass);color:var(--on-primary);border:0}
+/* ponto de presença (online agora) — canal efêmero via Realtime Presence, não é persistido */
+.presence-dot{position:absolute;right:-2px;bottom:-2px;width:9px;height:9px;border-radius:50%;
+  background:var(--ink-faint);border:2px solid var(--panel);transition:background .2s}
+.presence-dot.on{background:#5fbf6f}
+.autosave-hint{font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-faint);font-size:10px;margin-left:6px}
 .party-info{min-width:0}
 .party-name{font-family:var(--serif);font-weight:600;font-size:13px;color:var(--bone);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .party-role{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:2px}
+/* lista de pedidos de item (só Mestre) — antes um botão+painel flutuantes, agora fixa aqui no
+   trilho, entre o grupo e as ações de baixo. :empty some de vez pro jogador (o bloco nunca recebe
+   conteúdo nesse caso — ver mountItemRequests), sem deixar um espaço vazio com borda sobrando. */
+#mesa-requests:empty{display:none}
+#mesa-requests{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+#mesa-requests .list-row{margin-bottom:7px}
 .mesa-extra{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:2px}
 .mesa-extra button,.mesa-extra a{display:block;text-align:left;width:100%;font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);background:transparent;border:0;border-radius:8px;padding:9px 10px;cursor:pointer;text-decoration:none}
 .mesa-extra button:hover,.mesa-extra a:hover{background:var(--field);color:var(--ink)}

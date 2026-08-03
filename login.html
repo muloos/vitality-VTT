@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=9">
+<link rel="stylesheet" href="lib/theme.css?v=35">
 <style>
   html,body{min-height:100%}
   /* rolagem liberada: em telas baixas o card não fica mais cortado/inacessível */
@@ -26,6 +26,18 @@
   .pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;background:transparent;
     color:var(--ink-faint);cursor:pointer;font-size:15px;border-radius:8px;display:flex;align-items:center;justify-content:center}
   .pw-toggle:hover{color:var(--ink)}
+  /* link discreto (esqueci a senha / voltar pro login) — parece texto, não um botão de ação */
+  .link-btn{display:block;margin-top:8px;background:transparent;border:0;padding:0;cursor:pointer;
+    font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--ink-faint);text-decoration:underline;
+    text-underline-offset:2px}
+  .link-btn:hover{color:var(--ink-dim)}
+  /* barra de força da senha — 3 traços que preenchem conforme critérios básicos são atendidos
+     (comprimento, mistura de tipos de caractere); não bloqueia nada, é só um retorno visual */
+  .pw-strength{display:flex;gap:4px;margin-top:8px}
+  .pw-strength i{flex:1;height:3px;border-radius:2px;background:var(--line2);transition:background .15s}
+  .pw-strength.weak i:nth-child(1){background:var(--escarlate)}
+  .pw-strength.ok i:nth-child(1),.pw-strength.ok i:nth-child(2){background:var(--brass)}
+  .pw-strength.strong i{background:#4caf6b}
   /* Google "em breve" — honesto, não parece quebrado */
   .btn.soon{opacity:.75}
   .soon-pill{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);
@@ -44,7 +56,7 @@
       <p class="tagline">Crie seu próprio sistema de RPG e jogue com amigos: fichas, status, dados e trilha sonora — tudo numa mesa virtual.</p>
     </div>
 
-    <div class="seg glass" role="tablist">
+    <div class="seg glass" id="seg-tabs" role="tablist">
       <button id="tab-signin" class="on" onclick="setMode('signin')">Entrar</button>
       <button id="tab-signup" onclick="setMode('signup')">Criar conta</button>
     </div>
@@ -56,23 +68,30 @@
         <label for="name">Nome de exibição</label>
         <input id="name" type="text" autocomplete="nickname" placeholder="Como vão te chamar na mesa">
       </div>
-      <div class="fld">
+      <div class="fld" id="fld-email">
         <label for="email">Email</label>
         <input id="email" type="email" autocomplete="email" required placeholder="voce@exemplo.com">
       </div>
-      <div class="fld">
-        <label for="password">Senha</label>
+      <div class="fld" id="fld-password">
+        <label for="password" id="password-label">Senha</label>
         <div class="pw-wrap">
-          <input id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="••••••••">
+          <input id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="••••••••" oninput="onPasswordInput()">
           <button type="button" class="pw-toggle" id="pw-toggle" onclick="togglePw()" aria-label="Mostrar senha" title="Mostrar senha"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
+        <div class="pw-strength" id="pw-strength" style="display:none"><i></i><i></i><i></i></div>
+        <button type="button" class="link-btn" id="forgot-link" onclick="setMode('recover')">Esqueci minha senha</button>
+      </div>
+      <div class="fld" id="fld-confirm" style="display:none">
+        <label for="password2">Confirmar senha</label>
+        <input id="password2" type="password" autocomplete="new-password" minlength="6" placeholder="••••••••">
       </div>
       <button type="submit" id="submit" class="btn go">
         <span class="spin"></span><span id="submit-label">Entrar</span>
       </button>
+      <button type="button" class="link-btn" id="back-to-signin" style="display:none" onclick="setMode('signin')">← Voltar pro login</button>
     </form>
 
-    <div class="divider">ou</div>
+    <div class="divider" id="divider">ou</div>
 
     <button class="btn gbtn soon" id="google" onclick="googleLogin()">
       <svg class="gicon" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -91,7 +110,7 @@
 
 <script type="module">
 import { startParticles } from './lib/particles.js';
-import { signInWithPassword, signUp, signInWithGoogle, getSession } from './lib/db.js?v=24';
+import { signInWithPassword, signUp, signInWithGoogle, getSession, resetPasswordForEmail, updatePassword, onAuthChange } from './lib/db.js?v=30';
 
 startParticles(document.getElementById('fx'));
 
@@ -128,14 +147,47 @@ function setLoading(on) {
   $('google').disabled = on;
 }
 
+// 'signin'/'signup' são as duas abas normais; 'recover' pede só o email pra mandar o link de
+// redefinição; 'reset' aparece sozinho (sem o usuário escolher) quando a página é aberta a partir
+// do link daquele email — nesse modo as abas Entrar/Criar conta e o Google somem, já que não faz
+// sentido nenhum dos dois enquanto está no meio da troca de senha
 window.setMode = (m) => {
   mode = m;
   clearMsg();
+  const isAuthTab = m === 'signin' || m === 'signup';
   $('tab-signin').classList.toggle('on', m === 'signin');
   $('tab-signup').classList.toggle('on', m === 'signup');
+  $('seg-tabs').style.display = isAuthTab ? '' : 'none';
   $('fld-name').style.display = m === 'signup' ? '' : 'none';
-  $('submit-label').textContent = m === 'signup' ? 'Criar conta' : 'Entrar';
-  $('password').setAttribute('autocomplete', m === 'signup' ? 'new-password' : 'current-password');
+  $('fld-email').style.display = (m === 'signin' || m === 'signup' || m === 'recover') ? '' : 'none';
+  $('fld-password').style.display = (m === 'signin' || m === 'signup' || m === 'reset') ? '' : 'none';
+  $('password-label').textContent = m === 'reset' ? 'Nova senha' : 'Senha';
+  $('fld-confirm').style.display = (m === 'signup' || m === 'reset') ? '' : 'none';
+  $('forgot-link').style.display = m === 'signin' ? '' : 'none';
+  $('back-to-signin').style.display = (m === 'recover') ? '' : 'none';
+  $('pw-strength').style.display = (m === 'signup' || m === 'reset') ? '' : 'none';
+  $('pw-strength').className = 'pw-strength';
+  $('divider').style.display = isAuthTab ? '' : 'none';
+  $('google').style.display = isAuthTab ? '' : 'none';
+  $('email').required = m !== 'reset';
+  $('password').required = m !== 'recover';
+  $('password2').required = (m === 'signup' || m === 'reset');
+  const labels = { signin: 'Entrar', signup: 'Criar conta', recover: 'Enviar link de recuperação', reset: 'Salvar nova senha' };
+  $('submit-label').textContent = labels[m];
+  $('password').setAttribute('autocomplete', m === 'signup' || m === 'reset' ? 'new-password' : 'current-password');
+  if (m !== 'reset') { $('password').value = ''; $('password2').value = ''; }
+};
+
+window.onPasswordInput = () => {
+  const v = $('password').value;
+  const el = $('pw-strength');
+  if (el.style.display === 'none') return;
+  if (!v) { el.className = 'pw-strength'; return; }
+  let score = 0;
+  if (v.length >= 6) score++;
+  if (v.length >= 10 && /[A-Z]/.test(v) && /[0-9]/.test(v)) score++;
+  if (v.length >= 10 && /[A-Z]/.test(v) && /[0-9]/.test(v) && /[^A-Za-z0-9]/.test(v)) score++;
+  el.className = 'pw-strength ' + (score <= 1 ? 'weak' : score === 2 ? 'ok' : 'strong');
 };
 
 window.submitForm = (ev) => {
@@ -143,9 +195,32 @@ window.submitForm = (ev) => {
   clearMsg();
   const email = $('email').value.trim();
   const password = $('password').value;
+  const password2 = $('password2').value;
   const name = $('name').value.trim();
-  setLoading(true);
 
+  if ((mode === 'signup' || mode === 'reset') && password !== password2) {
+    showMsg('As senhas não são iguais.');
+    return false;
+  }
+
+  if (mode === 'recover') {
+    setLoading(true);
+    resetPasswordForEmail(email, new URL(location.pathname, location.href).href)
+      .then(() => showMsg('Se esse email tiver conta, enviamos um link de recuperação pra ele.', 'ok'))
+      .catch((err) => showMsg(translateError(err)))
+      .finally(() => setLoading(false));
+    return false;
+  }
+
+  if (mode === 'reset') {
+    setLoading(true);
+    updatePassword(password)
+      .then(() => { window.location.href = DEST; })
+      .catch((err) => { showMsg(translateError(err)); setLoading(false); });
+    return false;
+  }
+
+  setLoading(true);
   const run = mode === 'signup'
     ? signUp(email, password, name)
     : signInWithPassword(email, password);
@@ -164,6 +239,11 @@ window.submitForm = (ev) => {
   });
   return false;
 };
+
+// o Supabase detecta sozinho o token de recuperação na URL (detectSessionInUrl, já ligado pro
+// Google) e dispara este evento — troca a tela pro modo "definir nova senha" sem o usuário ter
+// feito nada além de clicar no link do email
+onAuthChange((_session, event) => { if (event === 'PASSWORD_RECOVERY') setMode('reset'); });
 
 window.togglePw = () => {
   const i = $('password'), b = $('pw-toggle');
@@ -198,8 +278,15 @@ function translateError(err) {
   return m;
 }
 
-// Já logado? vai direto pro destino (ou pro app, se não veio de nenhuma página específica).
-getSession().then((s) => { if (s) window.location.href = DEST; else $('email').focus(); });
+// Link de recuperação de senha: o Supabase cria uma sessão temporária SÓ pra permitir trocar a
+// senha — sem essa checagem, o redirecionamento automático (linha abaixo) mandaria a pessoa direto
+// pro app antes de sequer ver o formulário de nova senha. `type=recovery` chega no hash da URL
+// (mesmo mecanismo de detectSessionInUrl já usado pro retorno do Google).
+if (/type=recovery/.test(location.hash)) setMode('reset');
+
+// Já logado? vai direto pro destino (ou pro app, se não veio de nenhuma página específica) —
+// exceto no meio de uma recuperação de senha, que também conta como "logado" tecnicamente.
+getSession().then((s) => { if (s && mode !== 'reset') window.location.href = DEST; else if (!s) $('email').focus(); });
 </script>
 </body>
 </html>

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=9">
+<link rel="stylesheet" href="lib/theme.css?v=35">
 </head>
 <body class="home-page"> 
 <div id="fallback" class="solid"></div>
@@ -55,7 +55,8 @@
         <h4>Criar mesa</h4>
         <p>Escolha o sistema que a mesa vai usar — ela puxa os status, classes, árvores e itens dele. Você vira o Mestre e recebe um código de convite.</p>
         <form onsubmit="return doCreate(event)">
-          <div class="fld"><label>Sistema da campanha</label><select id="new-system" class="fld-input"></select></div>
+          <div class="fld"><label for="new-system">Sistema da campanha</label><select id="new-system" class="fld-input" onchange="onNewSystemChange()"></select>
+            <div id="new-system-preview" style="font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-top:6px"></div></div>
           <div class="inline-form">
             <input id="new-name" placeholder="Nome da mesa" required maxlength="60">
             <button class="btn go auto" type="submit"><span class="spin"></span>Criar</button>
@@ -118,6 +119,7 @@
       <button role="tab" data-sub="loja" class="on" aria-selected="true" onclick="showItemSub('loja')">Loja</button>
       <button role="tab" data-sub="favoritos" aria-selected="false" onclick="showItemSub('favoritos')">Favoritos</button>
       <button role="tab" data-sub="criar" aria-selected="false" onclick="showItemSub('criar')">Criar</button>
+      <button role="tab" data-sub="pacotes" aria-selected="false" onclick="showItemSub('pacotes')">Pacotes</button>
     </div>
 
     <!-- ---------- LOJA (itens de outros criadores) ---------- -->
@@ -165,6 +167,8 @@
           <div class="fld"><label>Nome</label><input id="it-name" required maxlength="80" placeholder="Ex.: Lâmina de Escarlate"></div>
           <div class="fld"><label>Categoria</label><select id="it-cat" class="fld-input" onchange="updateItemCategoryFields()"></select></div>
           <div class="fld"><label>Raridade</label><select id="it-rar" class="fld-input"></select></div>
+          <div class="fld"><label>Tipo de equipamento <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — define em qual slot da tela de equipamentos ele encaixa, se o item for copiado pra um sistema)</span></label>
+            <select id="it-eqtype" class="fld-input"></select></div>
 
           <div class="fld" id="it-damage-fld" style="display:none">
             <label>Dano <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(fórmula, ex.: 1d8+2)</span></label>
@@ -209,12 +213,26 @@
 
       <div id="items" class="item-grid"><div class="empty">Carregando…</div></div>
     </div>
+
+    <!-- ---------- PACOTES (grupos de itens da biblioteca, pra importar de uma vez num sistema) ---------- -->
+    <div id="itens-pacotes" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="section-title" style="margin:0">Meus pacotes de itens</div>
+        <button class="btn go auto sm" onclick="openPackageForm()">+ Criar pacote</button>
+      </div>
+      <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:0 0 14px">
+        Agrupe vários itens da sua biblioteca num pacote — depois, dentro de qualquer sistema, importe o pacote inteiro de uma vez em vez de copiar item por item.</p>
+
+      <div id="package-editor" class="surface" style="display:none;margin-bottom:20px"></div>
+
+      <div id="packages" class="list"><div class="empty">Carregando…</div></div>
+    </div>
   </section>
 </main>
 
 <script type="module">
-import * as db from './lib/db.js?v=24';
-import { mountHelp, mountThemeToggle, openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme } from './lib/ui.js?v=3';
+import * as db from './lib/db.js?v=30';
+import { mountHelp, mountThemeToggle, openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme, trapFocus } from './lib/ui.js?v=4';
 
 mountHelp('home');
 mountThemeToggle();
@@ -274,7 +292,8 @@ function confirmModal({ title, desc, confirmLabel = 'Confirmar', danger = true }
         <button class="btn auto ${danger ? 'danger' : 'go'}" id="cm-ok">${esc(confirmLabel)}</button>
       </div>
     </div>`;
-    const finish = (result) => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
+    const untrap = trapFocus(w);
+    const finish = (result) => { untrap(); w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
     const onEsc = (e) => { if (e.key === 'Escape') finish(false); };
     w.addEventListener('click', (e) => { if (e.target === w) finish(false); });
     w.querySelector('.x').onclick = () => finish(false);
@@ -288,6 +307,17 @@ function confirmModal({ title, desc, confirmLabel = 'Confirmar', danger = true }
 
 const CATEGORIES = ['Arma', 'Armadura', 'Escudo', 'Ferramenta', 'Consumível', 'Acessório', 'Artefato', 'Material', 'Outro'];
 const RARITIES = ['Comum', 'Incomum', 'Raro', 'Épico', 'Lendário', 'Único'];
+// tipos de item equipável — mesma lista usada no editor de item do sistema (sistema.html) e no
+// "Tipo aceito" dos slots da tela de equipamentos; casam por igualdade exata de texto. Fica
+// duplicada aqui (mesmo padrão de CATEGORIES/RARITIES neste arquivo) pra manter tudo sincronizado
+// quando um item da biblioteca é copiado pra dentro de um sistema.
+const EQUIP_TYPES = ['Capacete', 'Peitoral', 'Calças', 'Botas', 'Luvas', 'Cinto', 'Capa/Manto', 'Escudo',
+  'Anel', 'Colar/Pingente', 'Brinco', 'Arma (uma mão)', 'Arma (duas mãos)', 'Acessório'];
+function equipTypeOptionsHtml(current, emptyLabel) {
+  const extra = current && !EQUIP_TYPES.includes(current) ? [current] : [];
+  return `<option value="">${esc(emptyLabel)}</option>` +
+    [...EQUIP_TYPES, ...extra].map((t) => `<option value="${esc(t)}" ${current === t ? 'selected' : ''}>${esc(t)}</option>`).join('');
+}
 let profileName = '';
 let myEmail = null;
 let editingItemId = null;
@@ -298,7 +328,10 @@ let _favIds = new Set();      // ids favoritados pelo usuário atual
 const _itemById = new Map();  // cache de todo item já visto (loja/favoritos/criar), pra abrir o modal de detalhe por id
 
 function showMsg(t, kind) { const m = $('msg'); m.textContent = t; m.className = 'msg show ' + (kind || 'err'); setTimeout(() => { if (m.textContent === t) m.className = 'msg'; }, 4000); }
-function busy(form, on) { const b = form.querySelector('button[type=submit]'); if (b) { b.classList.toggle('loading', on); b.disabled = on; } }
+// aceita tanto um <form> (procura o botão type=submit dentro) quanto o próprio botão (ex.:
+// savePackage passa ev.currentTarget de um <button type="button">, que não tem filho nenhum —
+// antes disso o querySelector sempre voltava vazio e o loading/disabled nunca ligava de verdade)
+function busy(el, on) { const b = el.matches('button') ? el : el.querySelector('button[type=submit]'); if (b) { b.classList.toggle('loading', on); b.disabled = on; } }
 function cacheItems(list) { (list || []).forEach((it) => _itemById.set(it.id, it)); return list; }
 
 /* ---------- boot: sessão ---------- */
@@ -331,6 +364,7 @@ async function startHome() {
   renderItems();
   renderStore();
   renderFavorites();
+  renderPackages();
   try { _favSysIds = await db.listFavoriteSystemIds(); } catch (e) { console.error('[favoritos]', e); }
   renderStoreSystems();
   renderFavSystems();
@@ -391,6 +425,7 @@ window.showItemSub = (sub) => {
   $('itens-loja').style.display = sub === 'loja' ? '' : 'none';
   $('itens-favoritos').style.display = sub === 'favoritos' ? '' : 'none';
   $('itens-criar').style.display = sub === 'criar' ? '' : 'none';
+  $('itens-pacotes').style.display = sub === 'pacotes' ? '' : 'none';
 };
 
 /* ---------- sistemas ---------- */
@@ -411,13 +446,18 @@ window.showSysSub = (sub) => {
 async function renderSystems() {
   const box = $('systems');
   try {
-    const systems = cacheSystems(await db.listSystems());
-    _sysCount = systems.length; renderOnboard();
-    fillSystemPicker(systems);   // alimenta o seletor de sistema do "Criar mesa"
-    if (!systems.length) { box.className = ''; box.innerHTML = emptyState(ICON.gear, 'Nenhum sistema ainda',
+    const [mine, favorites, store] = await Promise.all([
+      db.listSystems(),
+      db.listFavoriteSystems().catch(() => []),
+      db.listStoreSystems().catch(() => []),
+    ]);
+    cacheSystems(mine); cacheSystems(favorites); cacheSystems(store);
+    _sysCount = mine.length; renderOnboard();
+    fillSystemPicker(mine, favorites, store);   // alimenta o seletor de sistema do "Criar mesa"
+    if (!mine.length) { box.className = ''; box.innerHTML = emptyState(ICON.gear, 'Nenhum sistema ainda',
       'O sistema é o coração do seu RPG: status, fórmulas, classes, árvores e itens. Crie o primeiro no campo acima ↑'); return; }
     box.className = 'grid';
-    box.innerHTML = systems.map((s) => `
+    box.innerHTML = mine.map((s) => `
       <a class="card-tile" href="sistema.html?id=${s.id}">
         <h3>${esc(s.name)}</h3>
         <div class="meta">${s.is_published ? 'Publicado na loja · ' : ''}Abrir construtor →</div>
@@ -485,7 +525,8 @@ window.openSystemDetail = (id) => {
       ${isOwner ? `<a class="btn go auto" href="sistema.html?id=${s.id}">Abrir no construtor</a>` : ''}
     </div>
   </div>`;
-  const close = () => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); };
+  const untrap = trapFocus(w);
+  const close = () => { untrap(); w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); };
   const onEsc = (e) => { if (e.key === 'Escape') close(); };
   w.addEventListener('click', (e) => { if (e.target === w) close(); });
   w.querySelector('.x').onclick = close;
@@ -544,12 +585,37 @@ window.doCreate = (ev) => { ev.preventDefault(); const name = $('new-name').valu
   if (!systemId) { showMsg('Crie um sistema primeiro (aba Sistemas) para usar na mesa.'); showSec('sistemas'); return false; }
   busy(ev.target, true);
   db.createCampaign(name, systemId).then((c) => { location.href = 'mesa.html?id=' + c.id; }).catch((e) => { showMsg('Não deu pra criar a mesa: ' + friendlyError(e)); busy(ev.target, false); }); return false; };
-function fillSystemPicker(systems) {
+function fillSystemPicker(mine, favorites, store) {
   const sel = $('new-system'); if (!sel) return;
-  if (!systems.length) { sel.innerHTML = '<option value="">— nenhum sistema ainda —</option>'; sel.disabled = true; return; }
+  const mineIds = new Set(mine.map((s) => s.id));
+  const favList = (favorites || []).filter((s) => !mineIds.has(s.id));
+  const favIds = new Set(favList.map((s) => s.id));
+  const storeList = (store || []).filter((s) => !mineIds.has(s.id) && !favIds.has(s.id));
+  if (!mine.length && !favList.length && !storeList.length) {
+    sel.innerHTML = '<option value="">— nenhum sistema disponível —</option>';
+    sel.disabled = true; $('new-system-preview').textContent = ''; return;
+  }
   sel.disabled = false;
-  sel.innerHTML = systems.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  const opts = (list) => list.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  sel.innerHTML =
+    (mine.length      ? `<optgroup label="Meus sistemas">${opts(mine)}</optgroup>` : '') +
+    (favList.length   ? `<optgroup label="Favoritos">${opts(favList)}</optgroup>` : '') +
+    (storeList.length ? `<optgroup label="Loja">${opts(storeList)}</optgroup>` : '');
+  onNewSystemChange();
 }
+// resumo rápido do sistema escolhido — antes só o nome aparecia no select, sem nenhuma pista do
+// quanto o sistema já tem montado antes de comprometer a mesa a ele
+window.onNewSystemChange = async () => {
+  const id = $('new-system')?.value;
+  const box = $('new-system-preview'); if (!box) return;
+  if (!id) { box.textContent = ''; return; }
+  box.textContent = 'Carregando resumo…';
+  try {
+    const b = await db.getSystemBundle(id);
+    if ($('new-system').value !== id) return; // trocou de novo enquanto carregava
+    box.textContent = `${b.stats.length} status · ${b.classes.length} classes · ${b.trees.length} árvores · ${b.items.length} itens`;
+  } catch (_) { box.textContent = ''; }
+};
 window.doJoin = (ev) => { ev.preventDefault(); const code = $('join-code').value.trim().toUpperCase(); if (!code) return false; busy(ev.target, true);
   db.joinCampaignByCode(code).then((c) => { location.href = 'mesa.html?id=' + c.id; }).catch((e) => { showMsg('Não deu pra entrar na mesa: ' + friendlyError(e)); busy(ev.target, false); }); return false; };
 
@@ -559,10 +625,23 @@ function addModRow(name = '', value = '') {
   row.className = 'mod-row';
   row.innerHTML = `<input class="mn" placeholder="Status (ex.: Vida)" value="${esc(name)}">
     <input class="mv" placeholder="+/-" value="${esc(value)}">
-    <button type="button" onclick="this.parentElement.remove()"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>`;
+    <button type="button" onclick="this.parentElement.remove();checkModsRequirement()"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>`;
   $('mod-list').appendChild(row);
+  checkModsRequirement();
 }
 window.addModRow = () => addModRow();
+
+// avisa ANTES de tentar salvar (não só no submit) que a categoria escolhida exige pelo menos um
+// modificador — sem isso, dava pra preencher a descrição inteira do item e só descobrir o
+// requisito ao clicar em "Salvar item"
+window.checkModsRequirement = () => {
+  const cat = $('it-cat').value;
+  const needsModifier = cat === 'Acessório' || cat === 'Artefato';
+  const hasMod = $('mod-list').children.length > 0;
+  const err = $('it-mods-err');
+  if (needsModifier && !hasMod) { err.textContent = 'Esta categoria precisa de pelo menos 1 modificador.'; err.classList.add('show'); }
+  else { err.textContent = ''; err.classList.remove('show'); }
+};
 
 // mostra/esconde os campos obrigatórios da categoria escolhida (Arma / Armadura·Escudo / Acessório·Artefato)
 window.updateItemCategoryFields = () => {
@@ -577,6 +656,7 @@ window.updateItemCategoryFields = () => {
     : '(o que o item adiciona — opcional)';
   if (!isWeapon) { $('it-damage').value = ''; }
   if (!isProtective) { $('it-protection').value = ''; }
+  checkModsRequirement();
 };
 function setItemFieldError(fieldId, errId, msg) {
   const el = $(fieldId);
@@ -606,10 +686,13 @@ window.clearItemImg = () => { itemImageFile = null; itemImageUrl = null; $('it-i
 
 window.openItemForm = (item = null) => {
   editingItemId = item?.id || null;
-  $('item-editor-title').textContent = item ? 'Editar item' : 'Novo item';
+  $('item-editor-title').innerHTML = item
+    ? `Editar item <span style="font-family:var(--mono);font-size:11px;color:var(--ink-faint);font-weight:400">#${esc(item.item_code || '')}</span>`
+    : 'Novo item';
   $('it-name').value = item?.name || '';
   $('it-cat').value = item?.category || 'Outro';
   $('it-rar').value = item?.rarity || 'Comum';
+  $('it-eqtype').innerHTML = equipTypeOptionsHtml(item?.equipment_type || '', 'Nenhum (não equipável em slot)');
   $('it-desc').value = item?.description || '';
   $('it-damage').value = item?.weapon_damage || '';
   $('it-protection').value = item?.protection ?? '';
@@ -657,6 +740,7 @@ window.saveItem = (ev) => {
         modifiers,
         weapon_damage: category === 'Arma' ? weaponDamage : null,
         protection: (category === 'Armadura' || category === 'Escudo') ? Number(protectionRaw) : null,
+        equipment_type: $('it-eqtype').value || null,
         image_url: itemImageUrl,
         is_published: $('it-published').checked,
       };
@@ -669,22 +753,52 @@ window.saveItem = (ev) => {
 
 /* ---------- card de item (pôster) — usado em Loja / Favoritos / Criar ---------- */
 const HEART_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.8-9.8-9.3C.6 7.7 2.3 4.5 5.6 4a4.9 4.9 0 0 1 6.4 2 4.9 4.9 0 0 1 6.4-2c3.3.5 5 3.7 3.4 7.2C19.5 15.7 12 20.5 12 20.5Z" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+// moldura de raridade "premium" (referência enviada pelo usuário): borda em degradê animado
+// por fora (via wrapper .rar-frame, truque do padding = espessura da borda) + decorações
+// internas dentro do .poster-card, que corta tudo com overflow:hidden — sweep de luz na
+// diagonal (Épico+), realce interno pulsando + linha no topo (Lendário+), vórtice duplo
+// girando em sentidos opostos + núcleo latejante (só Único) e estrelas de 8 pontas
+// (clip-path) piscando em posições fixas, mais densas a cada tier.
+function posterRarityLayers(rarity) {
+  const glintSpots = {
+    'Épico': [[16, 22]],
+    'Lendário': [[18, 18], [80, 28], [14, 66], [84, 86]],
+    'Único': [[12, 14], [82, 20], [6, 36], [90, 46], [16, 64], [86, 78], [24, 94], [72, 90], [48, 10], [46, 56], [66, 48]],
+  };
+  const spots = glintSpots[rarity] || [];
+  let glints = '';
+  spots.forEach((p, i) => {
+    const delay = (i * 0.28).toFixed(2);
+    const dur = (2.1 + (i % 4) * 0.3).toFixed(2);
+    const size = 8 + (i % 3) * 2;
+    glints += `<i class="pc-glint" style="left:${p[0]}%;top:${p[1]}%;width:${size}px;height:${size}px;animation-delay:${delay}s;animation-duration:${dur}s"></i>`;
+  });
+  let extra = '';
+  if (rarity === 'Épico' || rarity === 'Único') extra += `<span class="pc-sweep"></span>`;
+  if (rarity === 'Lendário' || rarity === 'Único') extra += `<span class="pc-highlight"></span><span class="pc-topline"></span><span class="pc-core"></span>`;
+  if (rarity === 'Único') extra += `<span class="pc-sweep pc-sweep2"></span><span class="pc-ring"></span><span class="pc-ring pc-ring2"></span>`;
+  return extra + glints;
+}
 function itemCardHtml(it) {
   const isFav = _favIds.has(it.id);
   const isMine = !!myUserId && it.owner_id === myUserId;
-  const rarityKey = 'r-' + esc((it.rarity || 'comum').toLowerCase());
+  const rarity = it.rarity || 'Comum';
+  const rarityKey = 'r-' + esc(rarity.toLowerCase());
   const initial = esc((it.name || '?').trim().charAt(0).toUpperCase() || '?');
   const bgStyle = it.image_url ? ` style="background-image:url('${esc(it.image_url)}')"` : '';
   return `
-    <div class="poster-card ${it.image_url ? '' : 'ph ' + rarityKey}"${bgStyle} onclick='openItemDetail("${it.id}")' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(it.name)}">
-      ${!it.image_url ? `<span class="poster-initial">${initial}</span>` : ''}
-      ${isMine ? `<span class="poster-pub ${it.is_published ? 'on' : ''}">${it.is_published ? 'Publicado' : 'Privado'}</span>` : ''}
-      <button class="poster-fav ${isFav ? 'on' : ''}" onclick='event.stopPropagation();toggleFavorite("${it.id}")' aria-label="${isFav ? 'Remover dos favoritos' : 'Favoritar'}" aria-pressed="${isFav}">${HEART_ICON}</button>
-      ${it.description ? `<div class="poster-hover"><p>${esc(it.description.slice(0, 90))}${it.description.length > 90 ? '…' : ''}</p></div>` : ''}
-      <div class="poster-scrim">
-        <div class="poster-badges">${it.rarity ? `<span class="badge ${rarityKey}">${esc(it.rarity)}</span>` : ''}</div>
-        <h4 class="poster-name">${esc(it.name)}</h4>
-        <div class="poster-meta">${esc(it.creator_name || '—')}</div>
+    <div class="rar-frame" data-rarity="${esc(rarity)}">
+      <div class="poster-card" onclick='openItemDetail("${it.id}")' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(it.name)}">
+        ${posterRarityLayers(rarity)}
+        ${isMine ? `<span class="poster-pub ${it.is_published ? 'on' : ''}">${it.is_published ? 'Publicado' : 'Privado'}</span>` : ''}
+        <button class="poster-fav ${isFav ? 'on' : ''}" onclick='event.stopPropagation();toggleFavorite("${it.id}")' aria-label="${isFav ? 'Remover dos favoritos' : 'Favoritar'}" aria-pressed="${isFav}">${HEART_ICON}</button>
+        <div class="poster-icon ${it.image_url ? '' : 'ph ' + rarityKey}"${bgStyle}>${!it.image_url ? `<span class="poster-initial">${initial}</span>` : ''}</div>
+        <div class="poster-body">
+          <h4 class="poster-name">${esc(it.name)}</h4>
+          ${it.rarity ? `<span class="rar-pill" data-rarity="${esc(it.rarity)}">${esc(it.rarity)}</span>` : ''}
+          ${it.description ? `<p class="poster-desc">${esc(it.description)}</p>` : ''}
+          <div class="poster-meta">${esc(it.creator_name || '—')}${it.item_code ? ` · #${esc(it.item_code)}` : ''}</div>
+        </div>
       </div>
     </div>`;
 }
@@ -788,13 +902,14 @@ window.openItemDetail = async (id) => {
   w.dataset.itemId = id;
   w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'idet-title');
   w.innerHTML = `<div class="box guide item-detail">
-    <div class="ghead"><h3 id="idet-title">${esc(it.name)}</h3><button class="x" aria-label="Fechar">×</button></div>
+    <div class="ghead"><h3 id="idet-title">${esc(it.name)} <span style="font-family:var(--mono);font-size:11px;color:var(--ink-faint);font-weight:400">#${esc(it.item_code || '')}</span></h3><button class="x" aria-label="Fechar">×</button></div>
     ${it.image_url ? `<img class="idet-img" src="${esc(it.image_url)}" alt="">` : ''}
     <div class="idet-badges">
       ${it.rarity ? `<span class="badge r-${esc((it.rarity || '').toLowerCase())}">${esc(it.rarity)}</span>` : ''}
       ${it.category ? `<span class="badge cat">${esc(it.category)}</span>` : ''}
       ${it.weapon_damage ? `<span class="badge mod">Dano ${esc(it.weapon_damage)}</span>` : ''}
       ${(it.protection != null && it.protection !== '') ? `<span class="badge mod">Proteção ${esc(String(it.protection))}</span>` : ''}
+      ${it.equipment_type ? `<span class="badge" style="border-color:var(--maq);color:var(--maq)">${esc(it.equipment_type)}</span>` : ''}
       ${isOwner ? `<span class="badge ${it.is_published ? 'mod' : 'cat'}">${it.is_published ? 'Publicado na loja' : 'Privado'}</span>` : ''}
     </div>
     ${it.description ? `<p class="gintro">${esc(it.description)}</p>` : ''}
@@ -807,7 +922,8 @@ window.openItemDetail = async (id) => {
         : `<select id="idet-sys-pick" class="fld-input" style="max-width:200px"><option value="">Carregando sistemas…</option></select><button class="btn go auto" id="idet-add-sys">+ Adicionar a um sistema</button>`}
     </div>
   </div>`;
-  const close = () => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); };
+  const untrap = trapFocus(w);
+  const close = () => { untrap(); w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); };
   const onEsc = (e) => { if (e.key === 'Escape') close(); };
   w.addEventListener('click', (e) => { if (e.target === w) close(); });
   w.querySelector('.x').onclick = close;
@@ -848,6 +964,80 @@ window.delItem = async (id) => {
   });
   if (!ok) return;
   db.deleteItem2(id).then(() => { renderItems(); showMsg('Item excluído.', 'ok'); }).catch((e) => showMsg('Não foi possível excluir: ' + friendlyError(e)));
+};
+
+/* ---------- Pacotes de itens (agrupa itens da biblioteca pra importar de uma vez num sistema) ---------- */
+let _myPackages = [];
+let editingPackageId = null;
+async function renderPackages() {
+  const box = $('packages');
+  try {
+    _myPackages = await db.listItemPackages();
+    paintPackages();
+  } catch (e) { box.innerHTML = '<div class="empty">Erro: ' + esc(friendlyError(e)) + '</div>'; }
+}
+function paintPackages() {
+  const box = $('packages');
+  if (!_myPackages.length) { box.innerHTML = emptyState(ICON.pouch, 'Nenhum pacote ainda',
+    'Crie um pacote e escolha vários itens da sua biblioteca — depois é só importar o pacote inteiro dentro de um sistema.',
+    '<button class="btn go auto sm" onclick="openPackageForm()">+ Criar meu primeiro pacote</button>'); return; }
+  box.innerHTML = _myPackages.map((p) => `
+    <div class="list-row">
+      <div class="grow"><div class="nm">${esc(p.name)}</div>
+        <div class="sub">${p.item_ids.length} ${p.item_ids.length === 1 ? 'item' : 'itens'}</div></div>
+      <button class="btn sm auto" onclick="openPackageForm('${p.id}')">Editar</button>
+      <button class="btn sm danger auto" onclick="deletePackage('${p.id}')"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>`).join('');
+}
+window.openPackageForm = (id = null) => {
+  const pkg = id ? _myPackages.find((p) => p.id === id) : null;
+  editingPackageId = pkg?.id || null;
+  const items = window._myItems || [];
+  const selected = new Set(pkg?.item_ids || []);
+  const box = $('package-editor');
+  box.innerHTML = `
+    <h4 style="font-family:var(--disp);font-size:17px;color:var(--bone);margin:0 0 16px">${pkg ? 'Editar pacote' : 'Novo pacote'}</h4>
+    <div class="fld" style="margin-bottom:14px"><label>Nome do pacote</label><input id="pkg-name" maxlength="60" value="${esc(pkg?.name || '')}" placeholder="Ex.: Kit inicial de aventureiro"></div>
+    <label style="display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px">Itens do pacote</label>
+    <div id="pkg-item-list" class="list" style="max-height:360px;overflow:auto;margin-bottom:14px">
+      ${items.length ? items.map((it) => `
+        <label class="list-row" style="cursor:pointer">
+          <input type="checkbox" value="${it.id}" ${selected.has(it.id) ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--brass);flex:0 0 auto">
+          <div class="grow"><div class="nm">${esc(it.name)} <span style="font-family:var(--mono);font-size:9px;color:var(--ink-faint)">#${esc(it.item_code || '')}</span></div></div>
+        </label>`).join('') : '<div class="empty">Crie itens na aba "Criar" primeiro.</div>'}
+    </div>
+    <div class="full actions">
+      <button type="button" class="btn" onclick="closePackageForm()">Cancelar</button>
+      <button type="button" class="btn go" onclick="savePackage()"><span class="spin"></span>Salvar pacote</button>
+    </div>`;
+  box.style.display = '';
+  $('pkg-name').focus();
+};
+window.closePackageForm = () => { $('package-editor').style.display = 'none'; $('package-editor').innerHTML = ''; editingPackageId = null; };
+window.savePackage = async (ev) => {
+  const name = $('pkg-name').value.trim();
+  if (!name) { showMsg('Dê um nome ao pacote.'); return; }
+  const itemIds = [...document.querySelectorAll('#pkg-item-list input[type=checkbox]:checked')].map((cb) => cb.value);
+  const btn = ev.currentTarget; busy(btn, true);
+  try {
+    if (editingPackageId) {
+      await db.updateItemPackage(editingPackageId, { name });
+      await db.setItemPackageItems(editingPackageId, itemIds);
+    } else {
+      await db.createItemPackage(name, itemIds);
+    }
+    busy(btn, false); closePackageForm(); renderPackages(); showMsg('Pacote salvo.', 'ok');
+  } catch (e) { busy(btn, false); showMsg('Não foi possível salvar o pacote: ' + friendlyError(e)); }
+};
+window.deletePackage = async (id) => {
+  const pkg = _myPackages.find((p) => p.id === id);
+  const ok = await confirmModal({
+    title: 'Excluir pacote',
+    desc: `Isto remove o pacote "${pkg?.name || ''}". Os itens dele continuam na sua biblioteca — só o agrupamento é apagado.`,
+    confirmLabel: 'Excluir', danger: true,
+  });
+  if (!ok) return;
+  db.deleteItemPackage(id).then(() => { renderPackages(); showMsg('Pacote excluído.', 'ok'); }).catch((e) => showMsg('Não foi possível excluir: ' + friendlyError(e)));
 };
 </script>
 </body>

@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR">
 <head>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("vt_theme")||"dark"}catch(e){}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Vitality · Editor de Árvore</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=9">
+<link rel="stylesheet" href="lib/theme.css?v=35">
 <style>
   /* fundo cósmico original (sobrescreve o solido do tema, SÓ nesta tela) */
   /* body PRECISA ficar transparente aqui: #fallback e #fx (o canvas de partículas) usam z-index
@@ -28,73 +29,78 @@
      radial-gradient(460px 380px at 50% 46%, rgba(var(--bgGlow),.10), transparent 60%),
      radial-gradient(1700px 1300px at 50% 44%, var(--bgDeep), var(--bgEdge) 82%)}
   #fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:-1}
-  svg#grid{position:fixed;inset:0;width:100%;height:100%;cursor:grab;touch-action:none;z-index:0}
-  svg#grid.panning{cursor:grabbing} svg#grid.adding{cursor:crosshair}
-  /* pan/zoom só mexem no transform destes grupos — will-change avisa o navegador com antecedência
-     pra promover uma camada própria, assim mover a tela vira um reposicionamento de bitmap já
-     pintado (GPU) em vez de repintar esferas/linhas/anéis a cada pixel de arrasto */
-  #world{will-change:transform}
-
-  /* ---------- nós (idêntico ao protótipo) ---------- */
-  .node{cursor:pointer;--c:var(--bone);color:var(--c)}
-  .beacon,.sel{transform-box:fill-box;transform-origin:center}
-  .dots{color:var(--c)}
-  .rim{fill:none;stroke:var(--c);stroke-width:1.8;opacity:0}
-  .body{stroke:var(--c);stroke-width:.6;stroke-opacity:.25}
-  .beacon{fill:none;stroke:#fff;stroke-width:1.3;opacity:0}
-  .lbl{fill:var(--ink);font-family:var(--mono);font-size:11px;text-anchor:middle;opacity:0;transition:opacity .2s;pointer-events:none;paint-order:stroke;stroke:#080615;stroke-width:4px}
-  .costbadge{fill:var(--c);font-family:var(--mono);font-weight:700;font-size:11px;text-anchor:middle;opacity:0;paint-order:stroke;stroke:#080615;stroke-width:3px}
-  .node:hover .lbl,.node.selected .lbl{opacity:.97}
-  .node.unlocked{filter:drop-shadow(0 0 7px var(--c))}
-  .node.unlocked .dots{opacity:1}
-  .node.unlocked .rim{opacity:.9}
-  .node.unlocked .costbadge{opacity:.95}
-  /* esfera que o JOGADOR já desbloqueou de verdade (distinto do "unlocked" de edição, que é
-     sempre ligado no editor) — aro dourado bem mais grosso pra ficar óbvio de longe */
-  .node.acquired .rim{stroke:var(--brass);stroke-width:3}
-  .node.acquired{filter:drop-shadow(0 0 3px var(--c)) drop-shadow(0 0 8px var(--brass))}
-  /* esfera marcada como "Desativada" no editor — mais apagada, sem glow (mais barato de pintar) */
-  .node.disabled{opacity:.5}
-  .node.disabled.unlocked{filter:none}
-  .node.selected .sel{stroke:#fff;stroke-width:1.3;fill:none;opacity:.9;animation:selpulse 1.8s ease-in-out infinite}
-  .node.multisel .sel{stroke:var(--brass);stroke-width:1.6;fill:rgba(227,192,113,.1);opacity:.95}
-  .sel{opacity:0}
-  .node.linksrc .rim{stroke-dasharray:2 4;opacity:.9}
+  /* svg#grid agora é só decoração (anéis, grade de encaixe, marca de encaixe) — o conteúdo
+     interativo (esferas/conexões) virou #worldCanvas, ver comentário grande mais abaixo sobre por
+     quê. pointer-events:none aqui documenta isso: quem recebe clique/arrasto é o canvas. */
+  svg#grid{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+  /* canvas 2D pra esferas/conexões — reescrito nesta sessão porque SVG (um <g> de ~8 filhos por
+     esfera) tem um teto real de desempenho: o navegador recalcula estilo/layout/pintura pra CADA
+     elemento de DOM a cada mudança, e isso cresce com o número de esferas, não importa quanta
+     otimização de CSS/JS se aplique por cima. Canvas desenha pixels, não elementos — o custo passa
+     a ser só o trabalho de desenho em si (barato, e cacheável via sprite), não a contagem de esferas. */
+  #worldCanvas{position:fixed;inset:0;width:100%;height:100%;cursor:grab;touch-action:none;z-index:1}
+  #worldCanvas.panning{cursor:grabbing} #worldCanvas.adding{cursor:crosshair} #worldCanvas.areaing{cursor:crosshair}
+  /* segunda barra (só Mestre) com as ferramentas de edição — cheia de controles (formato/cores),
+     por isso ganhou linha própria embaixo do topbar em vez de disputar espaço com ele: o .topbar
+     normal é altura fixa e não quebra linha, então essa fileira de controles empurrava o menu de
+     conta pra fora da tela. Aqui pode quebrar (flex-wrap) e crescer em altura à vontade. */
+  .arvore-toolbar{height:auto;min-height:52px;flex-wrap:wrap;row-gap:8px;padding:8px 18px;z-index:19;top:52px}
+  .arvore-toolbar .tools{flex-wrap:wrap}
+  /* embutida dentro da mesa (iframe): esconde só a barra de navegação (marca/voltar/conta) —
+     a mesa por fora já tem a dela. A barra de ferramentas de edição (.arvore-toolbar) NÃO é
+     navegação, continua funcionando normalmente pro Mestre — só sobe pro topo mesmo (top:0),
+     já que a barra de navegação que ela ficava colada embaixo (52px) sumiu. O "top:52px" acima
+     é regra de classe (não inline) só pra essa media query poder vencer no modo embutido. */
+  body.embedded .topbar:not(.arvore-toolbar){display:none}
+  body.embedded .arvore-toolbar{top:0}
+  /* botão de voltar embutido: pro Mestre mora dentro da própria .arvore-toolbar (ver .toolbar-back
+     abaixo); pro jogador, que não tem essa barra (é gm-only), flutua sobre o canvas mesmo. */
+  .toolbar-back{display:none}
+  body.embedded .toolbar-back{display:inline-flex;align-items:center;gap:6px;height:32px;
+    padding:0 12px 0 10px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid var(--line2);
+    color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+    text-transform:uppercase;cursor:pointer}
+  body.embedded .toolbar-back:hover{color:var(--ink);background:rgba(255,255,255,.1)}
+  body.embedded .toolbar-back svg{width:13px;height:13px}
+  .embed-back{display:none}
+  body.embedded .embed-back{display:flex;position:fixed;left:12px;top:12px;z-index:30;
+    align-items:center;gap:7px;height:38px;padding:0 14px 0 12px;border-radius:11px;
+    background:rgba(18,22,32,.9);border:1px solid var(--line2);color:var(--ink-dim);
+    font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+  body.embedded.is-gm .embed-back{display:none}
+  .embed-back:hover{color:var(--ink);background:rgba(255,255,255,.08)}
+  .embed-back svg{width:13px;height:13px}
+  /* esferas/conexões, halo, textura giratória, rótulos, pulso de seleção/conexão e flash de
+     desbloqueio agora são tudo desenhado no #worldCanvas (ver arvore.js: drawWorld/drawNode/
+     drawEdge) — não existe mais CSS pra isso, é tudo parâmetro de desenho no JS. #rings/#gridPolar/
+     #snapMark continuam SVG puro (decoração/grade, baixa contagem de elementos, sem motivo pra
+     mudar) — mantidos abaixo exatamente como antes. */
+  #rings,#gridPolar{will-change:transform;transform-box:view-box;transform-origin:0 0}
   /* seleção por área (retângulo de arrasto, tela) */
   #marquee{position:fixed;z-index:32;display:none;border:1.5px dashed var(--brass);background:rgba(227,192,113,.08);pointer-events:none}
-  svg#grid.areaing{cursor:crosshair}
   @keyframes selpulse{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:.2;transform:scale(1.15)}}
   @keyframes spin{to{transform:rotate(360deg)}}
-  @keyframes edgepulse{0%,100%{opacity:.78}50%{opacity:1}}
-  /* fios cristalinos — --edgec é o RGB customizável (aplicado via JS). por padrão a linha fica
-     apagada/opaca (fria); só quando as DUAS esferas que ela liga estão "Ativada" (classe .on)
-     ela ganha cor viva, glow e um pulsar leve — assim dá pra ver de relance quais caminhos do
-     desenho estão "ligados" de ponta a ponta.
-     nota de desempenho: mix-blend-mode + filter duplo em várias linhas/anéis ao mesmo tempo é
-     um dos jeitos mais caros de pintar SVG (o navegador não consegue usar os atalhos de GPU
-     normais) — por isso ficou só com UM drop-shadow e sem blend-mode; a cor em si já tem alfa
-     alto o bastante pra continuar viva sem precisar do blend. */
-  .edge{fill:none;stroke:rgba(var(--edgec,214,240,255),.3);stroke-width:1.4}
-  .edge.on{stroke:rgba(var(--edgec,214,240,255),.95);stroke-width:2;
-    filter:drop-shadow(0 0 5px rgba(var(--edgec,214,240,255),.75));
-    animation:edgepulse 2.6s ease-in-out infinite}
   /* anéis ornamentados do Crystarium — --ringc é o RGB customizável (aplicado via JS), com um
      lilás-azulado como padrão antes disso rodar. */
-  #rings{pointer-events:none;will-change:transform}
+  #rings{pointer-events:none}
   .ring{fill:none;stroke:rgba(var(--ringc,200,196,255),.6);stroke-width:1;
     filter:drop-shadow(0 0 6px rgba(var(--ringc,200,196,255),.6))}
   .ringTick{fill:none;stroke:rgba(var(--ringc,200,196,255),.75);
     filter:drop-shadow(0 0 7px rgba(var(--ringc,200,196,255),.65))}
   .ringspin{transform-origin:0 0;animation:spin 110s linear infinite}
   .ringspin.rev{animation-duration:160s;animation-direction:reverse}
-  @media (prefers-reduced-motion:reduce){.beacon,.sel,.rim,.ringspin,.edge.on{animation:none!important}}
-  /* enquanto o usuário está ativamente arrastando (pan/mover esfera/zoom por roda do mouse), pausa
-     as animações decorativas — elas são invisíveis durante o arrasto mesmo, e assim o quadro
-     inteiro fica livre pra responder ao gesto sem competir por tempo de repaint */
-  body.interacting .ringspin,body.interacting .edge.on{animation-play-state:paused}
+  @media (prefers-reduced-motion:reduce){.ringspin{animation:none!important}}
+  /* acessibilidade por teclado do canvas: um único proxy focável (não dá pra ter um elemento real
+     de DOM por esfera sem reintroduzir o mesmo teto de desempenho que motivou trocar pra canvas) —
+     Tab alcança a árvore uma vez, setas navegam entre esferas, Enter/Espaço ativa. Escondido de
+     forma acessível (não display:none, que também esconderia de leitores de tela). */
+  .visually-hidden{position:fixed;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;padding:0;margin:-1px}
 
   /* painel do editor (sólido, não faz parte do "visual da árvore") */
-  .epanel{position:fixed;top:64px;right:12px;width:340px;max-width:calc(100vw - 24px);max-height:calc(100vh - 84px);z-index:35;
+  /* --toolbar-bottom é medido em JS (updateEpanelOffset) a partir da altura real da
+     .arvore-toolbar, que pode quebrar em 2-3 linhas — um valor fixo aqui deixava o painel
+     cobrindo a barra de ferramentas sempre que ela quebrava linha */
+  .epanel{position:fixed;top:var(--toolbar-bottom,64px);right:12px;width:340px;max-width:calc(100vw - 24px);max-height:calc(100vh - var(--toolbar-bottom,64px) - 20px);z-index:35;
     border-radius:18px;overflow:hidden;display:none;flex-direction:column;background:rgba(18,22,32,.98);border:1px solid var(--line2);box-shadow:0 18px 50px rgba(0,0,0,.5)}
   .epanel.open{display:flex}
   .epanel .hd{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
@@ -120,16 +126,31 @@
   .zoom{display:flex;border-radius:11px;overflow:hidden;background:rgba(18,22,32,.9);border:1px solid var(--line2)}
   .zoom button{background:transparent;border:0;color:var(--ink-dim);font-family:var(--mono);font-size:16px;width:40px;height:38px;cursor:pointer}
   .zoom button:hover{color:var(--ink);background:rgba(255,255,255,.08)}
-  .count{position:fixed;right:12px;bottom:14px;z-index:30;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .count{position:fixed;right:12px;bottom:14px;left:12px;z-index:30;font-family:var(--mono);font-size:11px;color:var(--ink-faint);
+    text-align:right;white-space:pre-wrap;overflow-wrap:break-word;pointer-events:none}
+  .count.ok{color:#7fd48a}
+  .count.err{color:var(--escarlate,#e2645a)}
+  /* aparece por cima de tudo (inclusive dentro do iframe embutido na mesa) quando o boot falha —
+     ver showBootError() no script */
+  .boot-error-banner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:50;
+    display:flex;flex-direction:column;align-items:center;gap:14px;max-width:min(420px,calc(100vw - 32px));
+    text-align:center;background:rgba(18,22,32,.97);border:1px solid var(--escarlate,#e2645a);border-radius:16px;
+    padding:24px 26px;color:var(--ink);font-family:var(--serif);font-size:14px;line-height:1.5;
+    box-shadow:0 18px 50px rgba(0,0,0,.5)}
   .tools{display:flex;gap:5px;align-items:center;padding:5px;border-radius:12px;background:rgba(18,22,32,.9);border:1px solid var(--line2)}
   .tool{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);background:transparent;border:1px solid transparent;border-radius:9px;padding:8px 11px;cursor:pointer}
   .tool.on{color:var(--bone);border-color:var(--brass);background:rgba(227,192,113,.12)}
 
-  /* grade de encaixe — só aparece durante colocar/mover esferas (edição do GM) */
+  /* grade de encaixe — só aparece durante colocar/mover esferas (edição do GM). Cor dourada de
+     propósito, BEM diferente do lilás dos anéis decorativos (#rings) — os dois usavam tons quase
+     idênticos com opacidade baixíssima (.07/.2), então trocar o formato (octógono/hexágono/linear)
+     era fácil de confundir com "não mudou nada", já que os anéis decorativos são SEMPRE circulares
+     (decoração pura, não é a grade de encaixe de verdade) e a grade real ficava praticamente
+     invisível ao lado deles. Opacidade bem mais alta agora pra ficar óbvio que é outra coisa. */
   #gridPolar{display:none;pointer-events:none;will-change:transform}
   #gridPolar.show{display:block}
-  .gpring{fill:none;stroke:rgba(200,196,255,.07)}
-  .gpdot{fill:rgba(200,196,255,.2)}
+  .gpring{fill:none;stroke:rgba(227,192,113,.3)}
+  .gpdot{fill:rgba(227,192,113,.75)}
   #snapMark{display:none;pointer-events:none}
   #snapMark.show{display:block}
   #snapMark .ring1{fill:none;stroke:var(--brass);stroke-width:1.4;opacity:.85;animation:selpulse 1.1s ease-in-out infinite}
@@ -148,27 +169,68 @@
   .via-add-btn:hover{background:rgba(227,192,113,.12)}
 </style>
 </head>
-<body>
+<body class="arvore-page">
+<script>
+// esconder o topbar padrão no modo embutido NÃO PODE depender do módulo grande lá embaixo terminar
+// de carregar (import de db.js/ui.js, sessão, etc.) — se qualquer coisa nessa cadeia falhar ou
+// travar, essa classe nunca era adicionada e o topbar da árvore ficava por cima do topbar da mesa
+// (a "barra dupla"/"menu dentro da árvore"). Um script clássico (não-module) rodando aqui, síncrono,
+// antes de qualquer outra coisa, resolve isso incondicionalmente — não depende de rede nem de import.
+try { if (new URLSearchParams(location.search).get('embed') === '1') document.body.classList.add('embedded'); } catch (e) {}
+</script>
 <div id="fallback"></div>
 <canvas id="fx"></canvas>
 <div id="marquee"></div>
 <svg id="grid"><defs id="defs">
   <radialGradient id="orb-maq" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#7ee6dc" stop-opacity="0.02"/><stop offset="58%" stop-color="#7ee6dc" stop-opacity="0.06"/><stop offset="82%" stop-color="#7ee6dc" stop-opacity="0.20"/><stop offset="93%" stop-color="#c8fff8" stop-opacity="0.65"/><stop offset="100%" stop-color="#7ee6dc" stop-opacity="0"/></radialGradient>
-  <radialGradient id="bodyGrad" cx="42%" cy="36%" r="64%"><stop offset="0%" stop-color="#15131f"/><stop offset="55%" stop-color="#0b0914"/><stop offset="100%" stop-color="#050308"/></radialGradient>
-  <g id="dotSphere" fill="currentColor"></g>
-</defs><g id="rings"><g id="ringsInner"></g></g><g id="gridPolar"><g id="gridPolarInner"></g></g><g id="snapMark"><circle class="ring1" r="16"></circle><circle class="dot1" r="3"></circle></g><g id="world"></g></svg>
+</defs><g id="rings"><g id="ringsInner"></g></g><g id="gridPolar"><g id="gridPolarInner"></g></g><g id="snapMark"><circle class="ring1" r="16"></circle><circle class="dot1" r="3"></circle></g></svg>
+<!-- esferas e conexões: canvas 2D (ver comentário no <style> e em arvore.js) -->
+<canvas id="worldCanvas"></canvas>
+<!-- acessibilidade por teclado do canvas (ver arvore.js: seção "teclado (canvas)") -->
+<button type="button" id="tree-focus-proxy" class="visually-hidden" aria-describedby="tree-focus-help"></button>
+<p id="tree-focus-help" class="visually-hidden">Use as setas do teclado para navegar entre as esferas da árvore; Enter ou Espaço abre a esfera focada.</p>
+<div id="tree-live" class="visually-hidden" aria-live="polite"></div>
 
 <div class="topbar">
+  <a class="topbar-brand" href="app.html"><span class="mark">◈</span>VITALITY</a>
   <a class="iconbtn" id="back" href="app.html" title="Voltar" style="text-decoration:none"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></a>
   <div class="title" id="tree-name" style="font-size:14px">…</div>
   <div class="spacer"></div>
-  <div class="tools gm-only" id="tools">
-    <button class="tool on" data-tool="select" onclick="setTool('select')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3l6 16 2.5-6.5L20 10 5 3Z"/></svg></span>Selecionar</button>
-    <button class="tool" data-tool="add" onclick="setTool('add')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>Esfera</button>
-    <button class="tool" data-tool="link" onclick="setTool('link')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15l6-6"/><path d="M14 4.5 16 2.5a3.5 3.5 0 0 1 5 5L19 9.5"/><path d="M10 14.5 8 16.5a3.5 3.5 0 0 1-5-5L5 9.5"/></svg></span>Conectar</button>
-    <button class="tool" data-tool="area" onclick="setTool('area')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2.5" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1.5"/></svg></span>Área</button>
+  <div class="nav-user" id="nav-user">
+    <button type="button" class="chip" id="nav-user-btn" aria-haspopup="menu" aria-expanded="false" onclick="toggleUserMenu()">
+      <span class="av" id="nav-av">?</span><b id="who">…</b><span style="color:var(--ink-faint)">▾</span>
+    </button>
+    <div class="drop glass" role="menu">
+      <button role="menuitem" onclick="openProfile()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.8-4 3.6-6.5 7.5-6.5s6.7 2.5 7.5 6.5"/></svg></span>Meu perfil</button>
+      <button role="menuitem" onclick="openSettings()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M20.5 12h-2.6M6.1 12H3.5M17.7 6.3l-1.8 1.8M8.1 15.9l-1.8 1.8M17.7 17.7l-1.8-1.8M8.1 8.1 6.3 6.3"/></svg></span>Configurações</button>
+      <button role="menuitem" onclick="openHelp()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a2.8 2.8 0 1 1 4 2.6c-.9.5-1.7 1-1.7 2.1"/><circle cx="12" cy="17.2" r=".4" fill="currentColor" stroke="none"/></svg></span>Ajuda ou suporte</button>
+      <button role="menuitem" id="theme-menu-item" onclick="doToggleTheme()"><span class="ic" id="theme-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg></span><span id="theme-menu-label">Tema</span></button>
+      <div class="divider"></div>
+      <button role="menuitem" onclick="logout()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>Sair</button>
+    </div>
   </div>
-  <div class="tools gm-only" title="Como as esferas se encaixam (não muda cor nenhuma)" style="gap:8px">
+</div>
+
+<button type="button" class="embed-back" onclick="goBackEmbedded()" title="Voltar às árvores">
+  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>
+  Voltar às árvores
+</button>
+
+<!-- ferramentas de edição da árvore (Mestre) numa barra própria embaixo do topbar — misturadas
+     ali em cima, essa fileira cheia de controles (formato/cores) empurrava o menu de conta pra
+     fora da tela, porque o topbar não tem overflow nem quebra de linha -->
+<div class="topbar arvore-toolbar gm-only" id="tools">
+  <button type="button" class="toolbar-back" onclick="goBackEmbedded()" title="Voltar às árvores">
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>
+    Voltar
+  </button>
+  <div class="tools" role="radiogroup" aria-label="Ferramenta do editor">
+    <button class="tool on" role="radio" aria-checked="true" data-tool="select" onclick="setTool('select')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3l6 16 2.5-6.5L20 10 5 3Z"/></svg></span>Selecionar</button>
+    <button class="tool" role="radio" aria-checked="false" data-tool="add" onclick="setTool('add')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>Esfera</button>
+    <button class="tool" role="radio" aria-checked="false" data-tool="link" onclick="setTool('link')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15l6-6"/><path d="M14 4.5 16 2.5a3.5 3.5 0 0 1 5 5L19 9.5"/><path d="M10 14.5 8 16.5a3.5 3.5 0 0 1-5-5L5 9.5"/></svg></span>Conectar</button>
+    <button class="tool" role="radio" aria-checked="false" data-tool="area" onclick="setTool('area')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2.5" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1.5"/></svg></span>Área</button>
+  </div>
+  <div class="tools" title="Como as esferas se encaixam (não muda cor nenhuma)" style="gap:8px">
     <span style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.06em">◈ Formato</span>
     <select id="shape-select" onchange="changeGridShape(this.value)"
       style="background:rgba(255,255,255,.06);border:1px solid var(--line2);border-radius:7px;color:var(--ink);font-family:var(--mono);font-size:11px;padding:6px 8px;cursor:pointer">
@@ -177,13 +239,13 @@
       <option value="linear">Linear (quadrado)</option>
     </select>
   </div>
-  <div class="tools gm-only" title="Cor de fundo da árvore" style="gap:8px">
+  <div class="tools" title="Cor de fundo da árvore" style="gap:8px">
     <span style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.06em;display:inline-flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2s-.6-1.6-.6-2.4c0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8Z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor" stroke="none"/><circle cx="11" cy="7.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1" fill="currentColor" stroke="none"/></svg>Cor de fundo</span>
     <button type="button" class="color-swatch sm" style="--sw:#1b1536" onclick="openColorPicker(this, document.getElementById('bg-color').value, (v)=>{ document.getElementById('bg-color').value = v; previewBg(v); })"></button>
     <input type="hidden" id="bg-color" value="#1b1536">
     <button class="tool" onclick="saveBg()" style="border-color:var(--brass);color:var(--bone)">Aplicar</button>
   </div>
-  <div class="tools gm-only" title="Cor das linhas de conexão quando ambas as esferas estão Ativadas" style="gap:8px">
+  <div class="tools" title="Cor das linhas de conexão quando ambas as esferas estão Ativadas" style="gap:8px">
     <span style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.06em;display:inline-flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 19 19 4"/><circle cx="4" cy="19" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="4" r="1.6" fill="currentColor" stroke="none"/></svg>Cor das linhas</span>
     <button type="button" class="color-swatch sm" style="--sw:#d6f0ff" onclick="openColorPicker(this, document.getElementById('edge-color').value, (v)=>{ document.getElementById('edge-color').value = v; previewEdgeColor(v); })"></button>
     <input type="hidden" id="edge-color" value="#d6f0ff">
@@ -198,11 +260,8 @@
     <div class="fld"><label>Tipo</label><div class="chips" id="e-type">
       <div class="chip" data-v="passive" onclick="patch('kind','passive')">Passiva</div>
       <div class="chip" data-v="active" onclick="patch('kind','active')">Ativa</div>
-      <div class="chip" data-v="core" onclick="patch('kind','core')">Núcleo</div></div></div>
-    <div class="fld" id="e-start-fld" style="display:none">
-      <label>Esfera inicial</label>
-      <button type="button" class="btn" id="e-start-btn" style="width:100%" onclick="setAsStart()"></button>
-      <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:8px 0 0">Só pode existir uma por árvore — é o ponto de partida, já desbloqueado de graça pra todo jogador.</p>
+      <div class="chip" data-v="core" onclick="patch('kind','core')">Núcleo</div></div>
+      <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:8px 0 0">O Núcleo é a esfera inicial — só pode existir uma por árvore (escolher aqui troca de qual), já desbloqueada de graça pra todo jogador.</p>
     </div>
     <div class="fld"><label>Tamanho</label><div class="chips" id="e-size">
       <div class="chip" data-s="small" onclick="patch('size','small')">Pequena</div>
@@ -264,8 +323,13 @@
 </div>
 
 <div class="hud"><div class="zoom"><button onclick="zoom(1.2)">+</button><button onclick="zoom(.83)">−</button><button onclick="resetView()" style="display:inline-flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></button></div>
-  <div class="tools gm-only" title="Anéis giratórios do Núcleo" style="gap:6px">
+  <!-- ligar/desligar os anéis é preferência puramente visual e local (localStorage, sem efeito
+       nenhum de jogo) — por isso fica fora do gm-only; só a EDIÇÃO da cor/opacidade deles (que
+       persiste no banco e muda o que todo mundo vê) continua exclusiva do Mestre, no div abaixo -->
+  <div class="tools" title="Anéis giratórios do Núcleo" style="gap:6px">
     <button class="tool on" id="rings-toggle" onclick="toggleRings()" aria-pressed="true"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/></svg></span>Anéis</button>
+  </div>
+  <div class="tools gm-only" title="Cor dos anéis" style="gap:6px">
     <button type="button" class="color-swatch sm" title="Cor dos anéis" style="--sw:#c6d2ff" onclick="openColorPicker(this, document.getElementById('ring-color').value, (v)=>{ document.getElementById('ring-color').value = v; previewRingColor(v); })"></button>
     <input type="hidden" id="ring-color" value="#c6d2ff">
     <input type="range" id="ring-opacity" min="0.1" max="1" step="0.05" value="1" oninput="previewRingOpacity(this.value)" title="Opacidade dos anéis"
@@ -276,913 +340,6 @@
 </div>
 <div class="count" id="count"></div>
 
-<script type="module">
-import * as db from './lib/db.js?v=24';
-import { mountHelp } from './lib/ui.js?v=3';
-"use strict";
-mountHelp('arvore', { bottom: '52px' });
-const $ = (i) => document.getElementById(i);
-const esc = (s) => (s == null ? '' : String(s)).replace(/[&<>]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
-// ícones de linha (svgrepo-style, 24x24, stroke) — sem emoji em nenhuma opção de UI. O "✦" do
-// selo de custo desenhado NA esfera do canvas fica de fora de propósito: é conteúdo visual do
-// jogo (tema da árvore), não um ícone de interface.
-const ic = (paths, attrs = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${attrs}>${paths}</svg>`;
-// modal de confirmação estilizado (mesmo padrão visual do guia) — substitui confirm() nativo
-function confirmModal({ title, desc, confirmLabel = 'Confirmar', danger = true } = {}) {
-  return new Promise((resolve) => {
-    const trigger = document.activeElement;
-    const w = document.createElement('div');
-    w.className = 'ui-modal';
-    w.setAttribute('role', 'alertdialog');
-    w.setAttribute('aria-modal', 'true');
-    w.setAttribute('aria-labelledby', 'confirm-title');
-    w.innerHTML = `<div class="box guide">
-      <div class="ghead"><h3 id="confirm-title">${esc(title)}</h3><button class="x" aria-label="Fechar">×</button></div>
-      <p class="gintro">${esc(desc)}</p>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
-        <button class="btn auto" id="cm-cancel">Cancelar</button>
-        <button class="btn auto ${danger ? 'danger' : 'go'}" id="cm-ok">${esc(confirmLabel)}</button>
-      </div>
-    </div>`;
-    const finish = (result) => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
-    const onEsc = (e) => { if (e.key === 'Escape') finish(false); };
-    w.addEventListener('click', (e) => { if (e.target === w) finish(false); });
-    w.querySelector('.x').onclick = () => finish(false);
-    w.querySelector('#cm-cancel').onclick = () => finish(false);
-    w.querySelector('#cm-ok').onclick = () => finish(true);
-    document.addEventListener('keydown', onEsc);
-    document.body.appendChild(w);
-    w.querySelector('#cm-ok').focus();
-  });
-}
-// seletor de cor próprio — um color picker de verdade (quadrado de saturação/brilho + barra de
-// matiz arrastáveis + hex + atalhos de paleta), substitui <input type="color"> nativo do navegador.
-// openColorPicker(botãoGatilho, corAtual, (novaCor)=>...) — chama onPick a cada mudança (igual o
-// oninput do color picker nativo), pro chamador poder ter preview ao vivo se quiser.
-const COLOR_PRESETS = ['#f2585e','#fb923c','#f5b93d','#eab308','#84cc16','#22c55e','#3ecf7e','#10b981',
-  '#14b8a6','#35c6d4','#18b5c6','#0ea5e9','#3b82f6','#6366f1','#8b5cf6','#a855f7',
-  '#d946ef','#ec4899','#e9edf1','#93a0ab','#5c6771','#7ee6dc'];
-function hexToHsv(hex) {
-  hex = (hex || '#7ee6dc').replace('#', '');
-  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
-  const r = parseInt(hex.slice(0, 2), 16) / 255 || 0, g = parseInt(hex.slice(2, 4), 16) / 255 || 0, b = parseInt(hex.slice(4, 6), 16) / 255 || 0;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-  let h = 0;
-  if (d !== 0) {
-    if (max === r) h = ((g - b) / d) % 6;
-    else if (max === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    h *= 60; if (h < 0) h += 360;
-  }
-  return { h, s: max === 0 ? 0 : d / max, v: max };
-}
-function hsvToHex(h, s, v) {
-  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
-  let r, g, b;
-  if (h < 60) [r, g, b] = [c, x, 0]; else if (h < 120) [r, g, b] = [x, c, 0]; else if (h < 180) [r, g, b] = [0, c, x];
-  else if (h < 240) [r, g, b] = [0, x, c]; else if (h < 300) [r, g, b] = [x, 0, c]; else [r, g, b] = [c, 0, x];
-  const toHex = (n) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
-  return '#' + toHex(r) + toHex(g) + toHex(b);
-}
-let _colorPop = null;
-function closeColorPicker() {
-  if (!_colorPop) return;
-  _colorPop.remove(); _colorPop = null;
-  document.removeEventListener('mousedown', _cpOutside, true);
-  document.removeEventListener('keydown', _cpEsc);
-}
-function _cpOutside(e) { if (_colorPop && !_colorPop.contains(e.target)) closeColorPicker(); }
-function _cpEsc(e) { if (e.key === 'Escape') closeColorPicker(); }
-window.openColorPicker = (trigger, current, onPick) => {
-  closeColorPicker();
-  const state = hexToHsv(current);
-  const pop = document.createElement('div');
-  pop.className = 'color-pop';
-  pop.innerHTML = `
-    <div class="cp-sv" id="cp-sv"><div class="cp-sv-cursor" id="cp-sv-cursor"></div></div>
-    <div class="cp-hue" id="cp-hue"><div class="cp-hue-cursor" id="cp-hue-cursor"></div></div>
-    <div class="cp-bottom">
-      <span class="cp-preview" id="cp-preview"></span>
-      <input type="text" class="cp-hex" id="cp-hex" maxlength="7">
-    </div>
-    <div class="cp-grid">${COLOR_PRESETS.map((c) => `<button type="button" class="cp-swatch" style="--sw:${c}" data-c="${c}" title="${c}"></button>`).join('')}</div>`;
-  document.body.appendChild(pop);
-
-  const svEl = pop.querySelector('#cp-sv'), svCur = pop.querySelector('#cp-sv-cursor');
-  const hueEl = pop.querySelector('#cp-hue'), hueCur = pop.querySelector('#cp-hue-cursor');
-  const preview = pop.querySelector('#cp-preview'), hexInput = pop.querySelector('#cp-hex');
-
-  function render() {
-    svEl.style.setProperty('--h', state.h);
-    svCur.style.left = (state.s * svEl.clientWidth) + 'px';
-    svCur.style.top = ((1 - state.v) * svEl.clientHeight) + 'px';
-    hueCur.style.left = (state.h / 360 * hueEl.clientWidth) + 'px';
-    const hex = hsvToHex(state.h, state.s, state.v);
-    preview.style.setProperty('--sw', hex);
-    hexInput.value = hex;
-    trigger.style.setProperty('--sw', hex);
-    onPick(hex);
-  }
-  function dragSV(e) {
-    const r = svEl.getBoundingClientRect();
-    state.s = Math.min(Math.max(0, e.clientX - r.left), r.width) / r.width;
-    state.v = 1 - Math.min(Math.max(0, e.clientY - r.top), r.height) / r.height;
-    render();
-  }
-  function dragHue(e) {
-    const r = hueEl.getBoundingClientRect();
-    state.h = Math.min(Math.max(0, e.clientX - r.left), r.width) / r.width * 360;
-    render();
-  }
-  svEl.addEventListener('pointerdown', (e) => {
-    svEl.setPointerCapture(e.pointerId); dragSV(e);
-    const mv = (ev) => dragSV(ev), up = () => { svEl.removeEventListener('pointermove', mv); svEl.removeEventListener('pointerup', up); };
-    svEl.addEventListener('pointermove', mv); svEl.addEventListener('pointerup', up);
-  });
-  hueEl.addEventListener('pointerdown', (e) => {
-    hueEl.setPointerCapture(e.pointerId); dragHue(e);
-    const mv = (ev) => dragHue(ev), up = () => { hueEl.removeEventListener('pointermove', mv); hueEl.removeEventListener('pointerup', up); };
-    hueEl.addEventListener('pointermove', mv); hueEl.addEventListener('pointerup', up);
-  });
-  pop.querySelectorAll('.cp-swatch').forEach((b) => {
-    b.onclick = () => { const hsv = hexToHsv(b.dataset.c); state.h = hsv.h; state.s = hsv.s; state.v = hsv.v; render(); };
-  });
-  hexInput.addEventListener('change', () => {
-    const v = hexInput.value.trim();
-    if (/^#[0-9a-fA-F]{6}$/.test(v)) { const hsv = hexToHsv(v); state.h = hsv.h; state.s = hsv.s; state.v = hsv.v; render(); }
-  });
-
-  const r = trigger.getBoundingClientRect();
-  let left = r.left, top = r.bottom + 6;
-  if (left + pop.offsetWidth > window.innerWidth - 8) left = window.innerWidth - pop.offsetWidth - 8;
-  if (top + pop.offsetHeight > window.innerHeight - 8) top = r.top - pop.offsetHeight - 6;
-  pop.style.left = Math.max(8, left) + 'px';
-  pop.style.top = Math.max(8, top) + 'px';
-  _colorPop = pop;
-  render();
-  setTimeout(() => {
-    document.addEventListener('mousedown', _cpOutside, true);
-    document.addEventListener('keydown', _cpEsc);
-  }, 0);
-};
-const ICONS = {
-  check: ic('<path d="M5 12.5l4.5 4.5L19 7"/>', 'stroke-width="1.8"'),
-  x: ic('<path d="M6 6l12 12M18 6 6 18"/>', 'stroke-width="1.8"'),
-  star: `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.6 6 .7-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.8l6-.7Z"/></svg>`,
-  starOutline: ic('<path d="M12 3.5l2.6 5.6 6 .7-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.8l6-.7Z"/>'),
-  flipV: ic('<path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/>'),
-  flipH: ic('<path d="M3 12h18M7 8 3 12l4 4M17 8l4 4-4 4"/>'),
-  rotateCw: ic('<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>'),
-  rotateCcw: ic('<path d="M4 12a8 8 0 1 1 2.3 5.6"/><path d="M4 4v5h5"/>'),
-  sparkle: ic('<path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="2.4"/>'),
-};
-const params = new URLSearchParams(location.search);
-const treeId = params.get('tree'), systemId = params.get('system');
-const showMsg = (t) => { const el = $('count'); el.textContent = t; setTimeout(() => refreshCount(), 2500); };
-
-const SVGNS = "http://www.w3.org/2000/svg";
-const world = $('grid'), G = $('world'), ringsEl = $('rings'), ringsInner = $('ringsInner');
-const gridPolarEl = $('gridPolar'), gridPolarInner = $('gridPolarInner'), snapMarkEl = $('snapMark');
-const marqueeEl = $('marquee'), batchPanelEl = $('batchpanel');
-let W = innerWidth, H = innerHeight;
-let isGM = false; // só vira true depois do boot confirmar que o usuário é dono do sistema
-// nada no editor de esfera grava sozinho mais — os campos só mudam o rascunho local (`selected`)
-// e mostram o botão Salvar; editorSnapshot guarda como a esfera estava ao abrir, pra dar pra
-// descartar (trocar de esfera ou fechar o painel com edição pendente pede confirmação).
-let editorDirty = false, editorSnapshot = null;
-let tool = 'select', selected = null, linkSrc = null, view = { x: W/2, y: H/2, s: 1 }, coreNode = null;
-let nodes = [], edges = [];
-let areaSelection = new Set();
-const byId = (i) => nodes.find((n) => n.id === i);
-const MINZOOM = 0.35;
-
-/* ---------- grade de encaixe — formato escolhido por árvore ----------
-   octógono/hexágono: polar centrada no Núcleo, anéis concêntricos divididos em ângulos
-   iguais (múltiplos de 8 ou 6), pra que caminhos que saem do centro sempre formem
-   polígonos regulares, nunca a distância desigual entre vizinhos de uma grade quadrada.
-   linear: grade quadrada simples (linhas/colunas), independente do Núcleo. */
-const RING_STEP = 48, RING_MAX = 25, LINEAR_STEP = 60;
-const SHAPE_SEGMENTS = { octagon: 8, hexagon: 6 };
-let gridShape = 'octagon';
-let ringColor = '#c6d2ff';
-let ringOpacity = 1;
-let edgeColor = '#d6f0ff';
-
-function polarSnap(x, y) {
-  const core = coreNode || nodes.find((n) => n.kind === 'core');
-  if (!core) return { x: Math.round(x), y: Math.round(y) };
-  const segs0 = SHAPE_SEGMENTS[gridShape] || 8;
-  const dx = x - core.x, dy = y - core.y;
-  const dist = Math.hypot(dx, dy);
-  const ringIndex = Math.max(1, Math.min(RING_MAX, Math.round(dist / RING_STEP)));
-  const r = ringIndex * RING_STEP, segs = segs0 * ringIndex, step = (Math.PI * 2) / segs;
-  const angle = dist < 1e-6 ? 0 : Math.atan2(dy, dx);
-  const snappedAngle = Math.round(angle / step) * step;
-  return { x: Math.round(core.x + r * Math.cos(snappedAngle)), y: Math.round(core.y + r * Math.sin(snappedAngle)) };
-}
-function linearSnap(x, y) { return { x: Math.round(x / LINEAR_STEP) * LINEAR_STEP, y: Math.round(y / LINEAR_STEP) * LINEAR_STEP }; }
-function gridSnap(x, y, isCore) {
-  if (isCore) return { x: Math.round(x), y: Math.round(y) };
-  return gridShape === 'linear' ? linearSnap(x, y) : polarSnap(x, y);
-}
-function buildGridVisual() {
-  if (gridShape === 'linear') {
-    const R = 1200; let s = '';
-    for (let x = -R; x <= R; x += LINEAR_STEP) for (let y = -R; y <= R; y += LINEAR_STEP)
-      s += `<circle class="gpdot" cx="${x}" cy="${y}" r="1.6"></circle>`;
-    gridPolarInner.innerHTML = s;
-    return;
-  }
-  const segs0 = SHAPE_SEGMENTS[gridShape] || 8; let s = '';
-  for (let i = 1; i <= RING_MAX; i++) {
-    const r = i * RING_STEP, segs = segs0 * i;
-    s += `<circle class="gpring" r="${r}"></circle>`;
-    for (let k = 0; k < segs; k++) { const a = (Math.PI * 2 * k) / segs;
-      s += `<circle class="gpdot" cx="${(r * Math.cos(a)).toFixed(2)}" cy="${(r * Math.sin(a)).toFixed(2)}" r="1.6"></circle>`; }
-  }
-  gridPolarInner.innerHTML = s;
-}
-window.changeGridShape = (v) => {
-  if (!isGM) return;
-  gridShape = v; buildGridVisual(); buildRings(); renderDupOptions();
-  db.updateSystemTree(treeId, { grid_shape: v }).catch((e) => showMsg(e.message));
-};
-let snapMarkPos = null;
-function updateSnapMarkTransform() { if (snapMarkPos) snapMarkEl.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.s}) translate(${snapMarkPos.x} ${snapMarkPos.y})`); }
-function showSnapMark(x, y) { snapMarkPos = { x, y }; snapMarkEl.classList.add('show'); updateSnapMarkTransform(); }
-function hideSnapMark() { snapMarkPos = null; snapMarkEl.classList.remove('show'); }
-
-/* ---------- Vias (afinidades) — lista livre por árvore, nasce só com "Núcleo" ----------
-   o Mestre adiciona outras manualmente (nome + cor livre), do mesmo jeito que escolhe a cor de fundo. */
-const DEFAULT_VIAS = [{ key: 'neutral', name: 'Núcleo', color: '#e3c071' }];
-let vias = DEFAULT_VIAS.map((v) => ({ ...v }));
-/* ---------- atributos do sistema (pra ligar modificador de esfera a um status real) e
-   progresso do jogador (esferas desbloqueadas + pontos disponíveis) ---------- */
-let stats = [];
-let unlockedIds = new Set();
-let myPoints = 0;
-const statById = (id) => stats.find((s) => s.id === id);
-const viaByKey = (key) => vias.find((v) => v.key === key) || vias[0] || DEFAULT_VIAS[0];
-const genViaKey = () => 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-function saveVias() { return db.updateSystemTree(treeId, { vias }); }
-function renderViaChips() {
-  $('e-fac').innerHTML = vias.map((v) =>
-    `<div class="chip" data-f="${v.key}" style="--vc:${v.color}" onclick="patch('fac','${v.key}')">${esc(v.name)}</div>`).join('');
-  if (selected) $('e-fac').querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c.dataset.f === selected.fac));
-  // mesmos chips, no painel de edição em lote — aplica a via pra toda a seleção de área de uma vez
-  $('batch-fac').innerHTML = vias.map((v) =>
-    `<div class="chip" style="--vc:${v.color}" onclick="batchSet('fac','${v.key}')">${esc(v.name)}</div>`).join('');
-}
-function renderViaManager() {
-  $('via-edit').innerHTML = vias.map((v) => `
-    <div class="via-row">
-      <button type="button" class="color-swatch sm" title="Cor da via" style="--sw:${v.color}" onclick="openColorPicker(this, '${v.color}', (c)=>onViaFieldChange('${v.key}','color',c))"></button>
-      <input type="text" value="${esc(v.name)}" maxlength="24" oninput="onViaFieldChange('${v.key}','name',this.value)">
-      <button type="button" class="btn sm go" id="via-save-${v.key}" style="display:none" onclick="saveViaRow('${v.key}')" title="Salvar"><span class="ic">${ICONS.check}</span></button>
-      <button type="button" class="via-del" onclick="deleteVia('${v.key}')" title="Excluir via" aria-label="Excluir via"><span class="ic">${ICONS.x}</span></button>
-    </div>`).join('') + `
-    <div class="via-row">
-      <button type="button" class="color-swatch sm" title="Cor da nova via" style="--sw:#7ee6dc" onclick="openColorPicker(this, document.getElementById('via-new-color').value, (v)=>{ document.getElementById('via-new-color').value = v; })"></button>
-      <input type="hidden" id="via-new-color" value="#7ee6dc">
-      <input type="text" id="via-new-name" placeholder="Nova via (ex.: Sangue)" maxlength="24">
-      <button type="button" class="via-add-btn" onclick="addVia()" title="Adicionar via" aria-label="Adicionar via">+</button>
-    </div>`;
-}
-window.toggleViaEdit = () => { if (!isGM) return; const el = $('via-edit'); el.style.display = el.style.display === 'none' ? '' : 'none'; };
-// edita localmente (com pré-visualização imediata na árvore) — só grava no banco quando a linha
-// da via é salva explicitamente, igual ao resto do editor agora.
-window.onViaFieldChange = (key, field, value) => {
-  if (!isGM) return; const v = viaByKey(key); if (!v) return;
-  v[field] = field === 'name' ? value : value; // nome só normaliza (trim) ao salvar, não durante a digitação
-  renderViaChips(); if (field === 'color') render();
-  const b = $('via-save-' + key); if (b) b.style.display = '';
-};
-window.saveViaRow = (key) => {
-  if (!isGM) return; const v = viaByKey(key); if (!v) return;
-  v.name = (v.name || '').trim() || v.name;
-  const btn = $('via-save-' + key); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
-  saveVias().then(() => { renderViaChips(); if (btn) btn.style.display = 'none'; showMsg('Via salva.', 'ok'); })
-    .catch((e) => showMsg(e.message))
-    .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
-};
-window.addVia = () => {
-  if (!isGM) return;
-  const name = ($('via-new-name').value || '').trim() || 'Nova via';
-  const color = $('via-new-color').value || '#7ee6dc';
-  vias.push({ key: genViaKey(), name, color });
-  renderViaChips(); renderViaManager(); saveVias().catch((e) => showMsg(e.message));
-};
-window.deleteVia = (key) => {
-  if (!isGM) return;
-  if (vias.length <= 1) { showMsg('Precisa sobrar pelo menos uma Via.'); return; }
-  if (nodes.some((n) => n.fac === key)) { showMsg('Essa via está em uso — troque a via das esferas antes de excluir.'); return; }
-  vias = vias.filter((v) => v.key !== key);
-  renderViaChips(); renderViaManager(); saveVias().catch((e) => showMsg(e.message));
-};
-
-/* ---------- tamanho da esfera ---------- */
-const SIZE_SCALE = { small: 1, medium: 1.4, large: 1.8 };
-
-/* ---------- boot ---------- */
-(async () => {
-  if (!treeId) { location.href = 'app.html'; return; }
-  $('back').href = systemId ? `sistema.html?id=${systemId}` : 'app.html';
-  const session = await db.requireSession();
-  if (!session) return;
-  try {
-    const tree = await db.getSystemTree(treeId);
-    try {
-      const sys = await db.getSystem(tree.system_id);
-      isGM = !!(sys && sys.owner_id === session.user.id);
-    } catch (_) { isGM = false; } // falhou em confirmar posse — trata como jogador (falha segura)
-    document.body.classList.toggle('is-gm', isGM);
-    $('tree-name').innerHTML = esc(tree?.name || 'Árvore') + '<small>' + (isGM ? 'EDITOR DA ÁRVORE DE ESFERAS' : 'ÁRVORE DE ESFERAS') + '</small>';
-    applyBg(tree?.bg_color || '#1b1536');
-    $('bg-color').value = tree?.bg_color || '#1b1536';
-    gridShape = tree?.grid_shape || 'octagon'; $('shape-select').value = gridShape;
-    ringColor = tree?.ring_color || '#c6d2ff'; $('ring-color').value = ringColor;
-    ringOpacity = tree?.ring_opacity ?? 1; $('ring-opacity').value = ringOpacity;
-    edgeColor = tree?.edge_color || '#d6f0ff'; $('edge-color').value = edgeColor;
-    vias = (tree?.vias && tree.vias.length) ? tree.vias.map((v) => ({ ...v })) : DEFAULT_VIAS.map((v) => ({ ...v }));
-    renderViaChips(); renderViaManager();
-    try { stats = await db.listStats(tree.system_id); } catch (_) { stats = []; } // sem atributos cadastrados ainda — ok
-    const data = await db.loadSystemTree(treeId);
-    nodes = data.nodes.map((n) => ({ ...n }));
-    edges = data.edges.map((e) => ({ id: e.id, a: e.a, b: e.b }));
-    if (!nodes.length && isGM) { // jogador nunca cria dados — só o dono pode inicializar a árvore
-      const core = await db.insertTreeNode(treeId, { name: 'Núcleo', kind: 'core', fac: 'neutral', cost: 0, descr: 'A origem da árvore.', x: 0, y: 0, is_start: true });
-      nodes.push({ ...core });
-    }
-    if (!isGM) { // progresso de desbloqueio só existe pro jogador
-      try { unlockedIds = await db.getMyUnlocks(treeId); myPoints = await db.getMyProgress(treeId); }
-      catch (_) { unlockedIds = new Set(); myPoints = 0; }
-    }
-  } catch (e) { $('tree-name').textContent = 'Erro: ' + e.message; return; }
-  fxResize(); buildDotSphere(); buildRings(); applyRingColor(ringColor); applyRingOpacity(ringOpacity); applyEdgeColor(edgeColor); buildGridVisual(); renderDupOptions(); applyRingsToggle(); applyParticlesToggle(); render(); updateCoreAnchor(); applyView(); requestAnimationFrame(tick);
-})();
-
-/* ---------- cor de fundo (roda de cores) ---------- */
-function hexToRgb(hex) {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
-  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [27, 21, 54];
-}
-function applyBg(color) {
-  const [r, g, b] = hexToRgb(color);
-  // a cor escolhida vira o fundo INTEIRO da árvore (glow + base sólida + vinheta) — mora só aqui,
-  // no #fallback, independente dos anéis (que podem estar ligados ou desligados).
-  // usa rgba() (não hex+alfa) de propósito — mais robusto entre navegadores.
-  $('fallback').style.background =
-    `radial-gradient(900px 680px at 50% 40%, rgba(${r},${g},${b},.4), transparent 62%),` +
-    `radial-gradient(1500px 1100px at 50% 34%, rgba(255,255,255,.12), transparent 55%),` +
-    `radial-gradient(1700px 1400px at 50% 125%, rgba(0,0,0,.6), transparent 72%),` +
-    `${color}`;
-  // a poeira cósmica usa mistura aditiva ("lighter"), que some em fundos claros — adapta a cor/mistura
-  // das partículas pra sempre contrastar com o fundo escolhido, escuro ou claro.
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  if (lum > 0.6) { partRGB = '40,32,58'; partBlend = 'multiply'; }
-  else { partRGB = '206,196,255'; partBlend = 'lighter'; }
-}
-window.previewBg = (c) => { if (isGM) applyBg(c); };   // pré-visualiza ao mexer no seletor
-window.saveBg = () => { if (!isGM) return; const c = $('bg-color').value; applyBg(c);
-  db.updateSystemTree(treeId, { bg_color: c }).then(() => showMsg('Cor de fundo salva.')).catch((e) => showMsg(e.message)); };
-
-/* ---------- partículas flutuantes (tela fixa, independente do pan/zoom da árvore) ----------
-   ficam em coordenadas de TELA (sx,sy), não de mundo — são atmosfera decorativa, não fazem
-   parte do mapa de esferas. Guardar em world-space e reprojetar por view.s (jeito antigo) fazia
-   as partículas "recém-nascidas" herdarem um raio de mundo cada vez menor conforme o zoom
-   aumentava (a fórmula de respawn dividia por view.s), então elas acabavam se acumulando todas
-   perto de um único ponto do mundo assim que o zoom mudava de novo. */
-const REDUCED = matchMedia('(prefers-reduced-motion:reduce)').matches;
-const fx = $('fx'), fctx = fx.getContext('2d');
-let DPR = Math.min(devicePixelRatio || 1, 2), parts = [], partRGB = '206,196,255', partBlend = 'lighter', psprite = {};
-function spr(rgb) {
-  if (psprite[rgb]) return psprite[rgb];
-  const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
-  const g = cv.getContext('2d'), gr = g.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
-  gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(.4, `rgba(${rgb},.3)`); gr.addColorStop(1, `rgba(${rgb},0)`);
-  g.fillStyle = gr; g.fillRect(0, 0, s, s); return psprite[rgb] = cv;
-}
-function seedParts() {
-  const n = REDUCED ? 24 : Math.min(120, Math.round(W * H / 13000)); parts = [];
-  for (let i = 0; i < n; i++) parts.push({ sx:Math.random()*W, sy:Math.random()*H, r:.9+Math.random()*2.4, a:.3+Math.random()*.5, tw:.4+Math.random()*1.4, ph:Math.random()*7, vx:(Math.random()-.5)*.06, vy:(Math.random()-.5)*.06 });
-}
-function fxResize() { fx.width = W*DPR; fx.height = H*DPR; fx.style.width = W+'px'; fx.style.height = H+'px'; fctx.setTransform(DPR,0,0,DPR,0,0); seedParts(); }
-
-/* ---------- esfera de pontos 3D (gira) ---------- */
-let dotEls = [], dotAngle = 0;
-const TILT = 18 * Math.PI / 180, cT = Math.cos(TILT), sT = Math.sin(TILT);
-function buildDotSphere() {
-  const host = $('dotSphere'), data = [];
-  for (let lat = -80; lat <= 80; lat += 13) { const rad = lat * Math.PI/180, cl = Math.cos(rad); const n = Math.max(6, Math.round(17*cl));
-    for (let i = 0; i < n; i++) data.push({ lat: rad, lon0: (i/n)*Math.PI*2 }); }
-  host.innerHTML = data.map(() => '<circle r="2"></circle>').join('');
-  dotEls = [...host.children].map((el, i) => ({ el, lat: data[i].lat, lon0: data[i].lon0 }));
-  animateDots();
-}
-function animateDots() {
-  for (const d of dotEls) { const lon = d.lon0 + dotAngle, cl = Math.cos(d.lat);
-    const x = 100*cl*Math.sin(lon), y = -100*Math.sin(d.lat), z = 100*cl*Math.cos(lon);
-    const y2 = y*cT - z*sT, z2 = y*sT + z*cT, e = d.el;
-    if (z2 < -1) { e.setAttribute('opacity', '0'); continue; }
-    e.setAttribute('cx', x.toFixed(1)); e.setAttribute('cy', y2.toFixed(1));
-    e.setAttribute('r', Math.max(1.2, 1.7 + 1.2*(z2/100)).toFixed(2)); e.setAttribute('opacity', (0.16 + 0.84*(z2/100)).toFixed(2)); }
-}
-let last = performance.now();
-function tick(now) {
-  // try/catch pra um erro pontual (ex.: numa cor mal formada) nunca travar a animação pro resto da sessão —
-  // o requestAnimationFrame fica DE FORA do catch, sempre reagenda o próximo quadro.
-  try {
-    const dt = Math.min(40, now - last); last = now;
-    // pausa a esfera de pontos e a poeira cósmica durante pan/zoom/arrasto — imperceptível
-    // no gesto mesmo, e libera o quadro inteiro pra resposta do arrasto ficar fluida
-    if (!interacting && (tick.fc = (tick.fc || 0) + 1) % 2 === 0) { dotAngle += 0.009; animateDots(); }
-    fctx.clearRect(0, 0, W, H);
-    if (particlesOn && !interacting) {
-      fctx.globalCompositeOperation = partBlend;
-      const t = now * .001, sp = spr(partRGB), m = 160;
-      for (const p of parts) {
-        p.sx += p.vx * dt; p.sy += p.vy * dt;
-        if (p.sx < -m || p.sx > W + m || p.sy < -m || p.sy > H + m) { p.sx = Math.random()*W; p.sy = Math.random()*H; continue; }
-        fctx.globalAlpha = Math.max(0, p.a * (.5 + .5 * Math.sin(t * p.tw + p.ph)));
-        fctx.drawImage(sp, p.sx - p.r*3, p.sy - p.r*3, p.r*6, p.r*6);
-      }
-      fctx.globalAlpha = 1;
-    }
-  } catch (err) { console.error('[tick]', err); }
-  requestAnimationFrame(tick);
-}
-
-/* ---------- anéis arcanos do Crystarium (giram e seguem o Núcleo) ----------
-   os raios são múltiplos exatos de RING_STEP — o mesmo passo da grade de encaixe — então os
-   anéis visuais caem em cima das distâncias reais onde as esferas se encaixam, em vez de raios
-   arbitrários. a quantidade de traços de cada anel giratório também é múltipla da simetria da
-   grade (8 pontas no octógono, 6 no hexágono), pra reforçar o efeito de "círculo ritual" preso
-   ao mesmo formato escolhido pro sistema. */
-const RING_TICK_SEGMENTS = { octagon: 8, hexagon: 6, linear: 8 };
-function buildRings() {
-  const C = (r, cls, extra) => `<circle class="${cls}" cx="0" cy="0" r="${r}" fill="none" ${extra || ''}></circle>`;
-  const segs = RING_TICK_SEGMENTS[gridShape] || 8;
-  let s = '';
-  [3, 6, 9, 13, 17, 20, 24].forEach((k) => { s += C(k * RING_STEP, 'ring'); });
-  const spins = [
-    { k: 4,  mult: 9,  width: 6,  speed: 110, rev: false },
-    { k: 8,  mult: 13, width: 10, speed: 150, rev: false },
-    { k: 12, mult: 10, width: 4,  speed: 95,  rev: true },
-    { k: 16, mult: 16, width: 8,  speed: 170, rev: false },
-    { k: 21, mult: 12, width: 5,  speed: 130, rev: true },
-  ];
-  spins.forEach(({ k, mult, width, speed, rev }) => {
-    const r = k * RING_STEP, n = segs * mult, seg = (2 * Math.PI * r) / n, dash = seg * .15, gap = seg - dash;
-    s += `<g class="ringspin${rev ? ' rev' : ''}" style="animation-duration:${speed}s">` +
-      C(r, 'ringTick', `stroke-width="${width}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"`) + '</g>';
-  });
-  ringsInner.innerHTML = s;
-}
-function applyRingColor(hex) {
-  ringColor = hex;
-  ringsEl.style.setProperty('--ringc', hexToRgb(hex).join(','));
-}
-window.previewRingColor = (c) => { if (isGM) applyRingColor(c); };
-function applyRingOpacity(v) {
-  ringOpacity = +v;
-  ringsEl.style.opacity = ringOpacity;
-}
-window.previewRingOpacity = (v) => { if (isGM) applyRingOpacity(v); };
-window.saveRingSettings = () => {
-  if (!isGM) return;
-  const c = $('ring-color').value, o = +$('ring-opacity').value;
-  applyRingColor(c); applyRingOpacity(o);
-  db.updateSystemTree(treeId, { ring_color: c, ring_opacity: o })
-    .then(() => showMsg('Anéis salvos.', 'ok')).catch((e) => showMsg(e.message));
-};
-function applyEdgeColor(hex) {
-  edgeColor = hex;
-  G.style.setProperty('--edgec', hexToRgb(hex).join(','));
-}
-window.previewEdgeColor = (c) => { if (isGM) applyEdgeColor(c); };
-window.saveEdgeColor = () => { if (!isGM) return; const c = $('edge-color').value; applyEdgeColor(c);
-  db.updateSystemTree(treeId, { edge_color: c }).catch((e) => showMsg(e.message)); };
-
-/* ---------- liga/desliga os anéis (a animação pode atrapalhar durante a edição) ---------- */
-let ringsOn = true;
-try { ringsOn = localStorage.getItem('vt_rings') !== '0'; } catch (_) {}
-function applyRingsToggle() {
-  ringsEl.style.display = ringsOn ? '' : 'none';
-  const btn = $('rings-toggle');
-  btn.classList.toggle('on', ringsOn);
-  btn.innerHTML = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/></svg></span>Anéis';
-  btn.setAttribute('aria-pressed', String(ringsOn));
-}
-window.toggleRings = () => {
-  ringsOn = !ringsOn;
-  try { localStorage.setItem('vt_rings', ringsOn ? '1' : '0'); } catch (_) {}
-  applyRingsToggle();
-};
-
-/* ---------- liga/desliga a poeira cósmica (partículas) ---------- */
-let particlesOn = true;
-try { particlesOn = localStorage.getItem('vt_particles') !== '0'; } catch (_) {}
-function applyParticlesToggle() {
-  const btn = $('particles-toggle');
-  btn.classList.toggle('on', particlesOn);
-  btn.innerHTML = `<span class="ic">${ICONS.sparkle}</span>Poeira`;
-  btn.setAttribute('aria-pressed', String(particlesOn));
-}
-window.toggleParticles = () => {
-  particlesOn = !particlesOn;
-  try { localStorage.setItem('vt_particles', particlesOn ? '1' : '0'); } catch (_) {}
-  applyParticlesToggle();
-};
-
-/* ---------- render ---------- */
-function applyView() {
-  const tr = `translate(${view.x} ${view.y}) scale(${view.s})`;
-  G.setAttribute('transform', tr); ringsEl.setAttribute('transform', tr); gridPolarEl.setAttribute('transform', tr);
-  updateSnapMarkTransform();
-}
-// separado de applyView(): o Núcleo só muda de posição quando ele é arrastado, não a cada
-// pan/zoom — recalcular isso em todo pointermove do pan era escrita de DOM desperdiçada
-function updateCoreAnchor() {
-  const c = coreNode || nodes.find((n) => n.kind === 'core');
-  if (c) { ringsInner.setAttribute('transform', `translate(${c.x} ${c.y})`); gridPolarInner.setAttribute('transform', `translate(${c.x} ${c.y})`); }
-}
-function set4(ln, A, B) { ln.setAttribute('x1', A.x); ln.setAttribute('y1', A.y); ln.setAttribute('x2', B.x); ln.setAttribute('y2', B.y); }
-function toWorld(cx, cy) { const r = world.getBoundingClientRect(); return { x: (cx-r.left-view.x)/view.s, y: (cy-r.top-view.y)/view.s }; }
-function refreshCount() { $('count').textContent = nodes.length + ' esferas · ' + edges.length + ' conexões'; }
-function render() {
-  G.innerHTML = ''; coreNode = nodes.find((n) => n.kind === 'core') || null;
-  edges.forEach((e) => { const A = byId(e.a), B = byId(e.b); if (!A || !B) return;
-    const ln = document.createElementNS(SVGNS, 'line');
-    const on = A.enabled !== false && B.enabled !== false;
-    ln.setAttribute('class', 'edge' + (on ? ' on' : '')); set4(ln, A, B); G.appendChild(ln); e._el = ln; });
-  nodes.forEach((n) => { const base = n.kind === 'core' ? 22 : (n.kind === 'active' ? 16 : 13);
-    const r = Math.round(base * (SIZE_SCALE[n.size] || 1));
-    const g = document.createElementNS(SVGNS, 'g');
-    g.setAttribute('class', 'node ' + n.kind + ' unlocked' + (n.enabled === false ? ' disabled' : '') + (!isGM && isNodeUnlocked(n) ? ' acquired' : ''));   // no editor todas acesas, exceto quem foi marcado como desativado; pro jogador, "acquired" marca o que ele já desbloqueou
-    g.style.setProperty('--c', viaByKey(n.fac).color);
-    g.setAttribute('transform', `translate(${n.x} ${n.y})`);
-    g.innerHTML =
-      `<circle class="body" r="${r}" fill="url(#bodyGrad)"></circle>` +
-      `<use class="dots" href="#dotSphere" transform="scale(${(r/100).toFixed(3)})"></use>` +
-      `<circle class="rim" r="${r}" fill="none"></circle>` +
-      `<circle class="beacon" r="${r+7}" fill="none"></circle>` +
-      `<circle class="sel" r="${r+9}" fill="none"></circle>` +
-      `<text class="lbl" y="${r+16}">${esc(n.name || '(sem nome)')}</text>` +
-      `<text class="costbadge" y="${-(r+9)}">${n.cost || 0} ✦</text>`;
-    n._el = g; G.appendChild(g); attachNode(g, n); });
-  refreshSel(); refreshCount();
-}
-function updateEdges(n) { edges.forEach((e) => { if (!e._el) return; if (e.a === n.id) { e._el.setAttribute('x1', n.x); e._el.setAttribute('y1', n.y); } if (e.b === n.id) { e._el.setAttribute('x2', n.x); e._el.setAttribute('y2', n.y); } }); }
-function refreshSel() { nodes.forEach((n) => { if (!n._el) return; n._el.classList.toggle('selected', n === selected); n._el.classList.toggle('multisel', areaSelection.has(n.id)); }); }
-
-function attachNode(g, n) {
-  if (!isGM) { // jogador só pode clicar pra ver — nada de arrastar, ligar ou apagar
-    g.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); selectNode(n); });
-    return;
-  }
-  let moved = false, sx, sy, ox, oy;
-  g.addEventListener('pointerdown', (ev) => {
-    if (tool === 'area') return; // deixa o evento propagar pro mundo, que inicia a seleção por área
-    ev.stopPropagation();
-    if (tool === 'link') { ev.preventDefault(); return handleLink(n); }
-    moved = false; sx = ev.clientX; sy = ev.clientY; ox = n.x; oy = n.y;
-    g.setPointerCapture(ev.pointerId);
-    const mv = (e) => { const dx = (e.clientX-sx)/view.s, dy = (e.clientY-sy)/view.s;
-      if (!moved && Math.abs(e.clientX-sx)+Math.abs(e.clientY-sy) > 4) { moved = true; setInteracting(true); if (n.kind !== 'core') gridPolarEl.classList.add('show'); }
-      if (!moved) return;
-      const snapped = gridSnap(ox+dx, oy+dy, n.kind === 'core');
-      n.x = snapped.x; n.y = snapped.y; g.setAttribute('transform', `translate(${n.x} ${n.y})`); updateEdges(n); if (n.kind === 'core') updateCoreAnchor(); };
-    const up = () => { try { g.releasePointerCapture(ev.pointerId); } catch(_){}
-      world.removeEventListener('pointermove', mv); world.removeEventListener('pointerup', up);
-      gridPolarEl.classList.remove('show'); setInteracting(false);
-      if (moved) { db.updateTreeNode(n.id, { x: n.x, y: n.y }).catch((e) => showMsg(e.message)); }
-      else selectNode(n); };
-    world.addEventListener('pointermove', mv); world.addEventListener('pointerup', up); });
-}
-async function selectNode(n) {
-  if (isGM && editorDirty && selected && selected.id !== n.id) {
-    const ok = await confirmModal({ title: 'Descartar alterações', desc: `Você tem alterações não salvas em "${selected.name || 'esta esfera'}". Trocar de esfera mesmo assim?`, confirmLabel: 'Descartar' });
-    if (!ok) return;
-    discardEditorDraft();
-  }
-  selected = n; refreshSel(); if (isGM) openEditor(n); else openViewer(n);
-}
-function snapshotNode(n) {
-  return { name: n.name, kind: n.kind, size: n.size, enabled: n.enabled, fac: n.fac, cost: n.cost, descr: n.descr,
-    modifiers: (n.modifiers || []).map((m) => ({ ...m })) };
-}
-function discardEditorDraft() {
-  if (selected && editorSnapshot) { Object.assign(selected, editorSnapshot); render(); applyView(); }
-  editorDirty = false;
-}
-function markEditorDirty() { editorDirty = true; const b = $('node-save-btn'); if (b) b.style.display = ''; }
-function refreshEditorFields(n) {
-  $('e-name').value = n.name || ''; $('e-desc').value = n.descr || ''; $('e-cost').value = (n.cost || 0);
-  document.querySelectorAll('#e-type .chip').forEach((c) => c.classList.toggle('on', c.dataset.v === n.kind));
-  document.querySelectorAll('#e-size .chip').forEach((c) => c.classList.toggle('on', c.dataset.s === (n.size || 'small')));
-  document.querySelectorAll('#e-enabled .chip').forEach((c) => c.classList.toggle('on', c.dataset.e === (n.enabled === false ? '0' : '1')));
-  document.querySelectorAll('#e-fac .chip').forEach((c) => c.classList.toggle('on', c.dataset.f === n.fac));
-  renderModRows(n);
-  renderStartField(n);
-}
-function openEditor(n) {
-  editorSnapshot = snapshotNode(n); editorDirty = false;
-  const saveBtn = $('node-save-btn'); if (saveBtn) saveBtn.style.display = 'none';
-  refreshEditorFields(n);
-  $('editor').classList.add('open');
-}
-window.saveNodeEditor = () => {
-  if (!isGM || !selected) return;
-  const btn = $('node-save-btn'); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
-  const patch = { name: selected.name, kind: selected.kind, size: selected.size, enabled: selected.enabled,
-    fac: selected.fac, cost: selected.cost, descr: selected.descr, modifiers: selected.modifiers };
-  db.updateTreeNode(selected.id, patch).then(() => {
-    editorSnapshot = snapshotNode(selected); editorDirty = false;
-    if (btn) btn.style.display = 'none';
-    showMsg('Esfera salva.', 'ok');
-  }).catch((e) => showMsg(e.message))
-    .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
-};
-function renderStartField(n) {
-  const fld = $('e-start-fld'); if (!fld) return;
-  if (n.kind !== 'core') { fld.style.display = 'none'; return; }
-  fld.style.display = '';
-  const btn = $('e-start-btn');
-  if (n.is_start) { btn.innerHTML = `<span class="ic">${ICONS.star}</span>Esta é a esfera inicial`; btn.disabled = true; }
-  else { btn.innerHTML = `<span class="ic">${ICONS.starOutline}</span>Definir como esfera inicial`; btn.disabled = false; }
-}
-window.setAsStart = () => {
-  if (!isGM || !selected || selected.kind !== 'core' || selected.is_start) return;
-  const prevId = nodes.find((x) => x.is_start)?.id;
-  nodes.forEach((x) => { x.is_start = x.id === selected.id; });
-  render(); renderStartField(selected);
-  db.setStartNode(treeId, selected.id).catch((e) => {
-    // desfaz localmente se o banco recusar (ex.: corrida com outra aba)
-    nodes.forEach((x) => { x.is_start = x.id === prevId; }); render(); renderStartField(selected);
-    showMsg(e.message);
-  });
-};
-/* ---------- modificadores de status da esfera (mira um atributo real do sistema) ---------- */
-function renderModRows(n) {
-  if (!stats.length) {
-    $('e-mods').innerHTML = `<p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:0">Este sistema ainda não tem atributos cadastrados (aba Geral do sistema) — cadastre um pra poder linkar um modificador aqui.</p>`;
-    return;
-  }
-  const mods = n.modifiers || [];
-  const rowStyle = 'flex:1;background:rgba(255,255,255,.06);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);font-size:12px;padding:7px 9px';
-  let html = mods.map((m, i) => `
-    <div class="via-row">
-      <select onchange="setNodeModStat(${i},this.value)" style="${rowStyle}">
-        ${stats.map((s) => `<option value="${s.id}" ${s.id === m.stat_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}
-      </select>
-      <input type="number" step="1" value="${m.amount ?? 0}" oninput="setNodeModAmount(${i},this.value)" style="width:64px;${rowStyle}flex:0 0 auto">
-      <button type="button" class="via-del" onclick="removeNodeMod(${i})" title="Remover"><span class="ic">${ICONS.x}</span></button>
-    </div>`).join('');
-  html += `<button type="button" class="via-add-btn" style="width:100%;height:32px;border-radius:8px" onclick="addNodeMod()">+ Adicionar modificador</button>`;
-  $('e-mods').innerHTML = html;
-}
-window.addNodeMod = () => { if (!isGM || !selected || !stats.length) return;
-  selected.modifiers = [...(selected.modifiers || []), { stat_id: stats[0].id, amount: 1 }];
-  renderModRows(selected); markEditorDirty(); };
-window.removeNodeMod = (i) => { if (!isGM || !selected) return;
-  selected.modifiers = (selected.modifiers || []).filter((_, idx) => idx !== i);
-  renderModRows(selected); markEditorDirty(); };
-window.setNodeModStat = (i, statId) => { if (!isGM || !selected || !selected.modifiers[i]) return;
-  selected.modifiers[i].stat_id = statId; markEditorDirty(); };
-window.setNodeModAmount = (i, amount) => { if (!isGM || !selected || !selected.modifiers[i]) return;
-  selected.modifiers[i].amount = Number(amount) || 0; markEditorDirty(); };
-window.closePanel = async () => {
-  if (editorDirty) {
-    const ok = await confirmModal({ title: 'Descartar alterações', desc: 'As alterações não salvas nesta esfera serão perdidas.', confirmLabel: 'Descartar' });
-    if (!ok) return;
-    discardEditorDraft();
-  }
-  $('editor').classList.remove('open'); selected = null; refreshSel();
-};
-window.patch = (k, v) => { if (!isGM || !selected) return; selected[k] = v; render(); applyView(); refreshEditorFields(selected); markEditorDirty(); };
-/* ---------- visão somente-leitura pro jogador — mesmos dados, sem nenhum campo editável ---------- */
-function isNodeUnlocked(n) { return !!n.is_start || unlockedIds.has(n.id); }
-function canUnlock(n) {
-  if (isNodeUnlocked(n)) return { ok: false, reason: 'already' };
-  const connected = edges.some((e) => (e.a === n.id || e.b === n.id) && isNodeUnlocked(byId(e.a === n.id ? e.b : e.a) || {}));
-  if (!connected) return { ok: false, reason: 'connectivity' };
-  const spent = nodes.filter((x) => isNodeUnlocked(x)).reduce((s, x) => s + (x.cost || 0), 0);
-  const remaining = myPoints - spent;
-  if (remaining < (n.cost || 0)) return { ok: false, reason: 'points', remaining };
-  return { ok: true };
-}
-function openViewer(n) {
-  $('v-name').textContent = n.name || '(sem nome)';
-  $('v-type').textContent = n.kind === 'core' ? 'Núcleo' : n.kind === 'active' ? 'Ativa' : 'Passiva';
-  const via = viaByKey(n.fac);
-  $('v-via').innerHTML = `<div class="chip on" style="--vc:${via.color};flex:0 0 auto;cursor:default">${esc(via.name)}</div>`;
-  $('v-cost').innerHTML = `<span class="ic">${ICONS.sparkle}</span>${n.cost || 0}`;
-  $('v-desc').textContent = n.descr || 'Sem descrição.';
-  const mods = n.modifiers || [];
-  if (mods.length) {
-    $('v-mods-fld').style.display = '';
-    $('v-mods').innerHTML = mods.map((m) => { const s = statById(m.stat_id);
-      return `<div style="font-family:var(--mono);font-size:12px;color:var(--brass)">${s ? esc(s.name) : '(atributo removido)'}: ${m.amount >= 0 ? '+' : ''}${m.amount}</div>`; }).join('');
-  } else { $('v-mods-fld').style.display = 'none'; }
-  if (isGM) { $('v-unlock-fld').style.display = 'none'; }
-  else {
-    $('v-unlock-fld').style.display = '';
-    const btn = $('v-unlock-btn'), msg = $('v-unlock-msg');
-    if (isNodeUnlocked(n)) {
-      btn.style.display = 'none';
-      msg.innerHTML = `<span class="ic">${ICONS.check}</span>Já desbloqueada.`;
-    } else {
-      btn.style.display = '';
-      const check = canUnlock(n);
-      btn.disabled = !check.ok;
-      btn.textContent = `Desbloquear (custo: ${n.cost || 0} ponto${n.cost === 1 ? '' : 's'})`;
-      msg.textContent = check.ok ? ''
-        : check.reason === 'connectivity' ? 'Conecte a uma esfera já desbloqueada primeiro.'
-        : `Pontos insuficientes (você tem ${Math.max(0, check.remaining)} disponível).`;
-    }
-  }
-  $('viewer').classList.add('open');
-}
-window.closeViewer = () => { $('viewer').classList.remove('open'); selected = null; refreshSel(); };
-window.doUnlock = async () => {
-  if (isGM || !selected) return;
-  const n = selected, btn = $('v-unlock-btn');
-  btn.disabled = true;
-  try {
-    await db.unlockNode(n.id);
-    unlockedIds.add(n.id);
-    try { myPoints = await db.getMyProgress(treeId); } catch (_) {}
-    render(); openViewer(n);
-    showMsg('Esfera desbloqueada!');
-  } catch (e) { showMsg(e.message); btn.disabled = false; }
-};
-window.deleteSelected = () => { if (!isGM || !selected) return; const n = selected;
-  db.deleteTreeNode(n.id).then(() => { edges = edges.filter((x) => x.a !== n.id && x.b !== n.id); nodes = nodes.filter((x) => x !== n);
-    selected = null; editorDirty = false; closePanel(); render(); applyView(); }).catch((e) => showMsg(e.message)); };
-
-function handleLink(n) {
-  if (!linkSrc) { linkSrc = n; n._el.classList.add('linksrc'); return; }
-  if (linkSrc !== n) {
-    const ex = edges.some((x) => (x.a === linkSrc.id && x.b === n.id) || (x.a === n.id && x.b === linkSrc.id));
-    if (!ex) db.insertTreeEdge(treeId, linkSrc.id, n.id).then((e) => { if (e) { edges.push({ id: e.id, a: e.a, b: e.b }); render(); } }).catch((er) => showMsg(er.message));
-  }
-  linkSrc._el && linkSrc._el.classList.remove('linksrc'); linkSrc = null;
-}
-
-/* ---------- pan / zoom / add / seleção por área ---------- */
-/* enquanto o usuário arrasta a tela/uma esfera ou usa a roda do mouse pra dar zoom, pausa as
-   animações decorativas (anéis, pulso das linhas) via classe no <body> — elas ficam invisíveis
-   durante o gesto mesmo, e assim o navegador gasta o tempo de quadro todo respondendo ao arrasto
-   em vez de competir com repaint de coisas puramente decorativas. */
-let interacting = false, interactTimer = null;
-function setInteracting(on) {
-  if (interactTimer) { clearTimeout(interactTimer); interactTimer = null; }
-  if (on) { if (!interacting) { interacting = true; document.body.classList.add('interacting'); } }
-  else { interactTimer = setTimeout(() => { interacting = false; document.body.classList.remove('interacting'); }, 150); }
-}
-let panning = false, pStart, vStart;
-let areaDragging = false, areaScreenStart = null;
-world.addEventListener('pointerdown', async (ev) => {
-  if (tool === 'add' && isGM) { const p = toWorld(ev.clientX, ev.clientY);
-    const snapped = gridSnap(p.x, p.y);
-    const node = { name: '', kind: 'active', fac: vias[0].key, size: 'small', cost: 1, descr: '', x: snapped.x, y: snapped.y };
-    try { const saved = await db.insertTreeNode(treeId, node); node.id = saved.id; nodes.push(node); render(); selectNode(node); } catch (e) { showMsg(e.message); }
-    return; }
-  if (tool === 'area') {
-    areaDragging = true; areaScreenStart = { x: ev.clientX, y: ev.clientY };
-    Object.assign(marqueeEl.style, { left: ev.clientX + 'px', top: ev.clientY + 'px', width: '0px', height: '0px', display: 'block' });
-    return; }
-  panning = true; setInteracting(true); world.classList.add('panning'); pStart = { x: ev.clientX, y: ev.clientY }; vStart = { x: view.x, y: view.y }; });
-world.addEventListener('pointermove', (ev) => {
-  if (areaDragging) {
-    const x1 = Math.min(areaScreenStart.x, ev.clientX), y1 = Math.min(areaScreenStart.y, ev.clientY);
-    Object.assign(marqueeEl.style, { left: x1 + 'px', top: y1 + 'px',
-      width: Math.abs(ev.clientX - areaScreenStart.x) + 'px', height: Math.abs(ev.clientY - areaScreenStart.y) + 'px' });
-    return; }
-  if (panning) { view.x = vStart.x+(ev.clientX-pStart.x); view.y = vStart.y+(ev.clientY-pStart.y); applyView(); return; }
-  if (tool === 'add') { const p = toWorld(ev.clientX, ev.clientY); const s = gridSnap(p.x, p.y); showSnapMark(s.x, s.y); }
-});
-addEventListener('pointerup', (ev) => {
-  panning = false; world.classList.remove('panning'); setInteracting(false);
-  if (areaDragging) { areaDragging = false; marqueeEl.style.display = 'none';
-    finalizeAreaSelection(toWorld(areaScreenStart.x, areaScreenStart.y), toWorld(ev.clientX, ev.clientY)); }
-});
-function finalizeAreaSelection(p1, p2) {
-  const x1 = Math.min(p1.x, p2.x), x2 = Math.max(p1.x, p2.x), y1 = Math.min(p1.y, p2.y), y2 = Math.max(p1.y, p2.y);
-  if (x2 - x1 < 4 && y2 - y1 < 4) return; // arrasto quase nulo (clique) — ignora, não seleciona tudo sem querer
-  areaSelection = new Set(nodes.filter((n) => n.kind !== 'core' && n.x >= x1 && n.x <= x2 && n.y >= y1 && n.y <= y2).map((n) => n.id));
-  refreshSel(); updateBatchPanel();
-}
-function updateBatchPanel() {
-  const n = areaSelection.size;
-  $('batch-count').textContent = n + (n === 1 ? ' esfera selecionada' : ' esferas selecionadas');
-  batchPanelEl.classList.toggle('open', n > 0);
-}
-window.clearAreaSelection = () => { areaSelection = new Set(); refreshSel(); batchPanelEl.classList.remove('open'); };
-/* edição em lote — aplica um campo (via/tamanho/estado) a todas as esferas da seleção de área de uma vez */
-window.batchSet = (key, value) => {
-  if (!isGM) return;
-  const ids = [...areaSelection];
-  if (!ids.length) return;
-  ids.forEach((id) => { const n = byId(id); if (n) n[key] = value; });
-  render(); applyView();
-  Promise.all(ids.map((id) => db.updateTreeNode(id, { [key]: value })))
-    .then(() => showMsg(`${ids.length} esfera(s) atualizada(s).`))
-    .catch((e) => showMsg(e.message));
-};
-
-/* opções de duplicação — dependem do formato da grade, geradas dinamicamente */
-function renderDupOptions() {
-  const box = $('rotgrid');
-  if (gridShape === 'linear') {
-    $('dup-title').textContent = 'Espelhar cópia pelo Núcleo';
-    $('dup-hint').textContent = 'A cópia espelha pelo Núcleo e reconecta onde a seleção original se conectava — sempre encaixada na grade quadrada.';
-    box.innerHTML = `
-      <button class="tool" onclick="duplicateSelection('flipV')"><span class="ic">${ICONS.flipV}</span>Cima/baixo</button>
-      <button class="tool" onclick="duplicateSelection('flipH')"><span class="ic">${ICONS.flipH}</span>Esquerda/direita</button>
-      <button class="tool" onclick="duplicateSelection('flip180')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20 20 4"/><path d="M9 4H4v5"/><path d="M15 20h5v-5"/></svg></span>Diagonal</button>`;
-    return;
-  }
-  $('dup-title').textContent = 'Girar cópia ao redor do Núcleo';
-  $('dup-hint').textContent = 'A cópia gira ao redor do Núcleo e reconecta onde a seleção original se conectava — sempre encaixada na grade.';
-  const unit = 360 / (SHAPE_SEGMENTS[gridShape] || 8);
-  let html = '';
-  for (let k = 1; k * unit < 180; k++) html += `<button class="tool" onclick="duplicateSelection(${k * unit})"><span class="ic">${ICONS.rotateCw}</span>${k * unit}°</button>`;
-  html += `<button class="tool" onclick="duplicateSelection(180)"><span class="ic">${ICONS.rotateCw}</span>180°</button>`;
-  for (let k = 1; k * unit < 180; k++) html += `<button class="tool" onclick="duplicateSelection(${-k * unit})"><span class="ic">${ICONS.rotateCcw}</span>${k * unit}°</button>`;
-  box.innerHTML = html;
-}
-function transformPoint(x, y, cx, cy, op) {
-  if (typeof op === 'number') {
-    const a = op * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a), dx = x - cx, dy = y - cy;
-    return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
-  }
-  const dx = x - cx, dy = y - cy;
-  if (op === 'flipV') return { x: cx + dx, y: cy - dy };
-  if (op === 'flipH') return { x: cx - dx, y: cy + dy };
-  if (op === 'flip180') return { x: cx - dx, y: cy - dy };
-  return { x, y };
-}
-window.duplicateSelection = async (op) => {
-  if (!isGM) return;
-  const core = coreNode || nodes.find((n) => n.kind === 'core');
-  const ids = [...areaSelection];
-  if (!core || !ids.length) { showMsg('Nada pra duplicar.'); return; }
-  const idSet = new Set(ids);
-  const internalEdges = edges.filter((e) => idSet.has(e.a) && idSet.has(e.b));
-  const boundaryEdges = edges.filter((e) => idSet.has(e.a) !== idSet.has(e.b));
-  showMsg('Duplicando…');
-  try {
-    const idMap = new Map();
-    for (const id of ids) {
-      const n = byId(id); if (!n) continue;
-      const t = transformPoint(n.x, n.y, core.x, core.y, op);
-      const snapped = gridSnap(t.x, t.y);
-      const saved = await db.insertTreeNode(treeId, { name: n.name, kind: n.kind, fac: n.fac, size: n.size, cost: n.cost, descr: n.descr, x: snapped.x, y: snapped.y });
-      nodes.push({ ...saved }); idMap.set(id, saved.id);
-    }
-    for (const e of internalEdges) {
-      const a = idMap.get(e.a), b = idMap.get(e.b); if (!a || !b) continue;
-      const saved = await db.insertTreeEdge(treeId, a, b);
-      if (saved) edges.push({ id: saved.id, a: saved.a, b: saved.b });
-    }
-    for (const e of boundaryEdges) {
-      const insideOld = idSet.has(e.a) ? e.a : e.b, outside = idSet.has(e.a) ? e.b : e.a;
-      const insideNew = idMap.get(insideOld); if (!insideNew) continue;
-      const saved = await db.insertTreeEdge(treeId, insideNew, outside);
-      if (saved) edges.push({ id: saved.id, a: saved.a, b: saved.b });
-    }
-    render(); applyView(); clearAreaSelection();
-    showMsg(`${ids.length} esfera(s) duplicada(s).`);
-  } catch (e) { showMsg('Erro ao duplicar: ' + e.message); }
-};
-window.deleteAreaSelection = async () => {
-  if (!isGM) return;
-  const ids = [...areaSelection];
-  if (!ids.length) return;
-  const ok = await confirmModal({ title: 'Excluir esferas', desc: `Excluir ${ids.length} esfera(s) selecionada(s)? As conexões delas também somem. Não dá pra desfazer.`, confirmLabel: 'Excluir' });
-  if (!ok) return;
-  showMsg('Excluindo…');
-  Promise.all(ids.map((id) => db.deleteTreeNode(id))).then(() => {
-    const idSet = new Set(ids);
-    edges = edges.filter((e) => !idSet.has(e.a) && !idSet.has(e.b));
-    nodes = nodes.filter((n) => !idSet.has(n.id));
-    if (selected && idSet.has(selected.id)) { selected = null; closePanel(); }
-    clearAreaSelection(); render(); applyView();
-    showMsg(`${ids.length} esfera(s) excluída(s).`);
-  }).catch((e) => showMsg('Erro ao excluir: ' + e.message));
-};
-world.addEventListener('wheel', (ev) => { ev.preventDefault(); setInteracting(true); setInteracting(false); zoomAt(ev.clientX, ev.clientY, ev.deltaY < 0 ? 1.12 : .89); }, { passive: false });
-function zoomAt(cx, cy, f) { const r = world.getBoundingClientRect(); const wx = (cx-r.left-view.x)/view.s, wy = (cy-r.top-view.y)/view.s;
-  view.s = Math.max(MINZOOM, Math.min(2.6, view.s*f)); view.x = cx-r.left-wx*view.s; view.y = cy-r.top-wy*view.s; applyView(); }
-window.zoom = (f) => zoomAt(W/2, H/2, f);
-window.resetView = () => { view = { x: W/2, y: H/2, s: 1 }; applyView(); };
-window.setTool = (t) => { if (!isGM) return; tool = t; if (linkSrc) { linkSrc._el && linkSrc._el.classList.remove('linksrc'); linkSrc = null; }
-  document.querySelectorAll('.tool[data-tool]').forEach((b) => b.classList.toggle('on', b.dataset.tool === t)); world.classList.toggle('adding', t === 'add');
-  world.classList.toggle('areaing', t === 'area'); gridPolarEl.classList.toggle('show', t === 'add'); if (t !== 'add') hideSnapMark(); };
-addEventListener('keydown', (ev) => { if (ev.key === 'Delete' && isGM && selected) deleteSelected();
-  if (ev.key === 'Escape') { if (linkSrc) { linkSrc._el && linkSrc._el.classList.remove('linksrc'); linkSrc = null; } if (areaSelection.size) clearAreaSelection(); closePanel(); closeViewer(); } });
-addEventListener('resize', () => { W = innerWidth; H = innerHeight; fxResize(); });
-</script>
+<script src="arvore.js?v=16"></script>
 </body>
 </html>

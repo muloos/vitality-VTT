@@ -8,10 +8,35 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=9">
+<link rel="stylesheet" href="lib/theme.css?v=35">
+<style>
+  /* modo embutido (dentro da mesa, via iframe — ver mesa.html: viewSistemaInline/renderSistema):
+     mesmo padrão de arvore.html — esconde a topbar própria (a mesa já tem a dela por fora) e troca
+     o "voltar" por um botão flutuante que fala com a página-mãe em vez de navegar esta aba embutida
+     pra outro lugar. */
+  .embed-back{display:none}
+  body.embedded .topbar{display:none}
+  body.embedded .embed-back{display:flex;position:fixed;left:12px;top:12px;z-index:30;
+    align-items:center;gap:7px;height:38px;padding:0 14px 0 12px;border-radius:11px;
+    background:rgba(18,22,32,.9);border:1px solid var(--line2);color:var(--ink-dim);
+    font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+  .embed-back:hover{color:var(--ink);background:rgba(255,255,255,.08)}
+  .embed-back svg{width:13px;height:13px}
+  body.embedded .page{padding-top:56px}
+</style>
 </head>
 <body>
+<script>
+// mesmo motivo de arvore.html: não pode depender do módulo grande carregar — um script clássico
+// síncrono aqui garante que a topbar duplicada nunca aparece, mesmo se import/sessão falhar depois.
+try { if (new URLSearchParams(location.search).get('embed') === '1') document.body.classList.add('embedded'); } catch (e) {}
+</script>
 <div id="fallback" class="solid"></div>
+
+<button type="button" class="embed-back" onclick="goBackEmbedded()" title="Voltar à mesa">
+  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>
+  Voltar à mesa
+</button>
 
 <div class="topbar">
   <a class="iconbtn" href="app.html" title="Voltar" style="text-decoration:none"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></a>
@@ -28,11 +53,14 @@
 </div>
 
 <script type="module">
-import * as db from './lib/db.js?v=24';
-import { mountHelp, mountThemeToggle } from './lib/ui.js?v=3';
+import * as db from './lib/db.js?v=30';
+import { mountHelp, mountThemeToggle, trapFocus } from './lib/ui.js?v=4';
 
-mountHelp('sistema');
-mountThemeToggle();
+// embutido dentro da mesa (iframe) — ver comentário grande no <style> acima e em arvore.js (mesmo
+// padrão): sem topbar/FABs próprios (a mesa já cobre isso por fora).
+const embedded = document.body.classList.contains('embedded');
+if (!embedded) { mountHelp('sistema'); mountThemeToggle(); }
+window.goBackEmbedded = () => { try { window.parent.backFromSistemaEmbed(); } catch (_) {} };
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s == null ? '' : String(s)).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const emptyState = (icon, title, desc, cta) => `<div class="empty-cta"><div class="ec-icon">${icon}</div>
@@ -56,7 +84,8 @@ function confirmModal({ title, desc, confirmLabel = 'Confirmar', danger = true }
         <button class="btn auto ${danger ? 'danger' : 'go'}" id="cm-ok">${esc(confirmLabel)}</button>
       </div>
     </div>`;
-    const finish = (result) => { w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
+    const untrap = trapFocus(w);
+    const finish = (result) => { untrap(); w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); resolve(result); };
     const onEsc = (e) => { if (e.key === 'Escape') finish(false); };
     w.addEventListener('click', (e) => { if (e.target === w) finish(false); });
     w.querySelector('.x').onclick = () => finish(false);
@@ -196,6 +225,8 @@ const ICONS = {
   chat: ic('<path d="M4 5h16v11H8l-4 4V5Z"/>'),
   hammer: ic('<path d="M15 4l5 5-2 2-5-5Z"/><path d="M12.5 6.5l5 5-2.5 2.5-5-5Z"/><path d="M3 21l7.5-7.5"/>'),
   levelUp: ic('<path d="M4 20v-5M4 20h4M10 20v-9M10 20h4M16 20v-13M16 20h4"/><path d="M4 12l6-6 4 4 7-7"/>'),
+  equip: ic('<path d="M8 4 4 7l2 3 2-1.3V19h8V8.7L18 10l2-3-4-3-2 2h-4L8 4Z"/>'),
+  plus: ic('<path d="M12 5v14M5 12h14"/>'),
 };
 // deriva ícone + cor de uma categoria de proficiência a partir do texto — sem precisar de campo
 // novo no banco (categoria continua sendo texto livre). Cobre os tipos mais comuns por palavra-
@@ -219,11 +250,27 @@ function profCategoryColor(cat) {
 const systemId = new URLSearchParams(location.search).get('id');
 const CATEGORIES = ['Arma', 'Armadura', 'Escudo', 'Ferramenta', 'Consumível', 'Acessório', 'Artefato', 'Material', 'Outro'];
 const RARITIES = ['Comum', 'Incomum', 'Raro', 'Épico', 'Lendário', 'Único'];
+// tipos de item equipável — usado tanto no campo "Tipo de equipamento" do item quanto no "Tipo
+// aceito" do slot da tela de equipamentos; casam por igualdade exata de texto
+const EQUIP_TYPES = ['Capacete', 'Peitoral', 'Calças', 'Botas', 'Luvas', 'Cinto', 'Capa/Manto', 'Escudo',
+  'Anel', 'Colar/Pingente', 'Brinco', 'Arma (uma mão)', 'Arma (duas mãos)', 'Acessório'];
+// monta as <option> de um <select> de tipo de equipamento; se o valor atual não estiver na lista
+// fixa (ex.: slot criado antes dessa mudança, com texto livre), acrescenta ele como opção extra
+// pra não sumir silenciosamente ao salvar
+function equipTypeOptionsHtml(current, emptyLabel) {
+  const extra = current && !EQUIP_TYPES.includes(current) ? [current] : [];
+  return `<option value="">${esc(emptyLabel)}</option>` +
+    [...EQUIP_TYPES, ...extra].map((t) => `<option value="${esc(t)}" ${current === t ? 'selected' : ''}>${esc(t)}</option>`).join('');
+}
 
 let system = null, currentTab = 'geral';
 function showMsg(t, kind) { const m = $('msg'); m.textContent = t; m.className = 'msg show ' + (kind || 'err'); setTimeout(() => { if (m.textContent === t) m.className = 'msg'; }, 4000); }
 
-const TABS = [['geral', `<span class="ic">${ICONS.gear}</span>Geral`], ['status', `<span class="ic">${ICONS.bolt}</span>Status`], ['pericias', `<span class="ic">${ICONS.target}</span>Perícias`], ['proficiencias', `<span class="ic">${ICONS.checklist}</span>Proficiências`], ['classes', `<span class="ic">${ICONS.shield}</span>Classes`], ['nivel', `<span class="ic">${ICONS.levelUp}</span>Nível`], ['arvores', `<span class="ic">${ICONS.tree}</span>Árvores`], ['itens', `<span class="ic">${ICONS.bag}</span>Itens`]];
+// no modo embutido (dentro da mesa), a aba "Árvores" fica de fora de propósito: o link dela pra
+// arvore.html não leva "&embed=1" (é usado normalmente fora da mesa também), e carregar esse link
+// aqui dentro criaria um iframe dentro de outro iframe, com chrome duplicado e o botão "voltar"
+// indo pro lugar errado. A mesa já tem sua PRÓPRIA aba Árvores, com um caminho de embed correto.
+const TABS = [['geral', `<span class="ic">${ICONS.gear}</span>Geral`], ['status', `<span class="ic">${ICONS.bolt}</span>Status`], ['pericias', `<span class="ic">${ICONS.target}</span>Perícias`], ['proficiencias', `<span class="ic">${ICONS.checklist}</span>Proficiências`], ['classes', `<span class="ic">${ICONS.shield}</span>Classes`], ['nivel', `<span class="ic">${ICONS.levelUp}</span>Nível`], ...(embedded ? [] : [['arvores', `<span class="ic">${ICONS.tree}</span>Árvores`]]), ['itens', `<span class="ic">${ICONS.bag}</span>Itens`], ['equipamento', `<span class="ic">${ICONS.equip}</span>Equipamento`]];
 
 (async () => {
   if (!systemId) { location.href = 'app.html'; return; }
@@ -233,16 +280,37 @@ const TABS = [['geral', `<span class="ic">${ICONS.gear}</span>Geral`], ['status'
   $('who').innerHTML = '<b>' + esc(profile?.display_name || '—') + '</b>';
   try { system = await db.getSystem(systemId); } catch (e) { $('content').innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; return; }
   if (!system) { document.querySelector('.page').innerHTML = '<div class="empty">Sistema não encontrado. <a href="app.html" style="color:var(--brass)">Voltar</a></div>'; return; }
+  // este editor é só do dono do sistema — sem essa checagem, qualquer link (ex.: o "voltar" de
+  // arvore.html) podia deixar um jogador cair direto na tela de edição de um sistema que não é dele
+  if (system.owner_id !== session.user.id) {
+    document.querySelector('.page').innerHTML = '<div class="empty">Você não tem permissão pra editar este sistema. <a href="app.html" style="color:var(--brass)">Voltar</a></div>';
+    return;
+  }
   $('sys-name').innerHTML = esc(system.name) + '<small>CONSTRUTOR DE SISTEMA</small>';
   $('tabs').innerHTML = TABS.map(([id, label]) => `<button data-tab="${id}" onclick="openTab('${id}')">${label}</button>`).join('');
-  openTab('geral');
+  // deep-link: a mesa manda direto pra aba pedida (ex.: "Editar Itens" já abre em "itens") em vez
+  // de sempre cair em "Geral" — ignora valores desconhecidos/a aba Árvores quando embutido
+  const requestedTab = new URLSearchParams(location.search).get('tab');
+  const validTab = TABS.some(([id]) => id === requestedTab) ? requestedTab : 'geral';
+  openTab(validTab);
 })();
 
-window.openTab = (name) => {
+// contador de "linhas com edição pendente" (botão Salvar visível) nas abas Status/Perícias/Classes
+// — sem isso, trocar de aba descartava qualquer edição em memória sem nenhum aviso
+let _dirtyCount = 0;
+window.markDirty = () => { _dirtyCount++; };
+window.clearDirty = () => { _dirtyCount = Math.max(0, _dirtyCount - 1); };
+addEventListener('beforeunload', (e) => { if (_dirtyCount > 0) { e.preventDefault(); e.returnValue = ''; } });
+window.openTab = async (name) => {
+  if (currentTab && name !== currentTab && _dirtyCount > 0) {
+    const ok = await confirmModal({ title: 'Sair sem salvar?', desc: 'Você tem edições não salvas nesta aba — elas serão perdidas ao trocar de aba.', confirmLabel: 'Sair sem salvar' });
+    if (!ok) return;
+  }
+  _dirtyCount = 0;
   currentTab = name;
   [...$('tabs').children].forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
   const c = $('content'); c.innerHTML = '<div class="empty">Carregando…</div>';
-  ({ geral: renderGeral, status: renderStatus, pericias: renderPericias, proficiencias: renderProficiencias, classes: renderClasses, nivel: renderNivel, arvores: renderArvores, itens: renderItens }[name])(c)
+  ({ geral: renderGeral, status: renderStatus, pericias: renderPericias, proficiencias: renderProficiencias, classes: renderClasses, nivel: renderNivel, arvores: renderArvores, itens: renderItens, equipamento: renderEquipamento }[name])(c)
     .catch((e) => { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
 };
 
@@ -256,6 +324,7 @@ async function renderGeral(c) {
     [`<span class="ic">${ICONS.levelUp}</span>Nível`, 'Pontos de status concedidos por nível.', 'nivel'],
     [`<span class="ic">${ICONS.tree}</span>Árvores`, 'Desenhe as árvores de habilidade.', 'arvores'],
     [`<span class="ic">${ICONS.bag}</span>Itens`, 'Itens do sistema com modificadores.', 'itens'],
+    [`<span class="ic">${ICONS.equip}</span>Equipamento`, 'Monte a tela visual de equipamentos (paper doll).', 'equipamento'],
   ];
   c.innerHTML = `
     <div class="section-title">Identidade do sistema</div>
@@ -320,10 +389,10 @@ async function renderStatus(c) {
     <div class="list">${status.length ? status.map(statRow).join('') : '<div class="empty">Nenhum status ainda.</div>'}</div>
 
     <div class="surface" style="margin-top:16px">
-      <div class="item-form">
-        <div class="fld"><label>Nome</label><input id="st-name" placeholder="Ex.: Pontos de Vida" maxlength="40"></div>
-        <div class="fld"><label>Nome na fórmula</label><input id="st-formkey" placeholder="Ex.: HP" maxlength="20"></div>
-        <div class="fld"><label>Tipo</label>
+      <form class="item-form" onsubmit="return addStat(event)">
+        <div class="fld"><label for="st-name">Nome</label><input id="st-name" placeholder="Ex.: Pontos de Vida" maxlength="40" required></div>
+        <div class="fld"><label for="st-formkey">Nome na fórmula</label><input id="st-formkey" placeholder="Ex.: HP" maxlength="20"></div>
+        <div class="fld"><label for="st-type">Tipo</label>
           <select id="st-type" class="fld-input" onchange="onStatTypeChange()">
             <option value="status">Status (valor definido depois, por classe)</option>
             <option value="resource-fixed">Recurso — valor fixo</option>
@@ -333,8 +402,8 @@ async function renderStatus(c) {
           <button type="button" class="color-swatch full" style="--sw:#7ee6dc" onclick="openColorPicker(this, '#7ee6dc', (v)=>{ document.getElementById('st-color').value = v; })"></button>
           <input type="hidden" id="st-color" value="#7ee6dc"></div>
         <div class="fld" id="st-extra-wrap" style="display:none"></div>
-        <div class="full"><button class="btn go auto" onclick="addStat()">+ Adicionar status</button></div>
-      </div>
+        <div class="full"><button class="btn go auto" type="submit">+ Adicionar status</button></div>
+      </form>
     </div>
 
     ${formulaTutorial(stats)}`;
@@ -359,7 +428,7 @@ function statRow(s) {
       style="flex:1 1 180px;min-width:140px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:${isC?'var(--maq)':'var(--ink)'};font-family:var(--mono);font-size:12px;padding:8px 10px"
       onchange="onStatFieldChange('${s.id}','${isC?'formula':'default_value'}',this.value)">
     <button type="button" class="color-swatch" style="--sw:${esc(s.color || '#7ee6dc')}" title="Cor da caixa na ficha" onclick="openColorPicker(this, '${esc(s.color || '#7ee6dc')}', (v)=>onStatFieldChange('${s.id}','color',v))"></button>
-    <button class="btn sm go" id="stat-save-${s.id}" style="display:none" onclick="saveStatRow('${s.id}')"><span class="spin"></span>Salvar</button>
+    <button class="btn sm go auto" id="stat-save-${s.id}" style="display:none" onclick="saveStatRow('${s.id}')"><span class="spin"></span>Salvar</button>
     <button class="btn sm auto" style="${s.is_resource ? 'border-color:var(--maq);color:var(--maq)' : ''}" onclick="toggleResource('${s.id}', ${!s.is_resource})" title="Recurso: mostra atual/máximo na ficha (ex.: HP)">${s.is_resource ? `<span class="ic">${ICONS.heart}</span>recurso` : 'recurso?'}</button>
     ${isC ? `<button class="btn sm auto" onclick="toggleTest('${s.id}')" title="Testar a fórmula"><span class="ic">${ICONS.flask}</span>Testar</button>` : ''}
     <button class="btn sm danger auto" onclick="delStat('${s.id}')"><span class="ic">${ICONS.x}</span></button>
@@ -392,11 +461,25 @@ window.formulaTutorial = (stats) => {
       <p style="margin:10px 0 0;font-size:12px;color:var(--ink-faint)">Dica: use apelidos curtos, sem espaços nem acentos (ex.: <code>HP</code>, <code>MANA</code>, <code>FORCA</code>, <code>DES</code>). Assim fica fácil escrever as fórmulas.</p>
     </div></div>`;
 };
-window.addStat = () => {
-  const name = $('st-name').value.trim(); if (!name) { showMsg('Dê um nome ao status.'); return; }
+// dependentes de um "nome na fórmula" — varre as fórmulas dos outros status/perícias já
+// carregados; não cobre fórmulas de itens (escala de dano/proteção), que vivem noutra aba
+function statDependents(key, excludeId) {
+  const k = (key || '').trim(); if (!k) return [];
+  const re = new RegExp('(^|[^A-Za-zÀ-ú0-9_])' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^A-Za-zÀ-ú0-9_])');
+  return _statusStats.filter((s) => s.id !== excludeId && s.kind === 'computed' && re.test(s.formula || '')).map((s) => s.name);
+}
+function formulaKeyTaken(key, excludeId) {
+  const k = (key || '').trim().toLowerCase(); if (!k) return false;
+  return _statusStats.some((s) => s.id !== excludeId && (s.formula_key || '').trim().toLowerCase() === k);
+}
+window.addStat = (ev) => {
+  ev.preventDefault();
+  const name = $('st-name').value.trim(); if (!name) { showMsg('Dê um nome ao status.'); return false; }
+  const formKey = $('st-formkey').value.trim();
+  if (formKey && formulaKeyTaken(formKey)) { showMsg(`Já existe um status com o "nome na fórmula" "${formKey}" — escolha outro apelido.`); return false; }
   const type = $('st-type').value;
   const extra = $('st-extra')?.value.trim() || '';
-  const stat = { name, formula_key: $('st-formkey').value.trim() || null, sort_order: Date.now() % 100000, color: $('st-color')?.value || '#7ee6dc' };
+  const stat = { name, formula_key: formKey || null, sort_order: Date.now() % 100000, color: $('st-color')?.value || '#7ee6dc' };
   if (type === 'status') {
     stat.kind = 'base'; stat.is_resource = false; stat.default_value = null;
   } else {
@@ -405,25 +488,49 @@ window.addStat = () => {
     else { stat.kind = 'base'; stat.default_value = extra; }
   }
   db.createStat(systemId, stat).then(() => openTab('status')).catch((e) => showMsg(e.message));
+  return false;
 };
 // não grava mais no banco a cada campo — só atualiza o rascunho em memória (mantém o painel de
 // "Testar" com valores frescos) e mostra o botão Salvar dessa linha. saveStatRow() grava tudo
 // de uma vez quando o usuário decide confirmar.
 window.onStatFieldChange = (id, k, v) => {
   const s = _statusStats.find((x) => x.id === id); if (s) s[k] = v.trim();
-  const b = $('stat-save-' + id); if (b) b.style.display = '';
+  const b = $('stat-save-' + id);
+  if (b && b.style.display === 'none') markDirty();
+  if (b) b.style.display = '';
 };
 window.saveStatRow = (id) => {
   const s = _statusStats.find((x) => x.id === id); if (!s) return;
+  const key = (s.formula_key || '').trim();
+  if (key && formulaKeyTaken(key, id)) { showMsg(`Já existe outro status com o "nome na fórmula" "${key}".`); return; }
+  // valida a fórmula com os valores padrão dos status base ANTES de gravar — sem isso, uma
+  // fórmula incompleta (ex.: "FORCA +") só dava erro se alguém lembrasse de clicar em "Testar"
+  if (s.kind === 'computed') {
+    const baseVals = {};
+    _statusStats.forEach((b) => { if (b.kind !== 'computed' && (b.formula_key || '').trim()) baseVals[b.formula_key.trim()] = b.default_value || '0'; });
+    try { computeStat(s, baseVals); } catch (e) { showMsg('Fórmula inválida: ' + e.message); return; }
+  }
   const btn = $('stat-save-' + id); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
-  const patch = { name: (s.name || '').trim(), formula_key: (s.formula_key || '').trim() };
+  const patch = { name: (s.name || '').trim(), formula_key: key };
   if (s.kind === 'computed') patch.formula = (s.formula || '').trim(); else patch.default_value = (s.default_value || '').trim();
   patch.color = s.color || null;
-  db.updateStat(id, patch).then(() => { if (btn) btn.style.display = 'none'; showMsg('Salvo.', 'ok'); })
+  db.updateStat(id, patch).then(() => { if (btn) btn.style.display = 'none'; clearDirty(); showMsg('Salvo.', 'ok'); })
     .catch((e) => showMsg(e.message))
     .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
 };
-window.delStat = (id) => db.deleteStat(id).then(() => openTab('status')).catch((e) => showMsg(e.message));
+window.delStat = async (id) => {
+  const s = _statusStats.find((x) => x.id === id);
+  const deps = s ? statDependents(s.formula_key, id) : [];
+  const ok = await confirmModal({
+    title: 'Excluir status',
+    desc: deps.length
+      ? `A fórmula de "${deps.join('", "')}" usa este status — vai passar a dar erro ao calcular. Excluir mesmo assim?`
+      : 'Não dá pra desfazer.',
+    confirmLabel: 'Excluir',
+  });
+  if (!ok) return;
+  db.deleteStat(id).then(() => openTab('status')).catch((e) => showMsg(e.message));
+};
 
 /* ===================== PERÍCIAS ===================== */
 // perícia = um status "computed" com a etiqueta is_skill: sempre calculada por fórmula (nunca
@@ -449,15 +556,15 @@ async function renderPericias(c) {
     <div class="list">${pericias.length ? pericias.map(periciaRow).join('') : '<div class="empty">Nenhuma perícia ainda.</div>'}</div>
 
     <div class="surface" style="margin-top:16px">
-      <div class="item-form">
-        <div class="fld"><label>Nome</label><input id="pe-name" placeholder="Ex.: Furtividade" maxlength="40"></div>
-        <div class="fld"><label>Nome na fórmula</label><input id="pe-formkey" placeholder="Ex.: FURTIVIDADE" maxlength="20"></div>
-        <div class="fld"><label>Fórmula</label><input id="pe-formula" placeholder="Ex.: DES + PROF"></div>
+      <form class="item-form" onsubmit="return addPericia(event)">
+        <div class="fld"><label for="pe-name">Nome</label><input id="pe-name" placeholder="Ex.: Furtividade" maxlength="40" required></div>
+        <div class="fld"><label for="pe-formkey">Nome na fórmula</label><input id="pe-formkey" placeholder="Ex.: FURTIVIDADE" maxlength="20"></div>
+        <div class="fld"><label for="pe-formula">Fórmula</label><input id="pe-formula" placeholder="Ex.: DES + PROF"></div>
         <div class="fld"><label>Cor</label>
           <button type="button" class="color-swatch full" style="--sw:#7ee6dc" onclick="openColorPicker(this, '#7ee6dc', (v)=>{ document.getElementById('pe-color').value = v; })"></button>
           <input type="hidden" id="pe-color" value="#7ee6dc"></div>
-        <div class="full"><button class="btn go auto" onclick="addPericia()">+ Adicionar perícia</button></div>
-      </div>
+        <div class="full"><button class="btn go auto" type="submit">+ Adicionar perícia</button></div>
+      </form>
     </div>
 
     ${formulaTutorial(stats)}`;
@@ -472,22 +579,26 @@ function periciaRow(s) {
     <input value="${esc(s.formula)}" placeholder="fórmula (ex.: DES + PROF)"
       style="flex:1 1 180px;min-width:140px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--maq);font-family:var(--mono);font-size:12px;padding:8px 10px"
       onchange="onStatFieldChange('${s.id}','formula',this.value)">
-    <button class="btn sm go" id="stat-save-${s.id}" style="display:none" onclick="saveStatRow('${s.id}')"><span class="spin"></span>Salvar</button>
+    <button class="btn sm go auto" id="stat-save-${s.id}" style="display:none" onclick="saveStatRow('${s.id}')"><span class="spin"></span>Salvar</button>
     <button class="btn sm auto" onclick="toggleTest('${s.id}')" title="Testar a fórmula"><span class="ic">${ICONS.flask}</span>Testar</button>
     <button class="btn sm danger auto" onclick="delStat('${s.id}')"><span class="ic">${ICONS.x}</span></button>
   </div>
   <div id="test-${s.id}" class="surface" style="display:none;margin:-2px 0 8px;padding:14px"></div>`;
 }
-window.addPericia = () => {
-  const name = $('pe-name').value.trim(); if (!name) { showMsg('Dê um nome à perícia.'); return; }
+window.addPericia = (ev) => {
+  ev.preventDefault();
+  const name = $('pe-name').value.trim(); if (!name) { showMsg('Dê um nome à perícia.'); return false; }
+  const formKey = $('pe-formkey').value.trim();
+  if (formKey && formulaKeyTaken(formKey)) { showMsg(`Já existe um status/perícia com o "nome na fórmula" "${formKey}" — escolha outro apelido.`); return false; }
   const stat = {
-    name, formula_key: $('pe-formkey').value.trim() || null,
+    name, formula_key: formKey || null,
     formula: $('pe-formula').value.trim(),
     kind: 'computed', is_resource: false, is_skill: true,
     color: $('pe-color').value || '#7ee6dc',
     sort_order: Date.now() % 100000,
   };
   db.createStat(systemId, stat).then(() => openTab('pericias')).catch((e) => showMsg(e.message));
+  return false;
 };
 window.toggleSkillsEnabled = (val) => {
   system.skills_enabled = val;
@@ -538,12 +649,12 @@ async function renderProficiencias(c) {
       'Ex.: tipos de arma, armadura, ferramenta ou idioma que um personagem pode ou não saber usar.')}
 
     <div class="surface">
-      <div class="item-form">
-        <div class="fld"><label>Nome</label><input id="pr-name" placeholder="Ex.: Espada longa" maxlength="40"></div>
-        <div class="fld"><label>Categoria</label><input id="pr-cat" placeholder="Ex.: Arma" maxlength="24"></div>
-        <div class="fld"><label>Nome na fórmula <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional)</span></label><input id="pr-formkey" placeholder="Ex.: PROF_FERRARIA" maxlength="24"></div>
-        <div class="full"><button class="btn go auto" onclick="addProficiencia()">+ Adicionar proficiência</button></div>
-      </div>
+      <form class="item-form" onsubmit="return addProficiencia(event)">
+        <div class="fld"><label for="pr-name">Nome</label><input id="pr-name" placeholder="Ex.: Espada longa" maxlength="40" required></div>
+        <div class="fld"><label for="pr-cat">Categoria</label><input id="pr-cat" placeholder="Ex.: Arma" maxlength="24"></div>
+        <div class="fld"><label for="pr-formkey">Nome na fórmula <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional)</span></label><input id="pr-formkey" placeholder="Ex.: PROF_FERRARIA" maxlength="24"></div>
+        <div class="full"><button class="btn go auto" type="submit">+ Adicionar proficiência</button></div>
+      </form>
     </div>`;
 }
 function profRow(p) {
@@ -558,12 +669,17 @@ function profRow(p) {
     <button class="btn sm danger auto" onclick="delProficiencia('${p.id}')"><span class="ic">${ICONS.x}</span></button>
   </div>`;
 }
-window.addProficiencia = () => {
-  const name = $('pr-name').value.trim(); if (!name) { showMsg('Dê um nome à proficiência.'); return; }
+window.addProficiencia = (ev) => {
+  ev.preventDefault();
+  const name = $('pr-name').value.trim(); if (!name) { showMsg('Dê um nome à proficiência.'); return false; }
   const category = $('pr-cat').value.trim() || null;
   const formula_key = $('pr-formkey').value.trim() || null;
+  if (formula_key && _profsList.some((p) => (p.formula_key || '').trim().toLowerCase() === formula_key.toLowerCase())) {
+    showMsg(`Já existe uma proficiência com o "nome na fórmula" "${formula_key}" — escolha outro apelido.`); return false;
+  }
   db.createProficiency(systemId, { name, category, formula_key, sort_order: Date.now() % 100000 })
     .then(() => openTab('proficiencias')).catch((e) => showMsg(e.message));
+  return false;
 };
 window.updateProfField = (id, k, v) => {
   db.updateProficiency(id, { [k]: v.trim() || null }).then(() => showMsg('Salvo.', 'ok')).catch((e) => showMsg(e.message));
@@ -668,7 +784,7 @@ async function renderClasses(c) {
           style="flex:1;background:transparent;border:0;color:${isSub?'var(--ink)':'var(--bone)'};font-family:var(--disp);font-size:${isSub?14:16}px">
         ${!isSub ? `<button type="button" class="color-swatch" style="--sw:${esc(cl.color || '#7ee6dc')}" title="Cor da classe na ficha do jogador (subclasses puxam a mesma cor)" onclick="openColorPicker(this, '${esc(cl.color || '#7ee6dc')}', (v)=>onClassFieldChange('${cl.id}','color',v))"></button>` : ''}
         <span class="badge">${isSub ? 'Subclasse' : 'Classe'}</span>
-        <button class="btn sm go" id="class-save-${cl.id}" style="display:none" onclick="saveClass('${cl.id}')"><span class="spin"></span>Salvar</button>
+        <button class="btn sm go auto" id="class-save-${cl.id}" style="display:none" onclick="saveClass('${cl.id}')"><span class="spin"></span>Salvar</button>
         <button class="btn sm auto" onclick="toggleBase('${cl.id}', this)">Status base ▾</button>
         <button class="btn sm auto" onclick="toggleClassProfs('${cl.id}')">Proficiências ▾</button>
         <button class="btn sm danger auto" onclick="delClass('${cl.id}')"><span class="ic">${ICONS.x}</span></button>
@@ -702,19 +818,27 @@ window.delClass = async (id) => {
 function classDraft(id) { return _classDrafts[id] || (_classDrafts[id] = { baseStats: {} }); }
 window.onClassFieldChange = (id, k, v) => {
   classDraft(id)[k] = v;
-  const b = $('class-save-' + id); if (b) b.style.display = '';
+  const b = $('class-save-' + id);
+  if (b && b.style.display === 'none') markDirty();
+  if (b) b.style.display = '';
 };
 window.onClassBaseChange = (classId, statId, v) => {
   classDraft(classId).baseStats[statId] = v;
-  const b = $('class-save-' + classId); if (b) b.style.display = '';
+  const b = $('class-save-' + classId);
+  if (b && b.style.display === 'none') markDirty();
+  if (b) b.style.display = '';
 };
 window.toggleBase = async (classId, btn) => {
   const panel = $('base-' + classId);
   if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
-  if (!_stats.length) { panel.innerHTML = '<div class="sub" style="padding:8px">Crie status na aba “Status” primeiro.</div>'; panel.style.display = ''; return; }
+  // só "Status" de verdade (base, não-recurso) entram aqui — Recursos já têm o próprio valor
+  // fixo/fórmula (aba Status) e Perícias são sempre calculadas (nunca atribuídas na mão), então um
+  // "valor base por classe" pros dois não corresponde a nada que a ficha realmente usa
+  const baseStats = _stats.filter((s) => s.kind !== 'computed' && !s.is_resource);
+  if (!baseStats.length) { panel.innerHTML = '<div class="sub" style="padding:8px">Crie um Status (não-recurso) na aba “Status” primeiro.</div>'; panel.style.display = ''; return; }
   const vals = await db.getClassBaseStats(classId);
   const draft = classDraft(classId).baseStats;
-  panel.innerHTML = _stats.map((s) => `<div class="fld row" style="margin-bottom:6px"><label style="flex:0 0 120px">${esc(s.name)}</label>
+  panel.innerHTML = baseStats.map((s) => `<div class="fld row" style="margin-bottom:6px"><label style="flex:0 0 120px">${esc(s.name)}</label>
     <input value="${esc(draft[s.id] ?? vals[s.id] ?? s.default_value ?? '')}" oninput="onClassBaseChange('${classId}','${s.id}',this.value)"></div>`).join('');
   panel.style.display = '';
 };
@@ -763,6 +887,7 @@ window.saveClass = (id) => {
   Promise.all(ops).then(() => {
     delete _classDrafts[id];
     if (btn) btn.style.display = 'none';
+    clearDirty();
     showMsg('Salvo.', 'ok');
   }).catch((e) => showMsg(e.message))
     .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
@@ -878,6 +1003,15 @@ window.delLevel = async (level) => {
 
 /* ===================== ÁRVORES ===================== */
 async function renderArvores(c) {
+  // embutido dentro da mesa: essa aba fica de fora da barra (ver TABS acima), mas o cartão de
+  // "Monte seu sistema" na aba Geral também linka pra cá diretamente (openTab('arvores')) — sem
+  // essa segunda trava, esse segundo caminho ainda cairia no link de "Acessar árvore" sem
+  // embed=1 (linha abaixo), criando o iframe-dentro-de-iframe que a trava da barra evita.
+  if (embedded) {
+    c.innerHTML = emptyState(ICONS.tree, 'Use a aba Árvores da mesa',
+      'Editar árvores de habilidade aqui de dentro criaria uma árvore dentro de outra janela embutida. A própria mesa já tem uma aba Árvores com o caminho certo pra isso.');
+    return;
+  }
   const [trees, classes] = await Promise.all([db.listSystemTrees(systemId), db.listClasses(systemId)]);
   const label = (cl) => cl.parent_id ? `<span class="ic">${ICONS.cornerDownRight}</span>${esc(cl.name)}` : esc(cl.name);
   const sel = (on) => 'cursor:pointer;' + (on ? 'color:#08161a;background:linear-gradient(90deg,var(--brass),#f3dca0)' : '');
@@ -886,7 +1020,7 @@ async function renderArvores(c) {
     return `<div class="list-row" style="flex-direction:column;align-items:stretch;gap:10px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <div class="nm" style="flex:1;min-width:140px">${esc(t.name)}</div>
-        <a class="btn sm go auto" style="text-decoration:none" href="arvore.html?t=${Date.now()}&tree=${t.id}&system=${systemId}"><span class="ic">${ICONS.externalLink}</span>Acessar árvore</a>
+        <a class="btn sm go auto" style="text-decoration:none" href="arvore.html?tree=${t.id}&system=${systemId}&v=4"><span class="ic">${ICONS.externalLink}</span>Acessar árvore</a>
         <button class="btn sm danger auto" onclick="delTree('${t.id}')">Excluir</button>
       </div>
       <div class="sub">Atribuir a classes/subclasses:</div>
@@ -917,7 +1051,11 @@ async function renderArvores(c) {
 }
 window.addTree = (ev) => { ev.preventDefault(); const n = $('tr-name').value.trim(); if (!n) return false;
   db.createSystemTree(systemId, n, $('tr-shape').value).then(() => openTab('arvores')).catch((e) => showMsg(e.message)); return false; };
-window.delTree = (id) => db.deleteSystemTree(id).then(() => openTab('arvores')).catch((e) => showMsg(e.message));
+window.delTree = async (id) => {
+  const ok = await confirmModal({ title: 'Excluir árvore', desc: 'Apaga todas as esferas, conexões e o progresso dos jogadores nela. Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteSystemTree(id).then(() => openTab('arvores')).catch((e) => showMsg(e.message));
+};
 window.toggleAssign = (treeId, classId, cb) => {
   const on = cb.checked;
   const label = cb.closest('label');
@@ -928,11 +1066,33 @@ window.toggleAssign = (treeId, classId, cb) => {
 };
 
 /* ===================== ITENS ===================== */
+// moldura de raridade "premium" (mesmo padrão de app.html, duplicado aqui de propósito —
+// convenção do projeto de não compartilhar helpers de UI entre páginas): decorações internas
+// pra dentro do .poster-card/.list-row, que é envolvido por um .rar-frame (borda em degradê animado).
+function posterRarityLayers(rarity) {
+  const glintSpots = {
+    'Épico': [[16, 22]],
+    'Lendário': [[18, 18], [80, 28], [14, 66], [84, 86]],
+    'Único': [[12, 14], [82, 20], [6, 36], [90, 46], [16, 64], [86, 78], [24, 94], [72, 90], [48, 10], [46, 56], [66, 48]],
+  };
+  const spots = glintSpots[rarity] || [];
+  let glints = '';
+  spots.forEach((p, i) => {
+    const delay = (i * 0.28).toFixed(2);
+    const dur = (2.1 + (i % 4) * 0.3).toFixed(2);
+    const size = 8 + (i % 3) * 2;
+    glints += `<i class="pc-glint" style="left:${p[0]}%;top:${p[1]}%;width:${size}px;height:${size}px;animation-delay:${delay}s;animation-duration:${dur}s"></i>`;
+  });
+  let extra = '';
+  if (rarity === 'Épico' || rarity === 'Único') extra += `<span class="pc-sweep"></span>`;
+  if (rarity === 'Lendário' || rarity === 'Único') extra += `<span class="pc-highlight"></span><span class="pc-topline"></span><span class="pc-core"></span>`;
+  if (rarity === 'Único') extra += `<span class="pc-sweep pc-sweep2"></span><span class="pc-ring"></span><span class="pc-ring pc-ring2"></span>`;
+  return extra + glints;
+}
 let _sysItems = [];
 let _sysStats = []; // status do sistema — alimenta os seletores "Escala com" (só existe aqui dentro)
 let _siImgUrl = null, _siImgFile = null; // imagem do item do sistema em edição
 const statKey = (s) => s.formula_key || s.name;
-const statLabel = (key) => _sysStats.find((s) => statKey(s) === key)?.name || key;
 function statOptionsHtml(selected) {
   return '<option value="">— nenhum —</option>' + _sysStats.map((s) => {
     const key = statKey(s);
@@ -940,7 +1100,6 @@ function statOptionsHtml(selected) {
   }).join('');
 }
 let _sysProfs = [];
-const profLabel = (id) => _sysProfs.find((p) => p.id === id)?.name || '';
 function profOptionsHtml(selected) {
   return '<option value="">— nenhuma —</option>' + _sysProfs.map((p) =>
     `<option value="${esc(p.id)}" ${selected === p.id ? 'selected' : ''}>${esc(p.name)}${p.category ? ' (' + esc(p.category) + ')' : ''}</option>`
@@ -953,7 +1112,48 @@ async function renderItens(c) {
   _sysProfs = profs;
   const usedSources = new Set(inSystem.map((i) => i.source_item_id).filter(Boolean));
   const avail = library.filter((i) => !usedSources.has(i.id));
-  const badges = (it) => `${it.rarity ? `<span class="badge r-${esc((it.rarity||'').toLowerCase())}">${esc(it.rarity)}</span>` : ''}${it.category ? `<span class="badge cat">${esc(it.category)}</span>` : ''}${it.weapon_damage ? `<span class="badge mod">Dano ${esc(it.weapon_damage)}${it.damage_scale ? ' · ' + esc(statLabel(it.damage_scale)) : ''}</span>` : ''}${(it.protection != null && it.protection !== '') ? `<span class="badge mod">Proteção ${esc(String(it.protection))}${it.protection_scale ? ' · ' + esc(statLabel(it.protection_scale)) : ''}</span>` : ''}${it.proficiency_id ? `<span class="badge" style="border-color:var(--brass);color:var(--brass)"><span class="ic">${ICONS.checklist}</span>${esc(profLabel(it.proficiency_id))}</span>` : ''}`;
+  // mesmo card-pôster da aba Itens (app.html) — copiado igual, só troca a ação: aqui o clique
+  // abre o editor do item do sistema (lá abre um modal de detalhe) e o botão no canto remove
+  // (lá é favoritar).
+  const sysItemCard = (it) => {
+    const rarity = it.rarity || 'Comum';
+    const rarityKey = 'r-' + rarity.toLowerCase();
+    const initial = esc((it.name || '?').trim().charAt(0).toUpperCase() || '?');
+    const bgStyle = it.image_url ? ` style="background-image:url('${esc(it.image_url)}')"` : '';
+    return `
+      <div class="rar-frame" data-rarity="${esc(rarity)}">
+        <div class="poster-card" onclick='openSysItem("${it.id}")' tabindex="0" role="button" aria-label="Editar ${esc(it.name)}">
+          ${posterRarityLayers(rarity)}
+          <button class="poster-fav" onclick='event.stopPropagation();rmSysItem("${it.id}")' title="Remover do sistema" aria-label="Remover do sistema"><span class="ic">${ICONS.x}</span></button>
+          <div class="poster-icon ${it.image_url ? '' : 'ph ' + rarityKey}"${bgStyle}>${!it.image_url ? `<span class="poster-initial">${initial}</span>` : ''}</div>
+          <div class="poster-body">
+            <h4 class="poster-name">${esc(it.name)}</h4>
+            <span class="rar-pill" data-rarity="${esc(rarity)}">${esc(rarity)}</span>
+            ${it.description ? `<p class="poster-desc">${esc(it.description)}</p>` : ''}
+            <div class="poster-meta">${it.item_code ? '#' + esc(it.item_code) : ''}</div>
+          </div>
+        </div>
+      </div>`;
+  };
+  const libItemCard = (it) => {
+    const rarity = it.rarity || 'Comum';
+    const rarityKey = 'r-' + rarity.toLowerCase();
+    const initial = esc((it.name || '?').trim().charAt(0).toUpperCase() || '?');
+    const bgStyle = it.image_url ? ` style="background-image:url('${esc(it.image_url)}')"` : '';
+    return `
+      <div class="rar-frame" data-rarity="${esc(rarity)}">
+        <div class="poster-card" onclick='addLibItem("${it.id}")' tabindex="0" role="button" aria-label="Copiar ${esc(it.name)} pro sistema">
+          ${posterRarityLayers(rarity)}
+          <button class="poster-fav" onclick='event.stopPropagation();addLibItem("${it.id}")' title="Copiar p/ sistema" aria-label="Copiar p/ sistema">${ICONS.plus}</button>
+          <div class="poster-icon ${it.image_url ? '' : 'ph ' + rarityKey}"${bgStyle}>${!it.image_url ? `<span class="poster-initial">${initial}</span>` : ''}</div>
+          <div class="poster-body">
+            <h4 class="poster-name">${esc(it.name)}</h4>
+            <span class="rar-pill" data-rarity="${esc(rarity)}">${esc(rarity)}</span>
+            ${it.category ? `<div class="poster-meta">${esc(it.category)}</div>` : ''}
+          </div>
+        </div>
+      </div>`;
+  };
   c.innerHTML = `
     <div class="section-title">Itens do sistema (${inSystem.length})</div>
     <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:0 0 12px">
@@ -962,60 +1162,94 @@ async function renderItens(c) {
 
     <div id="sysitem-editor" class="surface" style="display:none;margin-top:14px"></div>
 
-    <div class="list" style="margin-top:14px">${inSystem.length ? inSystem.map((it) => `
-      <div class="list-row">
-        ${it.image_url ? `<img class="item-thumb" src="${esc(it.image_url)}" alt="" loading="lazy">` : ''}
-        <div class="grow"><div class="nm">${esc(it.name)}</div>
-          <div class="sub" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:4px">${badges(it)}
-            ${(it.modifiers||[]).map((m)=>`<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}
-            ${it.source_item_id ? '<span class="badge" style="color:var(--ink-faint)">da biblioteca</span>' : ''}</div></div>
-        <button class="btn sm auto" onclick="openSysItem('${it.id}')">Editar</button>
-        <button class="btn sm danger auto" onclick="rmSysItem('${it.id}')"><span class="ic">${ICONS.x}</span></button>
-      </div>`).join('') : emptyState(ICONS.bag, 'Nenhum item no sistema',
+    ${inSystem.length > 6 ? `<div class="toolbar" style="margin-top:14px"><div class="search-field">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-5.2-5.2"/></svg>
+      <input id="sysitem-q" placeholder="Buscar item do sistema por nome ou descrição..." oninput="paintSysItems()"></div></div>` : ''}
+    <div class="item-grid" id="sysitem-grid" style="margin-top:14px">${inSystem.length ? inSystem.map(sysItemCard).join('') : `<div style="grid-column:1/-1">${emptyState(ICONS.bag, 'Nenhum item no sistema',
         'Crie itens direto no sistema ou copie da sua biblioteca — eles ficam disponíveis pros jogadores das mesas.',
-        '<button class="btn go auto sm" onclick="openSysItem()">+ Criar item no sistema</button>')}</div>
+        '<button class="btn go auto sm" onclick="openSysItem()">+ Criar item no sistema</button>')}</div>`}</div>
 
     <div class="section-title">Adicionar da sua biblioteca</div>
-    <div class="list">${avail.length ? avail.map((it) => `
-      <div class="list-row"><div class="grow"><div class="nm">${esc(it.name)}</div>
-        <div class="sub">${[it.category,it.rarity].filter(Boolean).map(esc).join(' · ')}</div></div>
-        <button class="btn sm auto" onclick="addLibItem('${it.id}')">Copiar p/ sistema</button></div>`).join('')
-      : '<div class="empty">Nada novo na biblioteca (ou tudo já foi copiado).</div>'}</div>
+    ${avail.length > 6 ? `<div class="toolbar"><div class="search-field">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-5.2-5.2"/></svg>
+      <input id="libitem-q" placeholder="Buscar na biblioteca por nome ou descrição..." oninput="paintLibItems()"></div></div>` : ''}
+    <div class="item-grid" id="libitem-grid">${avail.length ? avail.map(libItemCard).join('')
+      : '<div class="empty" style="grid-column:1/-1">Nada novo na biblioteca (ou tudo já foi copiado).</div>'}</div>
+
+    <div class="section-title">Importar pacote de itens</div>
+    <div class="list" id="sysitem-packages"><div class="empty">Carregando…</div></div>
 
     <datalist id="stat-keys">${stats.map((s)=>`<option value="${esc(s.formula_key||s.name)}">${esc(s.name)}</option>`).join('')}</datalist>`;
+  renderSysItemPackages();
+  // busca só aparece quando há mais de 6 itens (grade pequena não precisa) — filtra por
+  // nome/descrição sem recarregar do banco, igual o padrão já usado em app.html
+  const filterBy = (list, q) => { const t = (q || '').trim().toLowerCase(); if (!t) return list;
+    return list.filter((it) => (it.name || '').toLowerCase().includes(t) || (it.description || '').toLowerCase().includes(t)); };
+  window.paintSysItems = () => {
+    const grid = $('sysitem-grid'); if (!grid) return;
+    const filtered = filterBy(inSystem, $('sysitem-q')?.value);
+    grid.innerHTML = filtered.length ? filtered.map(sysItemCard).join('')
+      : `<div style="grid-column:1/-1">${emptyState(ICONS.bag, 'Nada encontrado', 'Nenhum item do sistema corresponde à busca.')}</div>`;
+  };
+  window.paintLibItems = () => {
+    const grid = $('libitem-grid'); if (!grid) return;
+    const filtered = filterBy(avail, $('libitem-q')?.value);
+    grid.innerHTML = filtered.length ? filtered.map(libItemCard).join('')
+      : `<div class="empty" style="grid-column:1/-1">Nada encontrado.</div>`;
+  };
 }
+// pacotes são montados na aba Itens do app.html (biblioteca pessoal) — aqui só lista e importa
+async function renderSysItemPackages() {
+  const box = $('sysitem-packages'); if (!box) return;
+  try {
+    const packages = await db.listItemPackages();
+    box.innerHTML = packages.length ? packages.map((p) => `
+      <div class="list-row"><div class="grow"><div class="nm">${esc(p.name)}</div>
+        <div class="sub">${p.item_ids.length} ${p.item_ids.length === 1 ? 'item' : 'itens'}</div></div>
+        <button class="btn sm auto" onclick="importPackage('${p.id}')">Importar pacote</button></div>`).join('')
+      : '<div class="empty">Você ainda não criou pacotes — monte um na aba Itens &gt; Pacotes, na tela inicial.</div>';
+  } catch (e) { box.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; }
+}
+window.importPackage = (packageId) => {
+  db.importPackageToSystem(systemId, packageId).then((n) => {
+    showMsg(n ? `${n} ${n === 1 ? 'item importado' : 'itens importados'}.` : 'Todos os itens desse pacote já estavam no sistema.', 'ok');
+    openTab('itens');
+  }).catch((e) => showMsg(e.message));
+};
 window.openSysItem = (id = null) => {
   const it = id ? _sysItems.find((x) => x.id === id) : null;
   const box = $('sysitem-editor'); box.dataset.editing = id || '';
   box.innerHTML = `
     <h4 style="font-family:var(--disp);font-size:15px;color:var(--bone);margin:0 0 14px">${id ? 'Editar item do sistema' : 'Novo item do sistema'}</h4>
     <div class="item-form">
-      <div class="fld"><label>Nome</label><input id="si-name" maxlength="80" value="${esc(it?.name||'')}"></div>
-      <div class="fld"><label>Categoria</label><select id="si-cat" class="fld-input" onchange="updateSiCategoryFields()">${CATEGORIES.map((x)=>`<option ${it&&it.category===x?'selected':''}>${x}</option>`).join('')}</select></div>
-      <div class="fld"><label>Raridade</label><select id="si-rar" class="fld-input">${RARITIES.map((x)=>`<option ${it&&it.rarity===x?'selected':''}>${x}</option>`).join('')}</select></div>
-      <div class="fld"><label>Proficiência necessária <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional)</span></label>
+      <div class="fld"><label for="si-name">Nome</label><input id="si-name" maxlength="80" value="${esc(it?.name||'')}"></div>
+      <div class="fld"><label for="si-cat">Categoria</label><select id="si-cat" class="fld-input" onchange="updateSiCategoryFields()">${CATEGORIES.map((x)=>`<option ${it&&it.category===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="fld"><label for="si-rar">Raridade</label><select id="si-rar" class="fld-input">${RARITIES.map((x)=>`<option ${it&&it.rarity===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="fld"><label for="si-prof">Proficiência necessária <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional)</span></label>
         <select id="si-prof" class="fld-input">${profOptionsHtml(it?.proficiency_id || '')}</select></div>
+      <div class="fld"><label for="si-eqtype">Tipo de equipamento <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — define em qual slot da tela de equipamentos ele encaixa)</span></label>
+        <select id="si-eqtype" class="fld-input">${equipTypeOptionsHtml(it?.equipment_type || '', 'Nenhum (não equipável em slot)')}</select></div>
 
       <div class="fld" id="si-damage-fld" style="display:none">
-        <label>Dano <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(fórmula, ex.: 1d8+2)</span></label>
+        <label for="si-damage">Dano <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(fórmula, ex.: 1d8+2)</span></label>
         <input id="si-damage" value="${esc(it?.weapon_damage||'')}" placeholder="Ex.: 1d8+2" aria-describedby="si-damage-err">
         <div class="fld-err" id="si-damage-err"></div>
       </div>
       <div class="fld" id="si-damage-scale-fld" style="display:none">
-        <label>Escala com <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — status deste sistema)</span></label>
+        <label for="si-damage-scale">Escala com <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — status deste sistema)</span></label>
         <select id="si-damage-scale" class="fld-input">${statOptionsHtml(it?.damage_scale || '')}</select>
       </div>
       <div class="fld" id="si-protection-fld" style="display:none">
-        <label>Proteção</label>
+        <label for="si-protection">Proteção</label>
         <input id="si-protection" type="number" min="0" step="1" value="${it?.protection ?? ''}" placeholder="Ex.: 5" aria-describedby="si-protection-err">
         <div class="fld-err" id="si-protection-err"></div>
       </div>
       <div class="fld" id="si-protection-scale-fld" style="display:none">
-        <label>Escala com <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — status deste sistema)</span></label>
+        <label for="si-protection-scale">Escala com <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — status deste sistema)</span></label>
         <select id="si-protection-scale" class="fld-input">${statOptionsHtml(it?.protection_scale || '')}</select>
       </div>
 
-      <div class="fld full"><label>Descrição</label><input id="si-desc" value="${esc(it?.description||'')}" placeholder="O que o item faz..."></div>
+      <div class="fld full"><label for="si-desc">Descrição</label><input id="si-desc" value="${esc(it?.description||'')}" placeholder="O que o item faz..."></div>
       <div class="fld full"><label>Imagem do item <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional — até 3 MB)</span></label>
         <div class="img-picker">
           <img id="si-img-prev" class="img-thumb" alt="" ${it?.image_url ? `src="${esc(it.image_url)}"` : 'style="display:none"'}>
@@ -1029,8 +1263,8 @@ window.openSysItem = (id = null) => {
         <div id="si-mods"></div>
         <button type="button" class="btn auto sm" id="si-mods-add" onclick="addSiMod()">+ Modificador</button>
         <div class="fld-err" id="si-mods-err"></div></div>
-      <div class="full actions"><button class="btn" onclick="closeSysItem()">Cancelar</button>
-        <button class="btn go" onclick="saveSysItem()">Salvar</button></div>
+      <div class="full actions"><button class="btn auto" onclick="closeSysItem()">Cancelar</button>
+        <button class="btn go auto" onclick="saveSysItem()">Salvar</button></div>
     </div>`;
   _siImgUrl = it?.image_url || null; _siImgFile = null;
   $('si-mods').innerHTML = '';
@@ -1109,6 +1343,7 @@ window.saveSysItem = async () => {
       protection: isProtective ? Number(protectionRaw) : null,
       protection_scale: isProtective ? ($('si-protection-scale').value || null) : null,
       proficiency_id: $('si-prof').value || null,
+      equipment_type: $('si-eqtype').value.trim() || null,
     };
     const editing = $('sysitem-editor').dataset.editing;
     await (editing ? db.updateSystemItem(editing, payload) : db.createSystemItem(systemId, payload));
@@ -1121,6 +1356,355 @@ window.rmSysItem = async (id) => {
   db.deleteSystemItem(id).then(() => openTab('itens')).catch((e) => showMsg(e.message));
 };
 window.addLibItem = (libId) => db.addSystemItemFromLibrary(systemId, libId).then(() => openTab('itens')).catch((e) => showMsg(e.message));
+
+/* ===================== EQUIPAMENTO (tela "paper doll") ===================== */
+// o Mestre monta um quadro livre (sem grade fixa) com quantos slots quiser, arrasta cada um pra
+// posição exata (pos_x/pos_y em %, guardado normalizado — funciona em qualquer tamanho de tela) e
+// define, por slot, que "tipo de equipamento" ele aceita (texto livre, casa com o campo homônimo
+// do item — vazio aceita qualquer item). A ficha do jogador (mesa.html) espelha esse layout.
+let _eqSlots = [];
+let _eqDragMoved = false;
+let _eqsImgUrl = null, _eqsImgFile = null;
+// seleção — sempre tem pelo menos 1 slot selecionado (se existir algum), pra o painel lateral
+// nunca sumir; clique normal troca a seleção, shift/ctrl+clique acumula (seleção múltipla)
+let _eqSelected = new Set();
+let _eqPanelKey = null; // evita reconstruir o painel (e perder upload de imagem pendente) quando a seleção não mudou de fato
+async function renderEquipamento(c) {
+  const slots = await db.listEquipmentSlots(systemId);
+  _eqSlots = slots;
+  // mantém a seleção anterior se ainda existir; senão cai pro primeiro slot — nunca fica vazia
+  _eqSelected = new Set([..._eqSelected].filter((id) => slots.some((s) => s.id === id)));
+  if (!_eqSelected.size && slots.length) _eqSelected = new Set([slots[0].id]);
+  _eqPanelKey = null;
+  const bgUrl = system.equipment_bg_url || null;
+  const boardH = system.equipment_board_h || 760;
+  const boardW = system.equipment_board_w || 0; // 0 = largura automática (preenche a coluna, como antes)
+  c.innerHTML = `
+    <div class="eq-wide">
+    <div class="eq-text">
+    <div class="section-title">Tela de equipamentos</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
+      Crie quantos <b style="color:var(--brass)">slots</b> quiser (Capacete, Peitoral, Anel, Arma...) e arraste cada um pra posição exata dentro do quadro.
+      Clique num slot pra editar o nome, o <b style="color:var(--maq)">tipo de item aceito</b> e a silhueta de fundo — o painel fica sempre aberto na lateral.
+      Segure <b style="color:var(--brass)">Shift</b> ou <b style="color:var(--brass)">Ctrl</b> e clique pra selecionar vários slots de uma vez e editar/excluir em lote.
+      Suba uma imagem de fundo (um boneco, uma silhueta do personagem...) pra montar os slots em cima dela.</p>
+    </div>
+
+    <div class="eq-text" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
+      <button class="btn go auto sm" onclick="addEqSlot()">+ Novo slot</button>
+      ${slots.length > 1 ? `<button class="btn auto sm" onclick="eqSelectAll()">Selecionar todos (${slots.length})</button>` : ''}
+      <input type="file" id="eqbg-file" accept="image/*" style="display:none" onchange="onEqBgImg(this)">
+      <button class="btn auto sm" onclick="document.getElementById('eqbg-file').click()">${bgUrl ? 'Trocar imagem de fundo' : '+ Imagem de fundo'}</button>
+      ${bgUrl ? `<button class="btn auto sm" onclick="clearEqBg()">Remover fundo</button>` : ''}
+      <label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin-left:4px">
+        Altura do quadro
+        <input type="number" id="eq-board-h" min="200" max="1000" step="10" value="${boardH}" title="Ajusta a altura do quadro — útil pra não sobrar um bloco gigante quando são poucos slots"
+          style="width:76px;background:var(--field);border:1px solid var(--line2);border-radius:7px;color:var(--ink);font-family:var(--mono);font-size:11px;padding:6px 8px" onchange="onEqBoardHeight(this.value)">px
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em">
+        Largura do quadro
+        <input type="number" id="eq-board-w" min="300" max="1500" step="10" value="${boardW || ''}" placeholder="auto" title="Ajusta a largura do quadro (vazio = preenche o espaço disponível)"
+          style="width:76px;background:var(--field);border:1px solid var(--line2);border-radius:7px;color:var(--ink);font-family:var(--mono);font-size:11px;padding:6px 8px" onchange="onEqBoardWidth(this.value)">px
+      </label>
+    </div>
+
+    <div class="eq-layout">
+      <div class="eq-board${bgUrl ? ' has-bg' : ''}" id="eq-board" style="min-height:${boardH}px${boardW ? `;width:${boardW}px;flex:0 0 auto` : ''}">
+        ${bgUrl ? `<div class="eq-board-bgimg" style="background-image:url('${esc(bgUrl)}')"></div>` : ''}
+        ${slots.length ? slots.map(eqSlotHtml).join('') : ''}
+        ${!slots.length ? '<div class="eq-board-empty">Nenhum slot ainda — clique em "+ Novo slot" pra começar.</div>' : ''}
+      </div>
+      <div class="eq-side-editor" id="eq-slot-editor"></div>
+    </div>
+    </div>
+    </div>`;
+  renderEqEditorPanel(true);
+}
+window.onEqBoardHeight = (value) => {
+  const h = Math.max(200, Math.min(1000, parseInt(value) || 760));
+  $('eq-board-h').value = h;
+  system.equipment_board_h = h;
+  const board = $('eq-board'); if (board) board.style.minHeight = h + 'px';
+  db.updateSystem(systemId, { equipment_board_h: h }).catch((e) => showMsg(e.message));
+};
+// vazio = volta a preencher a largura disponível (auto, como era antes desse controle existir)
+window.onEqBoardWidth = (value) => {
+  const raw = (value || '').trim();
+  const w = raw ? Math.max(300, Math.min(1500, parseInt(raw) || 0)) : 0;
+  $('eq-board-w').value = w || '';
+  system.equipment_board_w = w || null;
+  const board = $('eq-board');
+  if (board) { board.style.width = w ? w + 'px' : ''; board.style.flex = w ? '0 0 auto' : ''; }
+  db.updateSystem(systemId, { equipment_board_w: w || null }).catch((e) => showMsg(e.message));
+};
+window.onEqBgImg = async (input) => {
+  const f = input.files && input.files[0]; if (!f) return;
+  if (!f.type.startsWith('image/')) { showMsg('Selecione um arquivo de imagem.'); input.value = ''; return; }
+  if (f.size > 5 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 5 MB).'); input.value = ''; return; }
+  try {
+    showMsg('Enviando imagem…', 'ok');
+    const url = await db.uploadImage(f, 'equipment-bg');
+    system.equipment_bg_url = url;
+    await db.updateSystem(systemId, { equipment_bg_url: url });
+    openTab('equipamento');
+  } catch (e) { showMsg(e.message); }
+};
+window.clearEqBg = async () => {
+  const ok = await confirmModal({ title: 'Remover imagem de fundo', desc: 'A tela de equipamentos volta a mostrar só a grade.', confirmLabel: 'Remover' });
+  if (!ok) return;
+  system.equipment_bg_url = null;
+  db.updateSystem(systemId, { equipment_bg_url: null }).then(() => openTab('equipamento')).catch((e) => showMsg(e.message));
+};
+function eqSlotHtml(s) {
+  return `<div class="eq-slot${_eqSelected.has(s.id) ? ' selected' : ''}" data-id="${s.id}" style="left:${s.pos_x}%;top:${s.pos_y}%;width:${s.width}px;height:${s.height}px;${s.silhouette_url ? `background-image:url('${esc(s.silhouette_url)}')` : ''}"
+    onpointerdown="onEqSlotPointerDown(event,'${s.id}')" onclick="onEqSlotClick(event,'${s.id}')">
+    <span class="eq-slot-label">${esc(s.name)}</span>
+  </div>`;
+}
+// redesenha só o quadro (não a aba toda) — usado depois de criar/salvar/excluir slot(s), pra
+// refletir posição/tamanho/seleção sem re-render geral
+function redrawEqBoard() {
+  const board = $('eq-board'); if (!board) return;
+  const bgUrl = system.equipment_bg_url || null;
+  board.innerHTML = `
+    ${bgUrl ? `<div class="eq-board-bgimg" style="background-image:url('${esc(bgUrl)}')"></div>` : ''}
+    ${_eqSlots.length ? _eqSlots.map(eqSlotHtml).join('') : ''}
+    ${!_eqSlots.length ? '<div class="eq-board-empty">Nenhum slot ainda — clique em "+ Novo slot" pra começar.</div>' : ''}`;
+}
+window.addEqSlot = async () => {
+  try {
+    const s = await db.createEquipmentSlot(systemId, { name: 'Novo slot', pos_x: 50, pos_y: 50, width: 72, height: 72, sort_order: Date.now() % 100000 });
+    // insere só o slot novo (e seleciona ele) em vez de re-renderizar a aba inteira — evita o
+    // "piscar" de tela e mantém os outros slots intactos
+    _eqSlots.push(s);
+    _eqSelected = new Set([s.id]);
+    redrawEqBoard();
+    renderEqEditorPanel(true);
+  } catch (e) { showMsg(e.message); }
+};
+// arrastar reposiciona (pointer events, mesmo padrão do editor de árvore) — só conta como clique
+// de seleção se o ponteiro não se moveu (senão todo arraste também trocaria a seleção)
+// mesmo tamanho da grade desenhada em .eq-board::before (theme.css) — precisa bater certinho pra
+// o slot encaixar exatamente nos cruzamentos das linhas
+const EQ_GRID_PX = 32;
+// a grade é centralizada no quadro (background-position:center), então os cruzamentos ficam em
+// "centro ± múltiplo de 32px", não em "0, 32, 64..." — encaixa relativo ao centro do eixo
+function eqSnapPx(px, dim) {
+  const center = dim / 2;
+  return center + Math.round((px - center) / EQ_GRID_PX) * EQ_GRID_PX;
+}
+window.onEqSlotPointerDown = (ev, id) => {
+  const board = $('eq-board'); const el = ev.currentTarget;
+  ev.preventDefault(); el.setPointerCapture(ev.pointerId);
+  _eqDragMoved = false;
+  const boardRect = board.getBoundingClientRect();
+  const startX = ev.clientX, startY = ev.clientY;
+  const slot = _eqSlots.find((s) => s.id === id); if (!slot) return;
+  const startPx = Number(slot.pos_x), startPy = Number(slot.pos_y);
+  let pendingX = startPx, pendingY = startPy;
+  const mv = (e) => {
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if (Math.abs(dx) + Math.abs(dy) > 4) _eqDragMoved = true;
+    const rawX = Math.min(100, Math.max(0, startPx + (dx / boardRect.width) * 100));
+    const rawY = Math.min(100, Math.max(0, startPy + (dy / boardRect.height) * 100));
+    // encaixa nos cruzamentos da grade de fundo — assim os slots ficam sempre alinhados entre si
+    // em vez de depender de precisão de olho no arraste
+    pendingX = Math.min(100, Math.max(0, (eqSnapPx((rawX / 100) * boardRect.width, boardRect.width) / boardRect.width) * 100));
+    pendingY = Math.min(100, Math.max(0, (eqSnapPx((rawY / 100) * boardRect.height, boardRect.height) / boardRect.height) * 100));
+    el.style.left = pendingX + '%'; el.style.top = pendingY + '%';
+  };
+  const up = () => {
+    el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up);
+    if (_eqDragMoved) {
+      slot.pos_x = pendingX; slot.pos_y = pendingY;
+      db.updateEquipmentSlot(id, { pos_x: pendingX, pos_y: pendingY }).catch((e) => showMsg(e.message));
+    }
+  };
+  el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up);
+};
+window.onEqSlotClick = (ev, id) => {
+  if (_eqDragMoved) { _eqDragMoved = false; return; }
+  const multi = ev.shiftKey || ev.ctrlKey || ev.metaKey;
+  if (multi) {
+    if (_eqSelected.has(id)) { if (_eqSelected.size > 1) _eqSelected.delete(id); } // nunca fica sem nenhum selecionado
+    else _eqSelected.add(id);
+  } else {
+    _eqSelected = new Set([id]);
+  }
+  document.querySelectorAll('#eq-board .eq-slot').forEach((el) => el.classList.toggle('selected', _eqSelected.has(el.dataset.id)));
+  renderEqEditorPanel();
+};
+// tira um slot da seleção múltipla a partir de um chip no painel de lote (mantém >=1 selecionado)
+window.eqSelectAll = () => {
+  _eqSelected = new Set(_eqSlots.map((s) => s.id));
+  document.querySelectorAll('#eq-board .eq-slot').forEach((el) => el.classList.toggle('selected', _eqSelected.has(el.dataset.id)));
+  renderEqEditorPanel(true);
+};
+window.eqDeselect = (id) => {
+  if (_eqSelected.size <= 1) return;
+  _eqSelected.delete(id);
+  document.querySelectorAll('#eq-board .eq-slot').forEach((el) => el.classList.toggle('selected', _eqSelected.has(el.dataset.id)));
+  renderEqEditorPanel(true);
+};
+// painel lateral — mostra o editor de 1 slot, ou um editor em lote quando há vários selecionados;
+// "force" ignora o cache de chave (usado depois de salvar/criar/excluir, quando o conteúdo mudou
+// mas o conjunto de ids selecionados pode ter ficado igual)
+function renderEqEditorPanel(force = false) {
+  const panel = $('eq-slot-editor'); if (!panel) return;
+  const ids = [..._eqSelected].filter((id) => _eqSlots.some((s) => s.id === id));
+  _eqSelected = new Set(ids);
+  const key = ids.slice().sort().join(',');
+  if (!force && key === _eqPanelKey) return; // evita resetar upload de imagem pendente ao re-selecionar o mesmo slot
+  _eqPanelKey = key;
+  if (!ids.length) { panel.innerHTML = '<div class="empty">Crie um slot pra começar a editar.</div>'; return; }
+  if (ids.length === 1) {
+    const s = _eqSlots.find((x) => x.id === ids[0]);
+    _eqsImgUrl = s.silhouette_url || null; _eqsImgFile = null;
+    panel.innerHTML = `
+      <div class="surface">
+        <h4 style="font-family:var(--disp);font-size:15px;color:var(--bone);margin:0 0 14px">Editar slot</h4>
+        <div class="item-form">
+          <div class="fld"><label for="eqs-name">Nome do slot</label><input id="eqs-name" maxlength="40" value="${esc(s.name)}"></div>
+          <div class="fld"><label for="eqs-type">Tipo de item aceito</label>
+            <select id="eqs-type" class="fld-input">${equipTypeOptionsHtml(s.accepts_type || '', 'Qualquer item')}</select>
+          </div>
+          <div class="fld"><label for="eqs-w">Largura (px)</label><input id="eqs-w" type="number" min="32" max="220" value="${s.width}"></div>
+          <div class="fld"><label for="eqs-h">Altura (px)</label><input id="eqs-h" type="number" min="32" max="220" value="${s.height}"></div>
+          <div class="fld"><label for="eqs-x">Posição X (%)</label><input id="eqs-x" type="number" min="0" max="100" step="0.5" value="${s.pos_x}"></div>
+          <div class="fld"><label for="eqs-y">Posição Y (%)</label><input id="eqs-y" type="number" min="0" max="100" step="0.5" value="${s.pos_y}"></div>
+          <div class="fld full"><label for="eqs-img-file">Silhueta <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(fundo mostrado quando o slot está vazio)</span></label>
+            <div class="img-picker">
+              <img id="eqs-img-prev" class="img-thumb" alt="" ${s.silhouette_url ? `src="${esc(s.silhouette_url)}"` : 'style="display:none"'}>
+              <div class="img-actions">
+                <input type="file" id="eqs-img-file" accept="image/*" style="display:none" onchange="onEqsImg(this)">
+                <button type="button" class="btn auto sm" onclick="document.getElementById('eqs-img-file').click()">Escolher imagem</button>
+                <button type="button" class="btn auto sm" id="eqs-img-rm" ${s.silhouette_url ? '' : 'style="display:none"'} onclick="clearEqsImg()">Remover</button>
+              </div>
+            </div>
+          </div>
+          <div class="full actions">
+            <button class="btn danger auto" onclick="delEqSlot('${s.id}')">Excluir slot</button>
+            <button class="btn auto" onclick="duplicateEqSlot('${s.id}')">Duplicar</button>
+            <button class="btn go auto" onclick="saveEqSlot('${s.id}')">Salvar</button>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+  const list = ids.map((id) => _eqSlots.find((s) => s.id === id)).filter(Boolean);
+  panel.innerHTML = `
+    <div class="surface">
+      <h4 style="font-family:var(--disp);font-size:15px;color:var(--bone);margin:0 0 14px">${list.length} slots selecionados</h4>
+      <div class="list" style="margin-bottom:14px">${list.map((s) => `<div class="list-row"><div class="grow"><div class="nm">${esc(s.name)}</div></div>
+        <button class="btn sm auto" onclick="eqDeselect('${s.id}')" title="Tirar da seleção"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>`).join('')}</div>
+      <div class="item-form">
+        <div class="fld full"><label>Tipo de item aceito <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(aplica a todos)</span></label>
+          <select id="eqb-type" class="fld-input">
+            <option value="">— não alterar —</option>
+            <option value="__none__">Qualquer item (remove a restrição)</option>
+            ${EQUIP_TYPES.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fld"><label>Largura (px) <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(vazio não altera)</span></label><input id="eqb-w" type="number" min="32" max="220" placeholder="—"></div>
+        <div class="fld"><label>Altura (px) <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(vazio não altera)</span></label><input id="eqb-h" type="number" min="32" max="220" placeholder="—"></div>
+        <div class="full actions">
+          <button class="btn danger auto" onclick="delEqSlotsBatch()">Excluir selecionados</button>
+          <button class="btn go auto" onclick="saveEqSlotsBatch()">Aplicar a todos</button>
+        </div>
+      </div>
+    </div>`;
+}
+window.onEqsImg = (input) => {
+  const f = input.files && input.files[0]; if (!f) return;
+  if (!f.type.startsWith('image/')) { showMsg('Selecione um arquivo de imagem.'); input.value = ''; return; }
+  if (f.size > 3 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 3 MB).'); input.value = ''; return; }
+  _eqsImgFile = f;
+  const p = $('eqs-img-prev'); p.src = URL.createObjectURL(f); p.style.display = ''; $('eqs-img-rm').style.display = '';
+};
+window.clearEqsImg = () => {
+  _eqsImgFile = null; _eqsImgUrl = null; $('eqs-img-file').value = '';
+  const p = $('eqs-img-prev'); p.removeAttribute('src'); p.style.display = 'none'; $('eqs-img-rm').style.display = 'none';
+};
+window.saveEqSlot = async (id) => {
+  const name = $('eqs-name').value.trim(); if (!name) { showMsg('Dê um nome ao slot.'); return; }
+  try {
+    if (_eqsImgFile) { showMsg('Enviando imagem…', 'ok'); _eqsImgUrl = await db.uploadImage(_eqsImgFile, 'slots'); }
+    const clampPct = (v, fallback) => { const n = parseFloat(v); return isNaN(n) ? fallback : Math.max(0, Math.min(100, n)); };
+    const patch = {
+      name, accepts_type: $('eqs-type').value.trim() || null,
+      width: parseInt($('eqs-w').value) || 72, height: parseInt($('eqs-h').value) || 72,
+      pos_x: clampPct($('eqs-x')?.value, 50), pos_y: clampPct($('eqs-y')?.value, 50),
+      silhouette_url: _eqsImgUrl,
+    };
+    await db.updateEquipmentSlot(id, patch);
+    const s = _eqSlots.find((x) => x.id === id); if (s) Object.assign(s, patch);
+    redrawEqBoard();
+    renderEqEditorPanel(true);
+    showMsg('Slot salvo.', 'ok');
+  } catch (e) { showMsg(e.message); }
+};
+window.delEqSlot = async (id) => {
+  const ok = await confirmModal({ title: 'Excluir slot', desc: 'Itens equipados nesse slot voltam pra mochila do jogador. Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  try {
+    await db.deleteEquipmentSlot(id);
+    _eqSlots = _eqSlots.filter((s) => s.id !== id);
+    _eqSelected.delete(id);
+    if (!_eqSelected.size && _eqSlots.length) _eqSelected = new Set([_eqSlots[0].id]);
+    redrawEqBoard();
+    renderEqEditorPanel(true);
+  } catch (e) { showMsg(e.message); }
+};
+// duplica um slot inteiro (nome, tipo, tamanho, silhueta) num offset pequeno — paper dolls quase
+// sempre têm pares simétricos (anéis, botas, luvas), então repetir tipo/tamanho na mão toda vez
+// era o gargalo mais bobo de montar um quadro de equipamentos
+window.duplicateEqSlot = async (id) => {
+  const s = _eqSlots.find((x) => x.id === id); if (!s) return;
+  try {
+    const copy = await db.createEquipmentSlot(systemId, {
+      name: s.name + ' (cópia)', accepts_type: s.accepts_type || null,
+      width: s.width, height: s.height, silhouette_url: s.silhouette_url || null,
+      pos_x: Math.min(96, (s.pos_x || 50) + 6), pos_y: Math.min(96, (s.pos_y || 50) + 6),
+      sort_order: Date.now() % 100000,
+    });
+    _eqSlots.push(copy);
+    _eqSelected = new Set([copy.id]);
+    redrawEqBoard();
+    renderEqEditorPanel(true);
+    showMsg('Slot duplicado.', 'ok');
+  } catch (e) { showMsg(e.message); }
+};
+window.saveEqSlotsBatch = async () => {
+  const ids = [..._eqSelected];
+  const type = $('eqb-type').value;
+  const w = parseInt($('eqb-w').value), h = parseInt($('eqb-h').value);
+  const patch = {};
+  if (type === '__none__') patch.accepts_type = null;
+  else if (type) patch.accepts_type = type;
+  if (!isNaN(w)) patch.width = w;
+  if (!isNaN(h)) patch.height = h;
+  if (!Object.keys(patch).length) { showMsg('Preencha ao menos um campo pra aplicar.'); return; }
+  try {
+    await Promise.all(ids.map((id) => db.updateEquipmentSlot(id, patch)));
+    ids.forEach((id) => { const s = _eqSlots.find((x) => x.id === id); if (s) Object.assign(s, patch); });
+    redrawEqBoard();
+    renderEqEditorPanel(true);
+    showMsg(`${ids.length} slots atualizados.`, 'ok');
+  } catch (e) { showMsg(e.message); }
+};
+window.delEqSlotsBatch = async () => {
+  const ids = [..._eqSelected];
+  const ok = await confirmModal({ title: `Excluir ${ids.length} slots`, desc: 'Itens equipados neles voltam pra mochila do jogador. Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  try {
+    await Promise.all(ids.map((id) => db.deleteEquipmentSlot(id)));
+    _eqSlots = _eqSlots.filter((s) => !ids.includes(s.id));
+    _eqSelected.clear();
+    if (_eqSlots.length) _eqSelected = new Set([_eqSlots[0].id]);
+    redrawEqBoard();
+    renderEqEditorPanel(true);
+  } catch (e) { showMsg(e.message); }
+};
 </script>
 </body>
 </html>
