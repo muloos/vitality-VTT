@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=35">
+<link rel="stylesheet" href="lib/theme.css?v=41">
 </head>
 <body class="mesa-page">
 <script>try{
@@ -66,9 +66,9 @@
 </button>
 
 <script type="module">
-import * as db from './lib/db.js?v=30';
+import * as db from './lib/db.js?v=40';
 import { openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme, trapFocus } from './lib/ui.js?v=4';
-import { mountYtPlayer } from './lib/ytplayer.js?v=4';
+import { mountYtPlayer } from './lib/ytplayer.js?v=5';
 
 // sem mountHelp/mountThemeToggle flutuantes aqui: "Ajuda ou suporte" e "Tema" já existem como itens
 // de texto no menu de conta (#nav-user, logo acima) — os FABs eram um atalho redundante pra mesma
@@ -144,6 +144,8 @@ const campaignId = new URLSearchParams(location.search).get('id');
 
 let role = null, mesa = null, character = null, currentTab = null, sys = null, myId = null, _statMap = null, _unsub = null, _unsubChat = null, _unsubItemReq = null;
 let _unsubCharLive = null, _unsubMembers = null, _unsubCampaign = null, _unsubGmView = null, _unsubPresence = null;
+let _unsubCombat = null, _unsubInitiative = null;
+let _combatState = null, _initiativeEntries = [], _combatRosterCache = null, _initiativeModalShownFor = null, _combatRenderToken = 0;
 let _onlineIds = new Set();
 let myName = null, myEmail = null;
 let inOnboarding = false;
@@ -164,8 +166,10 @@ function tabsFor() {
   const icBag = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/></svg></span>';
   const icPencil = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>';
   const icSparkle = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="2.4"/></svg></span>';
-  if (role === 'gm') return [['jogadores', icGroup + 'Jogadores'], ['atributos', (hasSys ? icGear : icChart) + (hasSys ? 'Sistema' : 'Atributos')], ['arvores', icTree + 'Árvores']];
-  return [['ficha', icScroll + 'Ficha'], ['biografia', icDna + 'Biografia'], ['inventario', icBag + 'Inventário'], ['habilidades', icSparkle + 'Habilidades'], ['anotacoes', icPencil + 'Anotações'], ['arvores', icTree + 'Árvores']];
+  const icPaw = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7.5" r="2"/><circle cx="12" cy="5.5" r="2"/><circle cx="17" cy="7.5" r="2"/><path d="M8 15.5c0-3 1.8-5 4-5s4 2 4 5c0 2.5-1.8 4-4 4s-4-1.5-4-4Z"/></svg></span>';
+  const icSwords = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 13l4.5 4.5"/><path d="M21 3l-3 3M18 6l3 3"/><path d="M6 21l3-3"/></svg></span>';
+  if (role === 'gm') return [['jogadores', icGroup + 'Jogadores'], ['criaturas', icPaw + 'Criaturas'], ['combate', icSwords + 'Combate'], ['atributos', (hasSys ? icGear : icChart) + (hasSys ? 'Sistema' : 'Atributos')], ['arvores', icTree + 'Árvores']];
+  return [['ficha', icScroll + 'Ficha'], ['biografia', icDna + 'Biografia'], ['inventario', icBag + 'Inventário'], ['habilidades', icSparkle + 'Habilidades'], ['combate', icSwords + 'Combate'], ['anotacoes', icPencil + 'Anotações'], ['arvores', icTree + 'Árvores']];
 }
 
 (async () => {
@@ -217,6 +221,7 @@ function enterMesa() {
   mountYtPlayer({ campaignId, role, db });
   mountItemRequests();
   mountLiveSync();
+  mountCombat();
 }
 
 // mantém a tela sincronizada sem precisar de F5 quando outro cliente conectado (o próprio Mestre,
@@ -288,7 +293,7 @@ async function renderParty() {
 window.selectTab = (id) => { closeMesaMenu(); openTab(id); };
 
 let _lastSistemaEmbedTabRendered; // sentinela pro guard abaixo — mesmo truque de _lastArvoreRenderedId
-window.openTab = (name) => {
+window.openTab = async (name) => {
   // reclicar na aba Árvores enquanto a mesma árvore já está aberta não deve recriar o iframe do
   // zero — só troca de aba (currentTab muda) ou troca de árvore (_arvoreViewingId muda) precisa
   if (name === 'arvores' && currentTab === 'arvores' && _arvoreViewingId === _lastArvoreRenderedId) return;
@@ -296,6 +301,13 @@ window.openTab = (name) => {
   // sub-aba do sistema (Status/Itens/...) não pode recriar o iframe, senão qualquer edição em
   // andamento ali dentro se perde
   if (name === 'atributos' && currentTab === 'atributos' && _sistemaEmbedTab === _lastSistemaEmbedTabRendered) return;
+  // Biografia tem campos de texto livre com "Salvar alterações" manual (saveIdentity) — sem esse
+  // aviso, trocar de aba com edição pendente descartava tudo em silêncio
+  if (currentTab === 'biografia' && name !== 'biografia' && _identityDirty) {
+    const ok = await confirmModal({ title: 'Sair sem salvar?', desc: 'Você tem edições não salvas na Biografia — elas serão perdidas ao trocar de aba.', confirmLabel: 'Sair sem salvar' });
+    if (!ok) return;
+    _identityDirty = false;
+  }
   // sair da visão somente-leitura do Mestre (viewPlayer) pra qualquer aba encerra a assinatura
   // daquele personagem — senão ela ficaria viva pra sempre no fundo, mesmo sem ninguém olhando
   if (_unsubGmView) { _unsubGmView(); _unsubGmView = null; }
@@ -308,7 +320,7 @@ window.openTab = (name) => {
   c.innerHTML = '<div class="empty">Carregando…</div>';
   if (name === 'arvores') _lastArvoreRenderedId = _arvoreViewingId;
   if (name === 'atributos') _lastSistemaEmbedTabRendered = _sistemaEmbedTab;
-  const fn = { jogadores: renderJogadores, atributos: renderAtributos, arvores: renderArvores,
+  const fn = { jogadores: renderJogadores, criaturas: renderCriaturas, combate: renderCombate, atributos: renderAtributos, arvores: renderArvores,
                ficha: renderFicha, biografia: renderBiografia, inventario: renderInventario, anotacoes: renderAnotacoes,
                habilidades: renderHabilidades }[name];
   fn(c).catch((e) => { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
@@ -434,15 +446,15 @@ async function renderJogadores(c) {
   const members = await db.listMembers(campaignId);
   const players = members.filter((m) => m.role === 'player');
   c.innerHTML = `
-    <div class="section-title">Convite</div>
+    <div class="section-title" role="heading" aria-level="2">Convite</div>
     <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 8px">
       Compartilhe o código <b style="color:var(--brass);letter-spacing:.15em">${esc(mesa.join_code)}</b> — quem entrar com ele vira Jogador desta mesa.</p>
 
-    <div class="section-title">Jogadores <span id="jogadores-count">(${players.length})</span></div>
+    <div class="section-title" role="heading" aria-level="2">Jogadores <span id="jogadores-count">(${players.length})</span></div>
     <div class="list" id="jogadores-list">${members.map(memberRowHtml).join('')}</div>
     <p id="jogadores-empty-hint" style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin:10px 2px;${players.length ? 'display:none' : ''}">Nenhum jogador entrou ainda.</p>
 
-    <div class="section-title">Configurações da mesa</div>
+    <div class="section-title" role="heading" aria-level="2">Configurações da mesa</div>
     <div class="fld row"><label>Nome da mesa <span class="autosave-hint">salva ao sair do campo</span></label>
       <input value="${esc(mesa.name)}" onchange="renameMesa(this.value)"></div>
     <div class="fld row"><label>Foto da mesa</label>
@@ -454,6 +466,8 @@ async function renderJogadores(c) {
           <button type="button" class="btn auto sm" id="mesa-img-rm" ${mesa.image_url ? '' : 'style="display:none"'} onclick="removeMesaImg()">Remover</button>
         </div>
       </div></div>
+
+    <div class="section-title" role="heading" aria-level="2">Zona de perigo</div>
     <button class="btn danger auto sm" onclick="deleteMesa()">Excluir mesa</button>`;
 }
 
@@ -506,6 +520,374 @@ window.deleteMesa = async () => {
   db.deleteCampaign(campaignId).then(() => { location.href = 'app.html'; }).catch((e) => showMsg(e.message));
 };
 
+// ============================================================
+// CRIATURAS (NPCs/monstros) — só o Mestre vê a aba (RLS também bloqueia jogador do lado do
+// servidor). Escopo enxuto de propósito: sem proficiências, sem inventário próprio — o Mestre
+// sempre age em nome da criatura, então uma "identidade que age sozinha" não é necessária ainda.
+// A ficha reaproveita resourceTileHtml/statTileHtml/skillChipHtml (mesmas funções da visão do
+// Mestre sobre um jogador), só trocando de onde vêm attrs/values/bônus.
+// ============================================================
+async function renderCriaturas(c) {
+  const npcs = await db.listNpcs(campaignId);
+  c.innerHTML = `
+    <div class="section-title" role="heading" aria-level="2">Criaturas <span id="npcs-count">(${npcs.length})</span></div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 10px">
+      Fichas rápidas de NPCs e monstros — você sempre age em nome delas no jogo. "Oculta" some da visão dos jogadores.</p>
+    <div class="list" id="npcs-list">${npcs.length ? npcs.map(npcRowHtml).join('') : emptyState(ICONS.dna, 'Nenhuma criatura ainda',
+      'Crie fichas rápidas de NPCs e monstros pra usar no combate. Crie a primeira no campo abaixo ↓')}</div>
+    <form class="inline-form" style="margin-top:14px" onsubmit="return addNpc(event)">
+      <input id="npc-name" aria-label="Nome da nova criatura" placeholder="Nova criatura (ex.: Goblin Batedor)" required maxlength="60">
+      <button class="btn go auto" type="submit">+ Criar criatura</button>
+    </form>`;
+}
+function npcRowHtml(n) {
+  return `<div class="list-row" data-id="${n.id}">
+    ${n.avatar_url ? `<img class="char-portrait" style="width:40px;height:40px" src="${esc(n.avatar_url)}" alt="">`
+      : `<div class="char-portrait ph" style="width:40px;height:40px;font-size:16px">${esc((n.name || '?').trim().charAt(0).toUpperCase() || '?')}</div>`}
+    <div class="grow"><div class="nm">${esc(n.name)}${n.is_hidden ? ' <span class="badge" style="border-color:var(--ink-faint);color:var(--ink-faint)">Oculta</span>' : ''}</div>
+    <div class="sub">${[n.level && ('Nível ' + n.level), n.char_class].filter(Boolean).join(' · ') || '—'}</div></div>
+    <button class="btn sm auto" onclick="viewNpc('${n.id}')">Ver ficha</button>
+    <button class="btn sm danger auto" onclick="delNpc('${n.id}')">Excluir</button>
+  </div>`;
+}
+window.addNpc = (ev) => {
+  ev.preventDefault();
+  const name = $('npc-name').value.trim(); if (!name) return false;
+  db.createNpc(campaignId, { name }).then(() => openTab('criaturas')).catch((e) => showMsg(e.message));
+  return false;
+};
+window.delNpc = async (id) => {
+  const ok = await confirmModal({ title: 'Excluir criatura', desc: 'Remove essa ficha de NPC/monstro. Não dá pra desfazer.', confirmLabel: 'Excluir' });
+  if (!ok) return;
+  db.deleteNpc(id).then(() => openTab('criaturas')).catch((e) => showMsg(e.message));
+};
+let _npcViewId = null, _npcViewData = null, _npcViewValues = {}, _npcViewResources = {};
+window.viewNpc = async (id) => {
+  const c = $('content');
+  c.innerHTML = '<div class="empty">Carregando ficha…</div>';
+  try {
+    const [npcs, values, resources] = await Promise.all([db.listNpcs(campaignId), db.getNpcAttributesValues(id), db.getNpcResources(id)]);
+    const npc = npcs.find((x) => x.id === id);
+    if (!npc) { c.innerHTML = '<div class="empty">Criatura não encontrada.</div>'; return; }
+    _npcViewId = id; _npcViewData = npc; _npcViewValues = values; _npcViewResources = resources;
+    renderNpcFicha(c);
+  } catch (e) { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; }
+};
+function renderNpcFicha(c) {
+  const n = _npcViewData;
+  const attrs = sys?.stats || [];
+  const ctx = { attrs, values: _npcViewValues, bonusMap: {}, profCtx: null, level: n.level, idPrefix: 'npcval-' };
+  const primaries = attrs.filter((a) => a.is_resource);
+  const npcSkills = sys?.system?.skills_enabled ? attrs.filter((a) => a.is_skill) : [];
+  const secondary = attrs.filter((a) => !a.is_resource && !a.is_skill);
+  c.innerHTML = `
+    <button class="btn auto sm" onclick="openTab('criaturas')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>Voltar às criaturas</button>
+    <div class="char-card" style="margin-top:14px">
+      ${n.avatar_url ? `<img class="char-portrait" src="${esc(n.avatar_url)}" alt="">` : `<div class="char-portrait ph">${esc((n.name || '?').trim().charAt(0).toUpperCase() || '?')}</div>`}
+      <div class="char-info">
+        <input value="${esc(n.name)}" oninput="onNpcFieldChange('name',this.value)" style="background:transparent;border:0;color:var(--bone);font-family:var(--disp);font-size:22px;padding:0;width:100%">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          <input placeholder="Classe/tipo (ex.: Guerreiro)" value="${esc(n.char_class || '')}" oninput="onNpcFieldChange('char_class',this.value)"
+            style="flex:1;min-width:140px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);font-size:12px;padding:7px 10px">
+          <input placeholder="Origem (ex.: Goblin)" value="${esc(n.origin_name || '')}" oninput="onNpcFieldChange('origin_name',this.value)"
+            style="flex:1;min-width:140px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);font-size:12px;padding:7px 10px">
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">
+          <span class="badge" style="border-color:var(--brass);color:var(--brass)">Nível ${n.level || 1}</span>
+          <button class="plus" title="Tira 1 nível" onclick="npcAdjustLevel(-1)">−</button>
+          <button class="plus" title="Sobe 1 nível" onclick="npcAdjustLevel(1)">+</button>
+          <label class="check-row" style="margin-left:auto"><input type="checkbox" ${n.is_hidden ? 'checked' : ''} onchange="onNpcFieldChange('is_hidden',this.checked)"><span>Oculta dos jogadores</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-hud" style="margin-top:18px">
+      ${primaries.length ? `<div class="hud-sec-label">Recursos<span class="ln"></span></div>
+        <div class="hud-bars">${primaries.map((a) => resourceTileHtml(a, { ...ctx, current: _npcViewResources[a.id], adjustFn: 'npcAdjustResource' })).join('')}</div>` : ''}
+      <div class="hud-sec-label">Status${secondary.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
+      <div class="stat-grid">
+        ${secondary.map((a) => statTileHtml(a, { ...ctx, adjustFn: 'npcAdjustStat' })).join('')}
+        ${secondary.length ? '' : '<div class="empty" style="grid-column:1/-1">Sem status secundários.</div>'}
+      </div>
+      ${npcSkills.length ? `<div class="hud-sec-label" style="margin-top:18px">Perícias<span class="ln"></span></div>
+      <div class="skill-grid">${npcSkills.map((a) => skillChipHtml(a, ctx)).join('')}</div>` : ''}
+    </div>
+
+    <div class="section-title" role="heading" aria-level="2" style="margin-top:18px">Anotações do Mestre</div>
+    <textarea id="npc-notes" placeholder="Táticas, saque, gatilhos de comportamento..." oninput="onNpcFieldChange('notes',this.value)"
+      style="width:100%;min-height:100px;background:var(--field);border:1px solid var(--line2);border-radius:10px;color:var(--ink);font-family:var(--serif);font-size:13px;padding:10px;resize:vertical">${esc(n.notes || '')}</textarea>`;
+}
+window.onNpcFieldChange = (key, val) => {
+  if (!_npcViewId) return;
+  const value = (key === 'is_hidden') ? !!val : (typeof val === 'string' ? (val.trim() || null) : val);
+  if (key === 'name' && !value) return; // nome não pode ficar vazio
+  db.updateNpc(_npcViewId, { [key]: value }).then((updated) => { _npcViewData = { ..._npcViewData, ...updated }; }).catch((e) => showMsg(e.message));
+};
+window.npcAdjustLevel = (delta) => {
+  if (!_npcViewData) return;
+  const next = Math.max(1, (_npcViewData.level || 1) + delta);
+  db.updateNpc(_npcViewId, { level: next }).then((updated) => { _npcViewData = updated; renderNpcFicha($('content')); }).catch((e) => showMsg(e.message));
+};
+window.npcAdjustStat = (statId, delta) => {
+  const stat = (sys?.stats || []).find((a) => a.id === statId); if (!stat) return;
+  const cur = Number(_npcViewValues[statId] ?? stat.default_value ?? 0) || 0;
+  const next = Math.max(0, cur + delta);
+  db.setNpcAttribute(_npcViewId, statId, String(next)).then(() => {
+    _npcViewValues[statId] = String(next);
+    const el = $('npcval-' + statId); if (el) el.textContent = next;
+  }).catch((e) => showMsg(e.message));
+};
+window.npcAdjustResource = (statId, delta) => {
+  const stat = (sys?.stats || []).find((a) => a.id === statId); if (!stat) return;
+  const max = evalStatIn(sys.stats, _npcViewValues, stat, {}, new Set(), null, _npcViewData?.level) ?? 0;
+  let cur = _npcViewResources[statId]; if (cur == null || cur === '') cur = max; cur = Number(cur);
+  const next = Math.max(0, cur + delta);
+  db.setNpcResource(_npcViewId, statId, next).then(() => {
+    _npcViewResources[statId] = next;
+    renderNpcFicha($('content'));
+  }).catch((e) => showMsg(e.message));
+};
+
+// ============================================================
+// COMBATE / INICIATIVA EM TEMPO REAL — aba "Combate" visível pra Mestre e jogadores (RLS decide o
+// que cada um pode escrever). mesa_combat_state é uma linha mutável por mesa (mesmo padrão do
+// player de música); mesa_initiative_entries guarda sempre 1 linha "atual" por participante.
+// A regra "quem inicia o combate age primeiro" é 100% derivada aqui no cliente — nunca uma escrita
+// especial — pra Mestre e jogador nunca poderem dessincronizar sobre quem abriu a luta.
+// ============================================================
+function computeTurnOrder(entries, combatState) {
+  const sorted = [...entries].sort((a, b) => Number(b.initiative_value) - Number(a.initiative_value));
+  const starterRef = combatState?.started_by;
+  if (starterRef) {
+    const idx = sorted.findIndex((e) => e.participant_ref === starterRef);
+    if (idx > 0) { const [starter] = sorted.splice(idx, 1); sorted.unshift(starter); }
+  }
+  return sorted;
+}
+async function mountCombat() {
+  try { _combatState = await db.getCombatState(campaignId); } catch (_) {}
+  try { _initiativeEntries = await db.listInitiativeEntries(campaignId); } catch (_) {}
+  renderCombatBar();
+  maybeShowInitiativeModal();
+  _unsubCombat = db.subscribeCombatState(campaignId, (row) => {
+    _combatState = row;
+    renderCombatBar();
+    maybeShowInitiativeModal();
+    if (currentTab === 'combate') renderCombate($('content'));
+  });
+  _unsubInitiative = db.subscribeInitiativeEntries(campaignId, async () => {
+    try { _initiativeEntries = await db.listInitiativeEntries(campaignId); } catch (_) { return; }
+    renderCombatBar();
+    if (currentTab === 'combate') renderCombate($('content'));
+  });
+}
+// barra fixa (mesmo espírito do #yt-bar, só que no topo pra não brigar com música/dados que já
+// moram embaixo) — some sozinha quando o combate não está ativo, aparece em qualquer aba
+function renderCombatBar() {
+  let bar = document.getElementById('combat-bar');
+  if (!_combatState || !_combatState.is_active) { if (bar) bar.remove(); return; }
+  const order = computeTurnOrder(_initiativeEntries, _combatState);
+  const idx = order.length ? _combatState.current_turn_index % order.length : 0;
+  const current = order[idx];
+  const label = current ? `Turno de ${esc(current.display_name)}` : 'Aguardando iniciativa…';
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'combat-bar';
+    bar.style.cssText = 'position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:80;display:flex;align-items:center;gap:12px;padding:8px 18px;border-radius:999px;background:var(--panel);border:1px solid var(--brass);box-shadow:0 8px 24px rgba(0,0,0,.4);font-family:var(--mono);font-size:12px;color:var(--ink);cursor:pointer';
+    bar.title = 'Abrir aba Combate';
+    bar.onclick = () => selectTab('combate');
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = `<b style="color:var(--brass)">Rodada ${_combatState.round}</b><span>${label}</span>`;
+}
+// só o jogador é convocado automaticamente (o Mestre define NPCs manualmente); usa started_at como
+// "chave" do combate atual pra não insistir de novo se ele fechar o modal sem rolar
+function maybeShowInitiativeModal() {
+  if (role !== 'player' || !character) return;
+  if (!_combatState || !_combatState.is_active) { _initiativeModalShownFor = null; return; }
+  const already = _initiativeEntries.some((e) => e.participant_type === 'player' && e.participant_ref === myId);
+  if (already) return;
+  const key = _combatState.started_at || _combatState.round;
+  if (_initiativeModalShownFor === key) return;
+  _initiativeModalShownFor = key;
+  openInitiativeRollModal();
+}
+window.openInitiativeRollModal = () => {
+  if (document.getElementById('init-modal-title')) return; // já tem um aberto
+  const trigger = document.activeElement;
+  const w = document.createElement('div');
+  w.className = 'ui-modal';
+  w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'init-modal-title');
+  w.innerHTML = `<div class="box guide">
+    <div class="ghead"><h3 id="init-modal-title">Rolar iniciativa</h3><button class="x" aria-label="Fechar">×</button></div>
+    <p class="gintro">O combate começou! Role 1d20 pra saber sua posição na ordem de turno.</p>
+    <div class="fld row"><label>Vantagem/desvantagem</label>
+      <select id="init-adv" class="fld-input">
+        <option value="">normal</option><option value="adv">vantagem</option><option value="dis">desvantagem</option>
+      </select></div>
+    <div class="full actions"><button class="btn go auto" onclick="rollInitiativeNow()">Rolar 1d20</button></div>
+  </div>`;
+  const untrap = trapFocus(w);
+  const close = () => { untrap(); w.remove(); document.removeEventListener('keydown', onEsc); if (trigger && trigger.focus) trigger.focus(); window._closeInitiativeModal = null; };
+  const onEsc = (e) => { if (e.key === 'Escape') close(); };
+  w.addEventListener('click', (e) => { if (e.target === w) close(); });
+  w.querySelector('.x').onclick = close;
+  document.addEventListener('keydown', onEsc);
+  document.body.appendChild(w);
+  window._closeInitiativeModal = close;
+};
+window.rollInitiativeNow = () => {
+  const advMode = $('init-adv')?.value || null;
+  try {
+    const { total, detail } = rollFormula('1d20', {}, advMode);
+    db.setInitiativeEntry(campaignId, {
+      participant_type: 'player', participant_ref: myId, display_name: (character && character.name) || myName,
+      initiative_value: total, is_manual: false, rolled_detail: detail,
+    }).then(() => {
+      showMsg('Iniciativa: ' + total, 'ok');
+      if (window._closeInitiativeModal) window._closeInitiativeModal();
+    }).catch((e) => showMsg(e.message));
+  } catch (e) { showMsg(e.message); }
+};
+// a aba Combate pode ser re-renderizada duas vezes quase juntas — abrir a aba manualmente E um
+// evento de tempo real chegando logo em seguida (ex.: o próprio Mestre inicia o combate enquanto
+// a aba acabou de abrir) — sem essa trava por token, a renderização mais LENTA vence mesmo sendo a
+// mais VELHA, e a tela mostra dado desatualizado. Mesmo truque de _lastArvoreRenderedId (openTab).
+async function renderCombate(c) {
+  const myToken = ++_combatRenderToken;
+  try { _combatState = await db.getCombatState(campaignId); } catch (_) {}
+  try { _initiativeEntries = await db.listInitiativeEntries(campaignId); } catch (_) {}
+  if (myToken !== _combatRenderToken) return;
+  if (role === 'gm') return renderCombateGm(c, myToken);
+  return renderCombateJogador(c, myToken);
+}
+function turnOrderListHtml(order, cs, idx) {
+  if (!order.length) return emptyState(ICONS.dice, 'Ninguém rolou iniciativa ainda', 'Assim que alguém rolar (ou o Mestre definir manualmente), a ordem de turno aparece aqui.');
+  const gm = role === 'gm';
+  return order.map((e, i) => `
+    <div class="list-row" style="${i === idx ? 'border-color:var(--brass);background:color-mix(in srgb, var(--brass) 10%, transparent)' : ''}">
+      <div class="grow"><div class="nm">${i === idx ? '▶ ' : ''}${esc(e.display_name)}${e.participant_ref === cs.started_by ? ' <span class="badge" style="border-color:var(--maq);color:var(--maq)">iniciou</span>' : ''}</div>
+      <div class="sub">${e.participant_type === 'npc' ? 'NPC' : 'Jogador'}${e.is_manual ? ' · definido manualmente' : (e.rolled_detail ? ' · ' + esc(e.rolled_detail) : '')}</div></div>
+      ${gm ? `<button class="btn sm auto" onclick="${e.participant_type === 'npc' ? `viewNpc('${e.participant_ref}')` : `viewPlayer('${e.participant_ref}', '${esc(e.display_name).replace(/'/g, "\\'")}')`}">Ver ficha</button>` : ''}
+      <div class="badge">${esc(String(e.initiative_value))}</div>
+    </div>`).join('');
+}
+async function renderCombateGm(c, myToken) {
+  const cs = _combatState;
+  if (!cs || !cs.is_active) {
+    const [members, chars, npcs] = await Promise.all([db.listMembers(campaignId), db.listCampaignCharacters(campaignId), db.listNpcs(campaignId)]);
+    const charByUser = new Map(chars.map((x) => [x.user_id, x]));
+    const roster = [
+      ...members.filter((m) => m.role === 'player').map((m) => ({ type: 'player', ref: m.user_id, name: charByUser.get(m.user_id)?.name || m.profile?.display_name || 'Jogador' })),
+      ...npcs.map((n) => ({ type: 'npc', ref: n.id, name: n.name })),
+    ];
+    _combatRosterCache = roster;
+    if (myToken !== _combatRenderToken) return;
+    c.innerHTML = `
+      <div class="section-title" role="heading" aria-level="2">Combate</div>
+      <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
+        Ao iniciar, todo mundo conectado é avisado pra rolar iniciativa. Se alguém emboscou o grupo (ou foi emboscado), escolha quem abaixo — essa pessoa/criatura sempre age primeiro na primeira rodada, não importa o resultado do dado dela.</p>
+      <div class="fld row"><label>Quem iniciou o combate <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional)</span></label>
+        <select id="combat-starter" class="fld-input" ${roster.length ? '' : 'disabled'}>
+          <option value="">Ninguém em especial</option>
+          ${roster.map((p) => `<option value="${p.type}:${p.ref}">${esc(p.name)}${p.type === 'npc' ? ' (NPC)' : ''}</option>`).join('')}
+        </select></div>
+      ${roster.length ? '' : `<p style="font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin:0 0 10px">Nenhum jogador ou criatura na mesa ainda — adicione alguém antes de iniciar o combate.</p>`}
+      <button class="btn go auto" style="margin-top:10px" onclick="startCombat()" ${roster.length ? '' : 'disabled'} title="${roster.length ? '' : 'Adicione um jogador ou criatura primeiro'}">Iniciar combate</button>
+      ${!roster.length ? '<p class="sub" style="margin-top:10px">Nenhum jogador ou criatura na mesa ainda.</p>' : ''}`;
+    return;
+  }
+  const [members, chars, npcs] = await Promise.all([db.listMembers(campaignId), db.listCampaignCharacters(campaignId), db.listNpcs(campaignId)]);
+  const charByUser = new Map(chars.map((x) => [x.user_id, x]));
+  const roster = [
+    ...members.filter((m) => m.role === 'player').map((m) => ({ type: 'player', ref: m.user_id, name: charByUser.get(m.user_id)?.name || m.profile?.display_name || 'Jogador' })),
+    ...npcs.map((n) => ({ type: 'npc', ref: n.id, name: n.name })),
+  ];
+  _combatRosterCache = roster;
+  const order = computeTurnOrder(_initiativeEntries, cs);
+  const idx = order.length ? cs.current_turn_index % order.length : 0;
+  const entryByKey = new Map(_initiativeEntries.map((e) => [e.participant_type + ':' + e.participant_ref, e]));
+  if (myToken !== _combatRenderToken) return;
+  c.innerHTML = `
+    <div class="section-title" role="heading" aria-level="2">Combate — Rodada ${cs.round}</div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn go auto" onclick="nextTurn()">Próximo turno</button>
+      <button class="btn auto" onclick="endCombat()">Encerrar combate</button>
+    </div>
+    <div class="section-title" role="heading" aria-level="2" style="font-size:13px">Ordem de turno</div>
+    <div class="list" style="margin-bottom:18px">${turnOrderListHtml(order, cs, idx)}</div>
+
+    <div class="section-title" role="heading" aria-level="2" style="font-size:13px">Definir/ajustar iniciativa</div>
+    <div class="list">${roster.map((p) => {
+      const key = p.type + ':' + p.ref;
+      const cur = entryByKey.get(key);
+      return `<div class="list-row">
+        <div class="grow"><div class="nm">${esc(p.name)}${p.type === 'npc' ? ' <span class="badge">NPC</span>' : ''}</div></div>
+        <input type="number" id="combat-val-${p.type}-${p.ref}" value="${cur ? esc(String(cur.initiative_value)) : ''}" placeholder="valor"
+          style="max-width:80px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);padding:7px">
+        ${p.type === 'npc' ? `<button type="button" class="btn sm auto" title="Rolar 1d20" aria-label="Rolar 1d20 pra iniciativa de ${esc(p.name)}" onclick="rollNpcInitiative('${p.ref}')">🎲</button>` : ''}
+        <button class="btn sm auto" onclick="gmSetInitiative('${p.type}','${p.ref}')">Definir</button>
+      </div>`;
+    }).join('')}</div>`;
+}
+async function renderCombateJogador(c, myToken) {
+  const cs = _combatState;
+  if (!cs || !cs.is_active) {
+    if (myToken !== _combatRenderToken) return;
+    c.innerHTML = '<div class="section-title" role="heading" aria-level="2">Combate</div><div class="empty">Nenhum combate em andamento agora.</div>';
+    return;
+  }
+  const order = computeTurnOrder(_initiativeEntries, cs);
+  const idx = order.length ? cs.current_turn_index % order.length : 0;
+  const mine = _initiativeEntries.find((e) => e.participant_type === 'player' && e.participant_ref === myId);
+  if (myToken !== _combatRenderToken) return;
+  c.innerHTML = `
+    <div class="section-title" role="heading" aria-level="2">Combate — Rodada ${cs.round}</div>
+    ${!mine ? `<div class="points-card" style="margin-bottom:16px;border-color:var(--brass)">
+      <div class="hud-sec-label">Você ainda não rolou iniciativa<span class="ln"></span></div>
+      <button class="btn go auto sm" style="margin-top:8px" onclick="openInitiativeRollModal()">Rolar iniciativa</button>
+    </div>` : ''}
+    <div class="list">${turnOrderListHtml(order, cs, idx)}</div>`;
+}
+window.startCombat = async () => {
+  const raw = $('combat-starter')?.value || '';
+  const [, starterRef] = raw ? raw.split(':') : [null, null];
+  try {
+    await db.clearInitiativeEntries(campaignId);
+    await db.setCombatState(campaignId, { is_active: true, round: 1, current_turn_index: 0, started_by: starterRef || null, started_at: new Date().toISOString() });
+    showMsg('Combate iniciado!', 'ok');
+  } catch (e) { showMsg(e.message); }
+};
+window.nextTurn = async () => {
+  const order = computeTurnOrder(_initiativeEntries, _combatState);
+  if (!order.length) { showMsg('Ninguém rolou iniciativa ainda.'); return; }
+  let idx = (_combatState.current_turn_index || 0) + 1;
+  let round = _combatState.round || 1;
+  if (idx >= order.length) { idx = 0; round += 1; }
+  try { await db.setCombatState(campaignId, { current_turn_index: idx, round }); } catch (e) { showMsg(e.message); }
+};
+window.endCombat = async () => {
+  const ok = await confirmModal({ title: 'Encerrar combate', desc: 'A ordem de turno atual será apagada.', confirmLabel: 'Encerrar', danger: false });
+  if (!ok) return;
+  try {
+    await db.setCombatState(campaignId, { is_active: false, round: 1, current_turn_index: 0, started_by: null, started_at: null });
+    await db.clearInitiativeEntries(campaignId);
+    showMsg('Combate encerrado.', 'ok');
+  } catch (e) { showMsg(e.message); }
+};
+window.gmSetInitiative = (type, ref) => {
+  const input = $('combat-val-' + type + '-' + ref); if (!input) return;
+  const val = Number(input.value); if (isNaN(val) || input.value.trim() === '') { showMsg('Digite um número.'); return; }
+  const p = (_combatRosterCache || []).find((x) => x.type === type && x.ref === ref);
+  db.setInitiativeEntry(campaignId, { participant_type: type, participant_ref: ref, display_name: p ? p.name : '—', initiative_value: val, is_manual: true, rolled_detail: null })
+    .then(() => showMsg('Iniciativa definida.', 'ok')).catch((e) => showMsg(e.message));
+};
+window.rollNpcInitiative = (ref) => {
+  const input = $('combat-val-npc-' + ref); if (!input) return;
+  input.value = String(1 + Math.floor(Math.random() * 20));
+  input.focus();
+};
+
 // moldura de raridade "premium" (mesmo padrão de app.html/sistema.html, duplicado aqui de
 // propósito) — usada na mochila somente-leitura que o Mestre vê da ficha do jogador. Diferente
 // do rarityFxLayers() do tabuleiro (paper doll), que é outro efeito (aura/ground/rings/rays).
@@ -548,9 +930,15 @@ async function viewPlayer(userId, name) {
   if (_unsubGmView) { _unsubGmView(); _unsubGmView = null; }
   try {
     let sheet = await db.loadPlayerSheet(campaignId, userId);
-    let gmChanged = sheet.character
-      ? await resyncClassDefaults(sheet.character.id, sheet.character.char_class, sheet.character.subclass) : false;
-    if (sheet.character) { try { const r = await db.applyLevelRewards(sheet.character.id); if (r.stat_points || r.tree_points) gmChanged = true; } catch (_) {} }
+    let gmChanged = false;
+    if (sheet.character) {
+      const [clChanged, orChanged] = await Promise.all([
+        resyncClassDefaults(sheet.character.id, sheet.character.char_class, sheet.character.subclass),
+        resyncOriginDefaults(sheet.character.id, sheet.character.origin_name, sheet.character.origin_variant_name),
+      ]);
+      if (clChanged || orChanged) gmChanged = true;
+      try { const r = await db.applyLevelRewards(sheet.character.id); if (r.stat_points || r.tree_points) gmChanged = true; } catch (_) {}
+    }
     if (gmChanged) sheet = await db.loadPlayerSheet(campaignId, userId); // busca de novo com os valores já atualizados
     const { character, attributes, values, resources, proficiencies, inventory, systemId } = sheet;
     _gmViewChar = character; _gmViewAttrs = attributes; _gmViewValues = { ...values }; _gmViewResources = { ...(resources || {}) };
@@ -562,9 +950,10 @@ async function viewPlayer(userId, name) {
     _unsubGmView = db.subscribeCharacterLive(character.id, userId, debounce(() => {
       if (_gmViewUserId === userId) viewPlayer(userId, name);
     }, 300));
-    try { _gmViewSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, userId)), equipBonusMap(inventory, attributes)); }
-    catch (_) { _gmViewSkillBonus = equipBonusMap(inventory, attributes); }
-    _gmViewProtection = protectionTotalIn(inventory, attributes, values, _gmViewSkillBonus, _gmViewProfCtx);
+    _gmViewConditions = await db.getCharacterConditions(character.id).catch(() => new Set());
+    try { _gmViewSkillBonus = mergeBonusMaps(bonusMapFrom(resolveBonusAmounts(await db.getSkillBonuses(campaignId, userId), attributes, values, character?.level, _gmViewProfCtx)), equipBonusMap(inventory, attributes), conditionBonusMap(sys?.conditions, _gmViewConditions)); }
+    catch (_) { _gmViewSkillBonus = mergeBonusMaps(equipBonusMap(inventory, attributes), conditionBonusMap(sys?.conditions, _gmViewConditions)); }
+    _gmViewProtection = protectionTotalIn(inventory, attributes, values, _gmViewSkillBonus, _gmViewProfCtx, character?.level);
     _gmViewTrees = systemId ? await db.listSystemTrees(systemId).catch(() => []) : [];
     _gmViewTreeRows = await Promise.all(_gmViewTrees.map(async (t) => {
       let pts = 0;
@@ -574,13 +963,14 @@ async function viewPlayer(userId, name) {
 
     c.innerHTML = `
       <button class="btn auto sm" onclick="openTab('jogadores')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>Voltar aos jogadores</button>
-      <div class="section-title" style="margin-top:18px">Ficha de ${esc(name)}</div>
+      <div class="section-title" role="heading" aria-level="2" style="margin-top:18px">Ficha de ${esc(name)}</div>
       <div class="char-card">
         ${character.avatar_url ? `<img class="char-portrait" src="${esc(character.avatar_url)}" alt="">`
           : `<div class="char-portrait ph">${esc((character.name || '?').trim().charAt(0).toUpperCase() || '?')}</div>`}
         <div class="char-info"><h2>${esc(character.name) || 'Sem nome'}</h2>
           <div class="char-meta">${[character.age && ('Idade: ' + esc(character.age)), character.gender && esc(character.gender),
-            character.char_class && (esc(character.char_class) + (character.subclass ? ' · ' + esc(character.subclass) : ''))].filter(Boolean).join(' &nbsp;·&nbsp; ') || '—'}</div>
+            character.char_class && (esc(character.char_class) + (character.subclass ? ' · ' + esc(character.subclass) : '')),
+            character.origin_name && (esc(character.origin_name) + (character.origin_variant_name ? ' · ' + esc(character.origin_variant_name) : ''))].filter(Boolean).join(' &nbsp;·&nbsp; ') || '—'}</div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
             <span class="badge" style="border-color:var(--brass);color:var(--brass)">Nível ${character.level || 1}</span>
             <button class="plus" title="Tira 1 nível" onclick="gmAdjustLevel(-1)">−</button>
@@ -589,11 +979,11 @@ async function viewPlayer(userId, name) {
         </div>
       </div>
       <nav class="home-tabs" id="gmview-tabs" role="tablist" style="margin-top:18px">
-        <button role="tab" data-tab="ficha" onclick="gmViewTab('ficha')">Ficha</button>
-        <button role="tab" data-tab="biografia" onclick="gmViewTab('biografia')">Biografia</button>
-        <button role="tab" data-tab="inventario" onclick="gmViewTab('inventario')">Inventário</button>
-        <button role="tab" data-tab="habilidades" onclick="gmViewTab('habilidades')">Habilidades</button>
-        <button role="tab" data-tab="arvores" onclick="gmViewTab('arvores')">Árvores</button>
+        <button role="tab" aria-selected="false" data-tab="ficha" onclick="gmViewTab('ficha')">Ficha</button>
+        <button role="tab" aria-selected="false" data-tab="biografia" onclick="gmViewTab('biografia')">Biografia</button>
+        <button role="tab" aria-selected="false" data-tab="inventario" onclick="gmViewTab('inventario')">Inventário</button>
+        <button role="tab" aria-selected="false" data-tab="habilidades" onclick="gmViewTab('habilidades')">Habilidades</button>
+        <button role="tab" aria-selected="false" data-tab="arvores" onclick="gmViewTab('arvores')">Árvores</button>
       </nav>
       <div id="gmview-content"></div>
       <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin:16px 2px 0">As anotações do jogador são privadas e não aparecem aqui.</p>`;
@@ -607,27 +997,65 @@ window.viewPlayer = viewPlayer;
 // isso. Essa sub-navegação vive inteira dentro do #gmview-content já criado por viewPlayer.
 window.gmViewTab = (name) => {
   _gmViewTab = name;
-  document.querySelectorAll('#gmview-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  document.querySelectorAll('#gmview-tabs button').forEach((b) => { const on = b.dataset.tab === name; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
   const c = $('gmview-content'); if (!c) return;
   ({ ficha: renderGmFicha, biografia: renderGmBiografia, inventario: renderGmInventario,
      habilidades: renderGmHabilidades, arvores: renderGmArvores }[name] || renderGmFicha)(c);
 };
+// três blocos de ficha parametrizados (attrs/values/bonus/profCtx/nível vêm todos de `ctx`, nunca
+// de uma global fixa) — servem tanto a visão do Mestre sobre um jogador (renderGmFicha) quanto a
+// ficha de NPC (renderNpcFicha), sem duplicar a leitura de fórmula/bônus duas vezes. `ctx.idPrefix`
+// e `ctx.adjustFn` são opcionais: sem eles o tile é só leitura (ex.: perícia, sempre calculada).
+function resourceTileHtml(a, ctx) {
+  const { attrs, values, bonusMap, profCtx, level, current, protection, adjustFn } = ctx;
+  const max = evalStatIn(attrs, values, a, bonusMap, new Set(), profCtx, level) ?? 0;
+  let cur = current; if (cur == null || cur === '') cur = max; cur = Number(cur);
+  const prot = protection || 0;
+  const protPct = (prot > 0 && max > 0) ? Math.max(2, Math.min(100, (prot / max) * 100)) : 0;
+  return `<div class="res-row" style="--res-color:${esc(a.color || '#35c6d4')}">
+    <div class="res-head">
+      <span class="res-label"><i class="res-dot"></i>${esc(a.name)}</span>
+      <span class="res-amt-line"><b>${cur}</b>&nbsp;/&nbsp;${max}${prot > 0 ? ` <span class="res-shield-badge" title="Proteção equipada">+${prot} proteção</span>` : ''}</span>
+    </div>
+    ${prot > 0 ? `<div class="res-shield-track" title="Proteção equipada: ${prot}"><div class="res-shield-fill" style="width:${protPct}%"></div></div>` : ''}
+    <div class="res-bar-row">
+      <div class="res-track">${resBarHtml(cur, max)}</div>
+      ${adjustFn ? `<div class="res-step">
+        <button class="res-btn dmg" title="Diminuir 1" onclick="${adjustFn}('${a.id}', -1)">−</button>
+        <button class="res-btn heal" title="Aumentar 1" onclick="${adjustFn}('${a.id}', 1)">+</button>
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+function statTileHtml(a, ctx) {
+  const { attrs, values, bonusMap, profCtx, level, idPrefix, adjustFn } = ctx;
+  if (a.kind === 'computed') {
+    const v = evalStatIn(attrs, values, a, bonusMap, new Set(), profCtx, level);
+    return `<div class="stat-tile computed" style="--stc:${esc(a.color || '#7ee6dc')}"><div class="stat-val calc">${v == null ? `<span style="color:var(--escarlate)" title="Fórmula com erro">${ICONS.warning}</span>` : v}</div><div class="stat-name">${esc(a.name)}</div></div>`;
+  }
+  const val = values[a.id] ?? a.default_value ?? 0;
+  const bonus = bonusMap[a.id];
+  return `<div class="stat-tile" style="--stc:${esc(a.color || '#7ee6dc')}">
+    ${bonus ? `<span class="mod-badge" title="${esc(bonusTitle(bonus))}">+${bonus.total}</span>` : ''}
+    <div class="stat-val" id="${idPrefix || ''}${a.id}">${esc(val)}</div>
+    <div class="stat-name">${esc(a.name)}</div>
+    ${adjustFn ? `<div class="stat-ctl">
+      <button class="plus" title="Desce 1 (ajuste direto)" onclick="${adjustFn}('${a.id}', -1)">−</button>
+      <button class="plus" title="Sobe 1 (ajuste direto)" onclick="${adjustFn}('${a.id}', 1)">+</button>
+    </div>` : ''}
+  </div>`;
+}
+function skillChipHtml(a, ctx) {
+  const { attrs, values, bonusMap, profCtx, level } = ctx;
+  const v = evalStatIn(attrs, values, a, bonusMap, new Set(), profCtx, level);
+  return `<div class="skill-chip" style="--skc:${esc(a.color || '#7ee6dc')}">
+    <span class="skc-name">${esc(a.name)}</span>
+    <span class="skc-val">${v == null ? `<span style="color:var(--escarlate)" title="Fórmula com erro">${ICONS.warning}</span>` : v}</span>
+  </div>`;
+}
 function renderGmFicha(c) {
   const attributes = _gmViewAttrs, values = _gmViewValues, character = _gmViewChar;
-  const gmResBar = (a) => {
-    const max = evalStatIn(attributes, values, a, _gmViewSkillBonus, new Set(), _gmViewProfCtx) ?? 0;
-    let cur = _gmViewResources?.[a.id]; if (cur == null || cur === '') cur = max; cur = Number(cur);
-    const prot = _gmViewProtection || 0;
-    const protPct = (prot > 0 && max > 0) ? Math.max(2, Math.min(100, (prot / max) * 100)) : 0;
-    return `<div class="res-row" style="--res-color:${esc(a.color || '#35c6d4')}">
-      <div class="res-head">
-        <span class="res-label"><i class="res-dot"></i>${esc(a.name)}</span>
-        <span class="res-amt-line"><b>${cur}</b>&nbsp;/&nbsp;${max}${prot > 0 ? ` <span class="res-shield-badge" title="Proteção equipada">+${prot} proteção</span>` : ''}</span>
-      </div>
-      ${prot > 0 ? `<div class="res-shield-track" title="Proteção equipada: ${prot}"><div class="res-shield-fill" style="width:${protPct}%"></div></div>` : ''}
-      <div class="res-bar-row"><div class="res-track">${resBarHtml(cur, max)}</div></div>
-    </div>`;
-  };
+  const ctx = { attrs: attributes, values, bonusMap: _gmViewSkillBonus, profCtx: _gmViewProfCtx, level: character?.level, idPrefix: 'gmval-' };
   const primaries = attributes.filter((a) => a.is_resource);
   const gmSkills = sys?.system?.skills_enabled ? attributes.filter((a) => a.is_skill) : [];
   const secondary = attributes.filter((a) => !a.is_resource && !a.is_skill);
@@ -635,10 +1063,10 @@ function renderGmFicha(c) {
   c.innerHTML = `
     <div class="status-hud">
       ${primaries.length ? `<div class="hud-sec-label">Recursos<span class="ln"></span></div>
-        <div class="hud-bars">${primaries.map(gmResBar).join('')}</div>` : ''}
+        <div class="hud-bars">${primaries.map((a) => resourceTileHtml(a, { ...ctx, current: _gmViewResources?.[a.id], protection: _gmViewProtection, adjustFn: 'gmAdjustResource' })).join('')}</div>` : ''}
       <div class="hud-sec-label">Status${secondary.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
       <div class="stat-grid">
-        ${secondary.map((a) => gmStatRow(a)).join('')}
+        ${secondary.map((a) => statTileHtml(a, { ...ctx, adjustFn: 'gmAdjustStat' })).join('')}
         ${secondary.length ? '' : '<div class="empty" style="grid-column:1/-1">Sem status secundários.</div>'}
       </div>
       ${hasBaseSec ? `<div class="points-card" style="margin-top:14px">
@@ -650,9 +1078,11 @@ function renderGmFicha(c) {
         </div>
       </div>` : ''}
       ${gmSkills.length ? `<div class="hud-sec-label" style="margin-top:18px">Perícias<span class="ln"></span></div>
-      <div class="skill-grid">${gmSkills.map(gmSkillChip).join('')}</div>` : ''}
+      <div class="skill-grid">${gmSkills.map((a) => skillChipHtml(a, ctx)).join('')}</div>` : ''}
       ${sys?.proficiencies?.length ? `<div class="hud-sec-label" style="margin-top:18px">Proficiências <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(clique pra conceder/revogar)</span><span class="ln"></span></div>
       <div class="prof-groups">${profChipsHtml(_gmViewProficiencies, true)}</div>` : ''}
+      ${sys?.conditions?.length ? `<div class="hud-sec-label" style="margin-top:18px">Condições <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(clique pra aplicar/remover)</span><span class="ln"></span></div>
+      <div class="prof-groups">${conditionChipsHtml(_gmViewConditions, true)}</div>` : ''}
     </div>`;
 }
 function renderGmBiografia(c) {
@@ -667,12 +1097,23 @@ function renderGmBiografia(c) {
 }
 function renderGmInventario(c) {
   const inventory = _gmViewInventory;
+  let weightHtml = '';
+  if (mesa.system_id && sys?.system?.weight_enabled) {
+    try {
+      const capStat = _gmViewAttrs.find((a) => a.id === sys.system.carry_capacity_stat_id);
+      const capacity = capStat ? evalStatIn(_gmViewAttrs, _gmViewValues, capStat, _gmViewSkillBonus, new Set(), _gmViewProfCtx, _gmViewChar?.level) : null;
+      const totalWeight = Math.round(inventory.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 1), 0) * 100) / 100;
+      const over = capacity != null && totalWeight > capacity;
+      weightHtml = `<div class="section-title" role="heading" aria-level="2">Carga <span style="color:${over ? 'var(--escarlate)' : 'var(--ink-faint)'};text-transform:none;letter-spacing:0">(${totalWeight}${capacity != null ? ' / ' + capacity : ''})</span></div>`;
+    } catch (_) {}
+  }
   c.innerHTML = `
+    ${weightHtml}
     ${(sys && sys.equipmentSlots && sys.equipmentSlots.length) ? `
-    <div class="section-title">Equipamentos</div>
+    <div class="section-title" role="heading" aria-level="2">Equipamentos</div>
     ${eqBoardHtml(sys.equipmentSlots, inventory.filter((it) => it.equipped && it.equipped_slot_id), true)}` : ''}
 
-    <div class="section-title" style="margin-top:14px">Mochila</div>
+    <div class="section-title" role="heading" aria-level="2" style="margin-top:14px">Mochila</div>
     <div class="list gm-view-inv">${inventory.length ? inventory.map((it) => { const rarity = it.rarity || 'Comum'; return `
       <div class="rar-frame" data-rarity="${esc(rarity)}">
       <div class="list-row">
@@ -680,7 +1121,7 @@ function renderGmInventario(c) {
         <div class="rar-row-body">
         <div class="grow"><div class="nm">${esc(it.name)}${it.equipped ? ' <span class="badge" style="border-color:var(--maq);color:var(--maq)">equipado</span>' : ''}</div>
         ${it.description ? `<div class="sub">${esc(it.description)}</div>` : ''}
-        ${(it.modifiers || []).length ? `<div class="mods" style="margin-top:5px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : ''}</div>
+        ${(it.modifiers || []).length ? `<div class="mods" style="margin-top:5px">${it.modifiers.map((m) => `<span class="badge mod">${itemModLabel(m)}</span>`).join('')}</div>` : ''}</div>
         <div class="sub">x${it.qty}</div>
         <button class="btn sm auto" onclick="gmOpenInvItemDetail('${it.id}')">Detalhes</button>
         </div>
@@ -694,7 +1135,7 @@ function renderGmInventario(c) {
 function renderGmArvores(c) {
   const userId = _gmViewUserId;
   c.innerHTML = _gmViewTrees.length ? `
-    <div class="section-title">Pontos de árvore de habilidade</div>
+    <div class="section-title" role="heading" aria-level="2">Pontos de árvore de habilidade</div>
     <div class="list">${_gmViewTreeRows.map(({ tree, pts }) => `
       <div class="list-row"><div class="grow"><div class="nm">${esc(tree.name)}</div></div>
         <input type="number" min="0" id="gm-treepts-${tree.id}" value="${pts}" style="max-width:70px;background:var(--field);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-family:var(--mono);padding:7px">
@@ -710,7 +1151,7 @@ async function renderGmHabilidades(c) {
   // mesma abilityCardHtml() que a aba do próprio jogador usa — garante que Mestre e jogador nunca
   // vejam listas diferentes pro mesmo personagem
   c.innerHTML = [...byTree.entries()].map(([treeName, list]) => `
-    <div class="section-title">${esc(treeName)}</div>
+    <div class="section-title" role="heading" aria-level="2">${esc(treeName)}</div>
     <div class="list">${list.map(abilityCardHtml).join('')}</div>`).join('');
 }
 // concessão manual — não precisa de pedido do jogador, o Mestre já entrega direto (RLS permite
@@ -745,7 +1186,7 @@ window.gmOpenInvItemDetail = (id) => {
       ${it.equipped ? `<span class="badge" style="border-color:var(--maq);color:var(--maq)">Equipado</span>` : ''}
     </div>
     ${it.description ? `<p class="gintro">${esc(it.description)}</p>` : `<p class="gintro" style="color:var(--ink-faint)">Sem descrição.</p>`}
-    ${(it.modifiers && it.modifiers.length) ? `<div class="mods" style="margin-bottom:12px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : ''}
+    ${(it.modifiers && it.modifiers.length) ? `<div class="mods" style="margin-bottom:12px">${it.modifiers.map((m) => `<span class="badge mod">${itemModLabel(m)}</span>`).join('')}</div>` : ''}
     <div class="idet-creator">Quantidade: ${esc(String(it.qty))}</div>
   </div>`;
   const untrap = trapFocus(w);
@@ -758,30 +1199,6 @@ window.gmOpenInvItemDetail = (id) => {
   w.querySelector('.x').focus();
 };
 
-function gmStatRow(a) {
-  if (a.kind === 'computed') {
-    const v = evalStatIn(_gmViewAttrs, _gmViewValues, a, _gmViewSkillBonus, new Set(), _gmViewProfCtx);
-    return `<div class="stat-tile computed" style="--stc:${esc(a.color || '#7ee6dc')}"><div class="stat-val calc">${v == null ? ICONS.warning : v}</div><div class="stat-name">${esc(a.name)}</div></div>`;
-  }
-  const val = _gmViewValues[a.id] ?? a.default_value ?? 0;
-  const bonus = _gmViewSkillBonus[a.id];
-  return `<div class="stat-tile" style="--stc:${esc(a.color || '#7ee6dc')}">
-    ${bonus ? `<span class="mod-badge" title="${esc(bonusTitle(bonus))}">+${bonus.total}</span>` : ''}
-    <div class="stat-val" id="gmval-${a.id}">${esc(val)}</div>
-    <div class="stat-name">${esc(a.name)}</div>
-    <div class="stat-ctl">
-      <button class="plus" title="Desce 1 (ajuste direto, não mexe nos pontos)" onclick="gmAdjustStat('${a.id}', -1)">−</button>
-      <button class="plus" title="Sobe 1 (ajuste direto, não mexe nos pontos)" onclick="gmAdjustStat('${a.id}', 1)">+</button>
-    </div>
-  </div>`;
-}
-function gmSkillChip(a) {
-  const v = evalStatIn(_gmViewAttrs, _gmViewValues, a, _gmViewSkillBonus, new Set(), _gmViewProfCtx);
-  return `<div class="skill-chip" style="--skc:${esc(a.color || '#7ee6dc')}">
-    <span class="skc-name">${esc(a.name)}</span>
-    <span class="skc-val">${v == null ? ICONS.warning : v}</span>
-  </div>`;
-}
 window.gmSetTreePoints = (treeId, userId) => {
   const el = $('gm-treepts-' + treeId); if (!el) return;
   const val = Math.max(0, parseInt(el.value) || 0);
@@ -827,6 +1244,19 @@ window.gmAdjustStat = (statId, delta) => {
     showMsg('Status ajustado.', 'ok');
   }).catch((e) => showMsg(e.message));
 };
+// mesmo atalho +/- direto que a ficha de NPC já tinha (npcAdjustResource) — faltava aqui na visão
+// do Mestre sobre um jogador, único jeito de ajustar HP/recurso era abrindo a ficha do próprio jogador
+window.gmAdjustResource = (statId, delta) => {
+  if (!_gmViewChar) return;
+  const stat = _gmViewAttrs.find((a) => a.id === statId); if (!stat) return;
+  const max = evalStatIn(_gmViewAttrs, _gmViewValues, stat, _gmViewSkillBonus, new Set(), _gmViewProfCtx, _gmViewChar?.level) ?? 0;
+  let cur = _gmViewResources?.[statId]; if (cur == null || cur === '') cur = max; cur = Number(cur);
+  const next = Math.max(0, cur + delta);
+  db.setCharacterResource(_gmViewChar.id, statId, next).then(() => {
+    if (_gmViewResources) _gmViewResources[statId] = next;
+    renderGmFicha($('content'));
+  }).catch((e) => showMsg(e.message));
+};
 window.gmToggleProficiency = (proficiencyId, granted) => {
   if (!_gmViewChar) return;
   db.gmSetProficiency(_gmViewChar.id, proficiencyId, granted).then(() => {
@@ -840,7 +1270,7 @@ async function renderAtributos(c) {
   if (mesa.system_id) return renderSistema(c);
   const attrs = await db.listAttributes(campaignId);
   c.innerHTML = `
-    <div class="section-title">Atributos da mesa</div>
+    <div class="section-title" role="heading" aria-level="2">Atributos da mesa</div>
     <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
       Defina os status que toda ficha desta mesa terá (ex.: Vida, Vigor, Lógica). Os jogadores preenchem os valores.</p>
     <div class="list" id="attr-list">${attrs.length ? attrs.map(attrRow).join('') : '<div class="empty">Nenhum atributo ainda.</div>'}</div>
@@ -933,12 +1363,12 @@ async function renderSistema(c) {
   const subs = (pid) => b.classes.filter((x) => x.parent_id === pid);
   // título de seção com atalho "Editar" pra aba correspondente do construtor de sistema — evita
   // repetir os mesmos cinco atributos inline em cada seção abaixo
-  const st = (label, tab) => `<div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+  const st = (label, tab) => `<div class="section-title" role="heading" aria-level="2" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
     <span>${label}</span>
     <button class="btn sm auto" style="text-transform:none;letter-spacing:0;font-family:var(--serif)" onclick="viewSistemaInline('${tab}')">Editar</button>
   </div>`;
   c.innerHTML = `
-    <div class="section-title">Sistema da campanha: ${esc(b.system.name)}</div>
+    <div class="section-title" role="heading" aria-level="2">Sistema da campanha: ${esc(b.system.name)}</div>
     <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 12px">
       Tudo abaixo vem deste sistema.</p>
     <button class="btn go auto" style="margin-bottom:16px" onclick="viewSistemaInline('geral')"><span class="ic">${ICONS.externalLink}</span>Editar sistema</button>
@@ -983,7 +1413,7 @@ async function renderSistema(c) {
       })()}
     </div>
 
-    <div class="section-title">Árvores de habilidade (${b.trees.length})</div>
+    <div class="section-title" role="heading" aria-level="2">Árvores de habilidade (${b.trees.length})</div>
     <div class="grid">${b.trees.length ? b.trees.map((t) => `
       <div class="card-tile glass" style="cursor:default"><h3>${esc(t.name)}</h3>
         <button class="btn sm auto" style="margin-top:6px" onclick="viewTreeInline('${t.id}')"><span class="ic">${ICONS.externalLink}</span>Abrir/editar</button></div>`).join('') : '<div class="empty">Sem árvores.</div>'}</div>
@@ -991,7 +1421,7 @@ async function renderSistema(c) {
     ${st('Itens (' + b.items.length + ')', 'itens')}
     <div class="list">${b.items.length ? b.items.map((it) => `
       <div class="list-row"><div class="grow"><div class="nm">${esc(it.name)}</div>
-        <div class="sub">${[it.category, it.rarity].filter(Boolean).map(esc).join(' · ')}${(it.modifiers && it.modifiers.length) ? ' · ' + it.modifiers.map((m) => esc(m.name + ' ' + m.value)).join(', ') : ''}</div></div></div>`).join('') : '<div class="empty">Sem itens.</div>'}</div>`;
+        <div class="sub">${[it.category, it.rarity].filter(Boolean).map(esc).join(' · ')}${(it.modifiers && it.modifiers.length) ? ' · ' + it.modifiers.map((m) => itemModLabel(m, b.stats)).join(', ') : ''}</div></div></div>`).join('') : '<div class="empty">Sem itens.</div>'}</div>`;
 }
 
 /* ============================ ÁRVORES (ambos) ============================ */
@@ -1036,7 +1466,7 @@ async function renderArvores(c) {
       return;
     }
     c.innerHTML = `
-      <div class="section-title">Árvores do sistema (${trees.length})</div>
+      <div class="section-title" role="heading" aria-level="2">Árvores do sistema (${trees.length})</div>
       <div class="grid">${trees.length ? trees.map((t) => `
         <div class="card-tile glass" style="cursor:default"><h3>${esc(t.name)}</h3>
           <button class="btn sm auto" style="margin-top:6px" onclick="viewTreeInline('${t.id}')"><span class="ic">${ICONS.externalLink}</span>${gm ? 'Abrir/editar' : 'Ver árvore'}</button></div>`).join('') : '<div class="empty">Este sistema não tem árvores.</div>'}</div>
@@ -1050,11 +1480,10 @@ async function renderArvores(c) {
   // nenhum, então o formulário de criação fica escondido; árvores antigas continuam listadas.
   const trees = await db.listTrees(campaignId);
   c.innerHTML = `
-    <div class="section-title">Árvores de Esferas</div>
-    ${trees.length ? `<div class="grid" id="arvores-grid">${trees.map((t) => treeCardHtml(t, gm)).join('')}</div>` : ''}
-    <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:18px 2px 0">
-      Esta mesa não está vinculada a um sistema, então o editor de árvores (com esferas, custos e desbloqueio por
-      pontos) não está disponível aqui. ${gm ? 'Vincule um sistema à mesa (ou crie uma mesa nova escolhendo um sistema) pra usar árvores de verdade.' : 'Fale com o Mestre sobre vincular um sistema à mesa.'}</p>`;
+    <div class="section-title" role="heading" aria-level="2">Árvores de Esferas</div>
+    ${emptyState(ICONS.warning, 'Mesa sem sistema vinculado',
+      `O editor de árvores (com esferas, custos e desbloqueio por pontos) não está disponível aqui. ${gm ? 'Vincule um sistema à mesa (ou crie uma mesa nova escolhendo um sistema) pra usar árvores de verdade.' : 'Fale com o Mestre sobre vincular um sistema à mesa.'}`)}
+    ${trees.length ? `<div class="grid" id="arvores-grid" style="margin-top:18px">${trees.map((t) => treeCardHtml(t, gm)).join('')}</div>` : ''}`;
 }
 function treeCardHtml(t, gm) {
   return `<div class="card-tile glass" style="cursor:default" data-id="${t.id}">
@@ -1091,18 +1520,21 @@ let _fichaAttrs = [], _fichaValues = {}, _fichaResources = {}, _fichaProficienci
 let _fichaInventory = [], _fichaFormulas = [], _builderTerms = [];
 let _fichaSkillBonus = {}; // {attribute_id: {total, sources:[{name,amount}]}} — bônus de esferas desbloqueadas
 let _fichaProtection = 0; // soma da Proteção de todo item EQUIPADO (armadura/escudo), já escalada pelo status configurado
+let _fichaConditions = new Set(); // ids das condições ATIVAS no personagem (aplicadas só pelo Mestre)
 let _gmViewChar = null, _gmViewAttrs = [], _gmViewValues = {}, _gmViewResources = {}, _gmViewSkillBonus = {}, _gmViewProficiencies = {}, _gmViewProfCtx = null, _gmViewProtection = 0,
-  _gmViewInventory = [], _gmViewTrees = [], _gmViewTreeRows = []; // ficha do jogador que o Mestre está vendo/editando (ver viewPlayer/gmViewTab)
+  _gmViewInventory = [], _gmViewTrees = [], _gmViewTreeRows = [], _gmViewConditions = new Set(); // ficha do jogador que o Mestre está vendo/editando (ver viewPlayer/gmViewTab)
 // soma a Proteção de todo item equipado — cada item soma seu valor fixo + (se tiver protection_scale)
 // o valor do status referenciado, do mesmo jeito que "escala com" já funciona pro dano da arma.
-function protectionTotalIn(items, attrs, values, bonuses, profCtx) {
+function protectionTotalIn(items, attrs, values, bonuses, profCtx, level) {
   let total = 0;
   (items || []).forEach((it) => {
     if (!it.equipped || it.protection == null || it.protection === '') return;
     total += Number(it.protection) || 0;
-    if (it.protection_scale) {
+    if (it.protection_scale === 'nivel') {
+      total += Number(level) || 0;
+    } else if (it.protection_scale) {
       const stat = attrs.find((a) => (a.formula_key || a.name) === it.protection_scale);
-      if (stat) total += Number(evalStatIn(attrs, values, stat, bonuses, new Set(), profCtx)) || 0;
+      if (stat) total += Number(evalStatIn(attrs, values, stat, bonuses, new Set(), profCtx, level)) || 0;
     }
   });
   return Math.max(0, Math.round(total));
@@ -1131,6 +1563,61 @@ function profCategoryColor(cat) {
   let h = 0; for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) >>> 0;
   return `hsl(${h % 360} 58% 58%)`;
 }
+// selo de condição — mesmo padrão visual/interativo de profChipsHtml. Mestre (editable=true) vê o
+// catálogo inteiro e clica pra aplicar/remover; jogador só vê as que estão ATIVAS agora, sem poder
+// mexer (aplicar/remover é sempre decisão do Mestre — de propósito, ver Fase 6 do roteiro).
+function conditionChipsHtml(activeIds, editable) {
+  const catalog = sys?.conditions || [];
+  if (!catalog.length) return '';
+  const list = editable ? catalog : catalog.filter((cond) => activeIds.has(cond.id));
+  if (!list.length) return '';
+  return `<div class="prof-chips">${list.map((cond) => {
+    const on = activeIds.has(cond.id);
+    const color = cond.color || '#f2585e';
+    const label = (cond.icon ? esc(cond.icon) + ' ' : '') + esc(cond.name);
+    const styleOn = `style="border-color:${esc(color)};color:${esc(color)};background:color-mix(in srgb, ${esc(color)} 16%, transparent)"`;
+    return editable
+      ? `<button type="button" class="prof-chip ${on ? 'on' : ''}" ${on ? styleOn : ''} title="${esc(cond.description || '')}" onclick="gmToggleCondition('${cond.id}', ${!on})">${label}</button>`
+      : `<span class="prof-chip on" ${styleOn} title="${esc(cond.description || '')}">${label}</span>`;
+  }).join('')}</div>`;
+}
+window.gmToggleCondition = (conditionId, apply) => {
+  if (!_gmViewChar) return;
+  const action = apply ? db.applyCondition(_gmViewChar.id, conditionId) : db.removeCondition(_gmViewChar.id, conditionId);
+  action.then(() => {
+    if (apply) _gmViewConditions.add(conditionId); else _gmViewConditions.delete(conditionId);
+    viewPlayer(_gmViewUserId, _gmViewName);
+    showMsg(apply ? 'Condição aplicada.' : 'Condição removida.', 'ok');
+  }).catch((e) => showMsg(e.message));
+};
+// escolha de proficiência com orçamento (Fase 7) — cartão inline em vez de modal de propósito: se
+// o jogador fechar a ficha sem confirmar, ele simplesmente reaparece na próxima vez que abrir "Ficha"
+// (a trava characters.proficiency_choices_made_at só é gravada quando a RPC realmente roda), então
+// não existe estado "perdido pra sempre" por ter fechado a aba no meio da escolha.
+function profChoiceCardHtml(node, pool) {
+  const limit = node.proficiency_choice_count;
+  return `<div class="points-card" id="profchoice-card" style="margin-top:14px;border-color:var(--brass)">
+    <div class="hud-sec-label">Escolha de proficiências — ${esc(node.name)}<span class="ln"></span></div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin:6px 0 10px">Escolha até ${limit} ${limit === 1 ? 'proficiência' : 'proficiências'} da lista abaixo. Essa escolha é definitiva.</p>
+    <div id="profchoice-list">${pool.map((p) => `<label class="check-row" style="margin-bottom:6px">
+      <input type="checkbox" value="${p.id}" onchange="onProfChoiceToggle(this,${limit})"><span>${esc(p.name)}</span>
+    </label>`).join('')}</div>
+    <button class="btn go auto sm" style="margin-top:10px" onclick="confirmProfChoice('${node.id}')">Confirmar escolha</button>
+  </div>`;
+}
+window.onProfChoiceToggle = (el, limit) => {
+  const checked = [...document.querySelectorAll('#profchoice-list input:checked')];
+  if (checked.length > limit) el.checked = false; // trava no cliente; a RPC também valida no servidor
+};
+window.confirmProfChoice = async (classId) => {
+  const ids = [...document.querySelectorAll('#profchoice-list input:checked')].map((i) => i.value);
+  if (!ids.length) { showMsg('Escolha pelo menos 1 proficiência.'); return; }
+  try {
+    await db.chooseClassProficiencies(character.id, classId, ids);
+    showMsg('Proficiências escolhidas.', 'ok');
+    if (currentTab === 'ficha') openTab('ficha');
+  } catch (e) { showMsg(e.message); }
+};
 function profChipsHtml(grantedMap, editable) {
   const catalog = sys?.proficiencies || [];
   if (!catalog.length) return '';
@@ -1179,10 +1666,36 @@ function classSubclassChips(ch) {
   }
   return classHtml + subHtml;
 }
+// Raça/Espécie/Origem — mesmo padrão de classe/subclasse acima (eixo independente, também
+// definitivo): raiz = raça, parent_id = variação. Só aparece quando a mesa tem sistema vinculado
+// (sem sistema, não tem catálogo de raças pra escolher — o campo livre de "naturalidade" já cobre
+// esse caso na Biografia).
+function originColor(name) { return (sys?.origins || []).find((x) => !x.parent_id && x.name === name)?.color; }
+function originVariantChips(ch) {
+  if (!sys || !sys.origins || !sys.origins.length) return '';
+  const chip = (label, color) => {
+    const c = color || 'var(--ink-dim)';
+    return `<span class="char-tag class-tag" style="border-color:${c};color:${c};background:color-mix(in srgb, ${c} 16%, transparent)">${esc(label)}</span>`;
+  };
+  let originHtml, variantHtml = '';
+  if (ch.origin_name) {
+    originHtml = chip(ch.origin_name, originColor(ch.origin_name));
+    if (ch.origin_variant_name) variantHtml = chip(ch.origin_variant_name, originColor(ch.origin_name));
+  } else {
+    const roots = sys.origins.filter((x) => !x.parent_id);
+    originHtml = `<select class="class-pick-inline" title="Só pode ser escolhida uma vez" onchange="pickOrigin(this.value)"><option value="">Escolher raça…</option>${roots.map((o) => `<option>${esc(o.name)}</option>`).join('')}</select>`;
+  }
+  if (ch.origin_name && !ch.origin_variant_name) {
+    const o = sys.origins.find((x) => !x.parent_id && x.name === ch.origin_name);
+    const variantOpts = o ? sys.origins.filter((x) => x.parent_id === o.id) : [];
+    if (variantOpts.length) variantHtml = `<select class="class-pick-inline" title="Só pode ser escolhida uma vez" onchange="pickOriginVariant(this.value)"><option value="">Escolher variação…</option>${variantOpts.map((v) => `<option>${esc(v.name)}</option>`).join('')}</select>`;
+  }
+  return originHtml + variantHtml;
+}
 function charTagsHtml(ch) {
   const otherTags = [ch.age ? 'Idade: ' + esc(ch.age) : '', ch.gender ? esc(ch.gender) : ''].filter(Boolean);
   return `<span class="char-tag" id="char-level-tag">Nível ${ch.level || 1}</span>` +
-    otherTags.map((t) => `<span class="char-tag">${t}</span>`).join('') + classSubclassChips(ch);
+    otherTags.map((t) => `<span class="char-tag">${t}</span>`).join('') + classSubclassChips(ch) + originVariantChips(ch);
 }
 // repinta só a etiqueta de nível/idade/gênero/classe-subclasse (usado depois de escolher
 // classe/subclasse, que troca o <select> por uma etiqueta travada) — sem recarregar a ficha toda
@@ -1193,18 +1706,41 @@ async function renderFicha(c) {
   let sheet = await db.loadSheet(campaignId);
   // se o Mestre mudou os "Status base" da classe/subclasse depois que o jogador escolheu, isso
   // traz a mudança pra ficha agora — sem nunca sobrescrever um status que o jogador já customizou
-  let changed = await resyncClassDefaults(sheet.character.id, sheet.character.char_class, sheet.character.subclass);
+  const [clChanged, orChanged] = await Promise.all([
+    resyncClassDefaults(sheet.character.id, sheet.character.char_class, sheet.character.subclass),
+    resyncOriginDefaults(sheet.character.id, sheet.character.origin_name, sheet.character.origin_variant_name),
+  ]);
+  let changed = clChanged || orChanged;
   // pega pontos de nível pendentes (idempotente — só concede o que ainda não foi dado, é seguro
   // chamar toda vez que a ficha abre, mesmo sem ter mudado de nível desde a última visita)
   try { const r = await db.applyLevelRewards(sheet.character.id); if (r.stat_points || r.tree_points) changed = true; } catch (_) {}
   if (changed) sheet = await db.loadSheet(campaignId);
   const { character: ch, attributes, values, resources, proficiencies, systemId } = sheet;
   character = ch; _fichaAttrs = attributes; _fichaValues = { ...values }; _fichaResources = { ...(resources || {}) }; _fichaProficiencies = proficiencies || {}; _fichaProfCtx = profCtxFrom(_fichaProficiencies);
+  // se a ficha carregou DEPOIS do combate já estar ativo (ex.: acabou de entrar na mesa no meio de
+  // uma luta), maybeShowInitiativeModal() do mountCombat() rodou cedo demais, sem `character` ainda
+  // — chama de novo agora que ele existe; a função já é idempotente (não insiste 2x pro mesmo combate)
+  maybeShowInitiativeModal();
   const [inv, formulas] = await Promise.all([db.listInventory(ch.id), db.listCharacterFormulas(ch.id)]);
   _fichaInventory = inv; _fichaFormulas = formulas;
-  try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, ch.user_id)), equipBonusMap(inv, attributes)); }
-  catch (_) { _fichaSkillBonus = equipBonusMap(inv, attributes); }
-  _fichaProtection = protectionTotalIn(inv, attributes, _fichaValues, _fichaSkillBonus, _fichaProfCtx);
+  _fichaConditions = await db.getCharacterConditions(ch.id).catch(() => new Set());
+  try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(resolveBonusAmounts(await db.getSkillBonuses(campaignId, ch.user_id), attributes, values, ch.level, _fichaProfCtx)), equipBonusMap(inv, attributes), conditionBonusMap(sys?.conditions, _fichaConditions)); }
+  catch (_) { _fichaSkillBonus = mergeBonusMaps(equipBonusMap(inv, attributes), conditionBonusMap(sys?.conditions, _fichaConditions)); }
+  _fichaProtection = protectionTotalIn(inv, attributes, _fichaValues, _fichaSkillBonus, _fichaProfCtx, ch.level);
+
+  // escolha de proficiência com orçamento (Fase 7) — usa a classe/subclasse mais específica já
+  // escolhida (subclasse vence se houver); some sozinho da ficha assim que a escolha for confirmada
+  // (proficiency_choices_made_at deixa de ser null)
+  const profChoiceCl = sys?.classes?.find((x) => !x.parent_id && x.name === ch.char_class);
+  const profChoiceSub = (profChoiceCl && ch.subclass) ? sys.classes.find((x) => x.parent_id === profChoiceCl.id && x.name === ch.subclass) : null;
+  const profChoiceNode = profChoiceSub || profChoiceCl;
+  let profChoicePool = [];
+  if (profChoiceNode && profChoiceNode.proficiency_choice_count > 0 && !ch.proficiency_choices_made_at) {
+    try {
+      const poolIds = await db.getClassProficiencyChoices(profChoiceNode.id);
+      profChoicePool = (sys.proficiencies || []).filter((p) => poolIds.has(p.id));
+    } catch (_) {}
+  }
 
   const primaries = attributes.filter((a) => a.is_resource);
   const skills = sys?.system?.skills_enabled ? attributes.filter((a) => a.is_skill) : [];
@@ -1252,7 +1788,7 @@ async function renderFicha(c) {
     </div>
 
     <div class="ficha-head">
-      <span class="section-title">Atributos</span>
+      <span class="section-title" role="heading" aria-level="2">Atributos</span>
       <span class="ficha-hint">role dados a qualquer momento pelo painel de rolagens no canto inferior direito</span>
     </div>
 
@@ -1278,9 +1814,12 @@ async function renderFicha(c) {
       <div class="skill-grid">${skills.map(skillChip).join('')}</div>` : ''}
       ${sys?.proficiencies?.length ? `<div class="hud-sec-label" style="margin-top:18px">Proficiências<span class="ln"></span></div>
       <div class="prof-groups">${profChipsHtml(_fichaProficiencies, false)}</div>` : ''}
+      ${_fichaConditions.size ? `<div class="hud-sec-label" style="margin-top:18px">Condições<span class="ln"></span></div>
+      <div class="prof-groups">${conditionChipsHtml(_fichaConditions, false)}</div>` : ''}
     </div>
+    ${profChoicePool.length ? profChoiceCardHtml(profChoiceNode, profChoicePool) : ''}
 
-    <div class="section-title"><span class="ic">${ICONS.calc}</span>Guia rápido</div>
+    <div class="section-title" role="heading" aria-level="2"><span class="ic">${ICONS.calc}</span>Guia rápido</div>
     <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:0 0 12px">
       Monte suas próprias fórmulas combinando itens do inventário e status da ficha — ex.: dano de uma arma + sua Força.</p>
     <div id="formula-list">${_fichaFormulas.length ? _fichaFormulas.map(formulaRow).join('') : '<div class="empty">Nenhuma fórmula ainda.</div>'}</div>
@@ -1374,8 +1913,9 @@ window.onAvatarQuickFile = (input) => {
 function evalFormulaTermIn(attrs, values, t, profCtx) {
   if (t.type === 'stat') {
     const stat = attrs.find((a) => a.id === t.statId);
-    return stat ? (evalStatIn(attrs, values, stat, _fichaSkillBonus, new Set(), profCtx) ?? 0) : 0;
+    return stat ? (evalStatIn(attrs, values, stat, _fichaSkillBonus, new Set(), profCtx, character?.level) ?? 0) : 0;
   }
+  if (t.type === 'level') return Number(character?.level) || 0;
   return Number(t.value) || 0; // item (valor no momento em que foi adicionado) e número fixo
 }
 function evalFormulaIn(attrs, values, f, profCtx) { return (f.terms || []).reduce((sum, t) => sum + (t.sign || 1) * evalFormulaTermIn(attrs, values, t, profCtx), 0); }
@@ -1421,6 +1961,7 @@ function termRow(t, i) {
     <option value="1" ${t.sign === 1 ? 'selected' : ''}>+</option><option value="-1" ${t.sign === -1 ? 'selected' : ''}>−</option></select>` : '<span class="fterm-sign"></span>';
   const typeSel = `<select onchange="setTermType(${i}, this.value)">
     <option value="stat" ${t.type === 'stat' ? 'selected' : ''}>Status</option>
+    <option value="level" ${t.type === 'level' ? 'selected' : ''}>Nível</option>
     <option value="item" ${t.type === 'item' ? 'selected' : ''}>Item do inventário</option>
     <option value="number" ${t.type === 'number' ? 'selected' : ''}>Número fixo</option></select>`;
   let refSel;
@@ -1428,6 +1969,8 @@ function termRow(t, i) {
     refSel = `<select onchange="setTermField(${i},'statId',this.value)">
       <option value="">— escolha —</option>
       ${_fichaAttrs.map((a) => `<option value="${a.id}" ${t.statId === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
+  } else if (t.type === 'level') {
+    refSel = `<span style="font-family:var(--mono);font-size:11px;color:var(--ink-dim)">nível atual (${character?.level || 1}) — sempre atualizado</span>`;
   } else if (t.type === 'item') {
     refSel = `<select onchange="setTermItem(${i}, this.value)">
       <option value="">— escolha —</option>
@@ -1446,17 +1989,17 @@ function termItemModSelect(t, i) {
   if (!mods.length) return '<span style="font-family:var(--mono);font-size:10px;color:var(--ink-faint)">(sem modificadores)</span>';
   return `<select onchange="setTermItemMod(${i}, this.value)">
     <option value="">— modificador —</option>
-    ${mods.map((m) => `<option value="${esc(m.name)}" ${t.modName === m.name ? 'selected' : ''}>${esc(m.name)} (${esc(m.value)})</option>`).join('')}</select>`;
+    ${mods.map((m) => `<option value="${esc(m.stat_id)}" ${t.modStatId === m.stat_id ? 'selected' : ''}>${itemModLabel(m, _fichaAttrs)}</option>`).join('')}</select>`;
 }
 window.addBuilderTerm = () => { _builderTerms.push({ sign: 1, type: 'stat' }); renderFormulaBuilder(); };
 window.rmBuilderTerm = (i) => { _builderTerms.splice(i, 1); renderFormulaBuilder(); };
 window.setTermField = (i, key, val) => { _builderTerms[i][key] = val; };
 window.setTermType = (i, type) => { _builderTerms[i] = { sign: _builderTerms[i].sign, type }; renderFormulaBuilder(); };
-window.setTermItem = (i, itemId) => { _builderTerms[i].itemId = itemId; _builderTerms[i].modName = null; _builderTerms[i].value = 0; renderFormulaBuilder(); };
-window.setTermItemMod = (i, modName) => {
-  const t = _builderTerms[i]; t.modName = modName;
+window.setTermItem = (i, itemId) => { _builderTerms[i].itemId = itemId; _builderTerms[i].modStatId = null; _builderTerms[i].value = 0; renderFormulaBuilder(); };
+window.setTermItemMod = (i, modStatId) => {
+  const t = _builderTerms[i]; t.modStatId = modStatId;
   const item = _fichaInventory.find((it) => it.id === t.itemId);
-  const mod = item && (item.modifiers || []).find((m) => m.name === modName);
+  const mod = item && (item.modifiers || []).find((m) => m.stat_id === modStatId);
   t.value = mod ? (parseFloat(String(mod.value).replace(',', '.')) || 0) : 0;
 };
 window.saveFormulaBuilder = () => {
@@ -1466,9 +2009,13 @@ window.saveFormulaBuilder = () => {
       const stat = _fichaAttrs.find((a) => a.id === t.statId);
       return stat ? { type: 'stat', sign: t.sign || 1, statId: t.statId, label: stat.name } : null;
     }
+    if (t.type === 'level') {
+      return { type: 'level', sign: t.sign || 1, label: 'Nível' };
+    }
     if (t.type === 'item') {
       const item = _fichaInventory.find((it) => it.id === t.itemId);
-      return item ? { type: 'item', sign: t.sign || 1, value: t.value || 0, label: `${item.name}${t.modName ? ' (' + t.modName + ')' : ''}` } : null;
+      const modStat = t.modStatId ? _fichaAttrs.find((a) => a.id === t.modStatId) : null;
+      return item ? { type: 'item', sign: t.sign || 1, value: t.value || 0, label: `${item.name}${modStat ? ' (' + modStat.name + ')' : ''}` } : null;
     }
     return { type: 'number', sign: t.sign || 1, value: t.value || 0, label: String(t.value || 0) };
   }).filter(Boolean);
@@ -1558,10 +2105,12 @@ window.commitStatPoints = async () => {
 /* ============================ BIOGRAFIA / CRIAÇÃO DO PERSONAGEM ============================ */
 async function renderCharSetup(c, onboarding) {
   character = character || await db.ensureCharacter(campaignId);
+  _identityDirty = false;
   c.innerHTML = identitySection(character, onboarding);
 }
 async function renderBiografia(c) {
   character = character || await db.ensureCharacter(campaignId);
+  _identityDirty = false;
   c.innerHTML = identitySection(character, false);
 }
 
@@ -1573,12 +2122,17 @@ function identitySection(ch, onboarding) {
 
   const ageField = `<div class="fld row"><label>Idade</label>
       <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="${esc(ch.age)}" placeholder="Ex.: 27" oninput="onAgeInput(this)"></div>`;
+  const knownGenders = ['', 'Masculino', 'Feminino'];
+  const isCustomGender = !!(ch.gender && !knownGenders.includes(ch.gender));
   const genderField = `<div class="fld row"><label>Sexo</label>
-      <select style="flex:1" onchange="onIdentityFieldChange('gender', this.value)">
+      <select id="gender-select" style="flex:1" onchange="onGenderSelectChange(this.value)">
         <option value="" ${!ch.gender ? 'selected' : ''}>— não informado —</option>
         <option value="Masculino" ${ch.gender === 'Masculino' ? 'selected' : ''}>Masculino</option>
         <option value="Feminino" ${ch.gender === 'Feminino' ? 'selected' : ''}>Feminino</option>
-      </select></div>`;
+        <option value="__custom__" ${isCustomGender ? 'selected' : ''}>Outro (digitar)</option>
+      </select></div>
+      <div class="fld row" id="gender-custom-row" style="${isCustomGender ? '' : 'display:none'}"><label></label>
+        <input value="${esc(isCustomGender ? ch.gender : '')}" placeholder="Como prefere descrever" oninput="onIdentityFieldChange('gender', this.value)"></div>`;
 
   const gallery = Array.isArray(ch.gallery) ? ch.gallery : [];
   const loreFiles = Array.isArray(ch.lore_files) ? ch.lore_files : [];
@@ -1590,31 +2144,33 @@ function identitySection(ch, onboarding) {
         Antes de ver sua ficha, conte quem é o seu personagem. Dá pra editar tudo isso depois na aba Biografia.</p>
     </div>` : ''}
 
-    <div class="section-title">Identidade</div>
-    ${f('Nome', 'name', ch.name, 'Nome do personagem', 'ident-name')}
+    <div class="section-title" role="heading" aria-level="2">Identidade</div>
+    ${f('Nome <span style="color:var(--escarlate)">*</span>', 'name', ch.name, 'Nome do personagem', 'ident-name')}
     ${ageField}
     ${genderField}
 
-    <div class="section-title">Fotos do personagem</div>
-    <div class="char-gallery" id="char-gallery">${gallery.length ? gallery.map((url, i) => galleryThumb(url, i, ch.avatar_url)).join('') : '<div class="empty" style="border:0">Nenhuma foto ainda.</div>'}</div>
+    <div class="section-title" role="heading" aria-level="2">Fotos do personagem</div>
+    <div class="char-gallery" id="char-gallery">${gallery.length ? gallery.map((url, i) => galleryThumb(url, i, ch.avatar_url)).join('') : emptyState(ICONS.image, 'Nenhuma foto ainda',
+      'Adicione fotos do personagem — a primeira vira automaticamente o retrato principal.')}</div>
     <input type="file" id="gal-file" accept="image/*" style="display:none" onchange="onGalleryFile(this)">
     <button type="button" class="btn auto sm" onclick="document.getElementById('gal-file').click()">+ Adicionar foto</button>
 
-    <div class="section-title" style="margin-top:22px">Personalidade</div>
+    <div class="section-title" role="heading" aria-level="2" style="margin-top:22px">Personalidade <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional)</span></div>
     ${ta('Traços de personalidade', 'personality', ch.personality, 'Como o personagem age, fala, reage sob pressão...')}
     ${ta('Ideais e motivações', 'ideals', ch.ideals, 'O que move o personagem a agir')}
     ${ta('Vínculos', 'bonds', ch.bonds, 'Pessoas, lugares ou causas importantes pra ele')}
     ${ta('Defeitos e medos', 'flaws', ch.flaws, 'Fraquezas, medos, vícios...')}
 
-    <div class="section-title" style="margin-top:22px">Aparência e origem</div>
+    <div class="section-title" role="heading" aria-level="2" style="margin-top:22px">Aparência e origem <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(opcional)</span></div>
     ${ta('Aparência física', 'appearance', ch.appearance, 'Altura, porte, marcas, jeito de se vestir...')}
     ${f('Naturalidade / origem', 'origin', ch.origin, 'De onde o personagem veio')}
 
-    <div class="section-title" style="margin-top:22px">Bio / descrição breve</div>
+    <div class="section-title" role="heading" aria-level="2" style="margin-top:22px">Bio / descrição breve</div>
     <div class="fld"><textarea style="width:100%;min-height:70px;background:var(--field);border:1px solid var(--line2);border-radius:10px;color:var(--ink);font-family:var(--serif);font-size:14px;padding:10px 12px;line-height:1.5" oninput="onIdentityFieldChange('bio', this.value)" placeholder="Quem é o seu personagem...">${esc(ch.bio)}</textarea></div>
 
-    <div class="section-title">Arquivos de lore <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(opcional — imagem, PDF ou texto)</span></div>
-    <div class="list" id="lore-list">${loreFiles.length ? loreFiles.map((lf, i) => loreRow(lf, i)).join('') : '<div class="empty">Nenhum arquivo ainda.</div>'}</div>
+    <div class="section-title" role="heading" aria-level="2">Arquivos de lore <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(opcional — imagem, PDF ou texto)</span></div>
+    <div class="list" id="lore-list">${loreFiles.length ? loreFiles.map((lf, i) => loreRow(lf, i)).join('') : emptyState(ICONS.pencil, 'Nenhum arquivo ainda',
+      'Anexe imagens, PDFs ou textos com histórico, mapas ou qualquer material de apoio do personagem.')}</div>
     <input type="file" id="lore-file" accept="image/*,application/pdf,text/plain" style="display:none" onchange="onLoreFile(this)">
     <button type="button" class="btn auto sm" onclick="document.getElementById('lore-file').click()">+ Adicionar arquivo</button>
 
@@ -1630,8 +2186,8 @@ function galleryThumb(url, i, avatarUrl) {
     <img src="${esc(url)}" alt="">
     ${isMain ? `<span class="gal-badge">${ICONS.star}Principal</span>` : ''}
     <div class="gal-thumb-actions">
-      ${isMain ? '' : `<button class="gal-act" title="Definir como foto principal" onclick="setMainPhoto(${i})">${ICONS.star}</button>`}
-      <button class="gal-act danger" title="Remover foto" onclick="rmGalleryPhoto(${i})">${ICONS.x}</button>
+      ${isMain ? '' : `<button class="gal-act" title="Definir como foto principal" aria-label="Definir como foto principal" onclick="setMainPhoto(${i})">${ICONS.star}</button>`}
+      <button class="gal-act danger" title="Remover foto" aria-label="Remover foto" onclick="rmGalleryPhoto(${i})">${ICONS.x}</button>
     </div>
   </div>`;
 }
@@ -1643,22 +2199,31 @@ function rerenderIdentity() {
   if (inOnboarding) { renderCharSetup($('content'), true); return; }
   if (currentTab === 'biografia') renderBiografia($('content'));
 }
+// IMPORTANTE: esses handlers mandam um patch PARCIAL pro banco (só galeria/avatar ou só arquivos
+// de lore) — nunca faça `character = {...character, ...updated}` aqui. `updated` é a LINHA INTEIRA
+// devolvida pelo banco, e sobrescreveria nome/idade/bio/etc que o usuário já tenha digitado em
+// memória mas ainda não salvo (via onIdentityFieldChange/onAgeInput, que não gravam sozinhos) de
+// volta pro valor antigo que ainda está no banco — foi exatamente esse bug que resetava a
+// identidade do personagem ao adicionar uma foto no onboarding. Object.assign(character, patch)
+// aplica só os campos que este patch realmente escreveu, preservando o resto.
 window.onGalleryFile = (input) => {
   const file = input.files && input.files[0]; if (!file) return;
   if (!file.type.startsWith('image/')) { showMsg('Selecione uma imagem.'); input.value = ''; return; }
   if (file.size > 3 * 1024 * 1024) { showMsg('Imagem muito grande (máx. 3 MB).'); input.value = ''; return; }
+  let patch;
   db.uploadImage(file, 'characters').then((url) => {
     const gallery = [...(character.gallery || []), url];
-    const patch = { gallery };
+    patch = { gallery };
     if (!character.avatar_url) patch.avatar_url = url; // primeira foto vira a principal
     return db.updateCharacter(character.id, patch);
-  }).then((updated) => { character = { ...character, ...updated }; input.value = ''; rerenderIdentity(); })
+  }).then(() => { Object.assign(character, patch); input.value = ''; rerenderIdentity(); })
     .catch((e) => showMsg(e.message));
 };
 window.setMainPhoto = (i) => {
   const url = (character.gallery || [])[i]; if (!url) return;
-  db.updateCharacter(character.id, { avatar_url: url })
-    .then((updated) => { character = { ...character, ...updated }; rerenderIdentity(); })
+  const patch = { avatar_url: url };
+  db.updateCharacter(character.id, patch)
+    .then(() => { Object.assign(character, patch); rerenderIdentity(); })
     .catch((e) => showMsg(e.message));
 };
 window.rmGalleryPhoto = async (i) => {
@@ -1669,14 +2234,17 @@ window.rmGalleryPhoto = async (i) => {
   const patch = { gallery };
   if (character.avatar_url === removed) patch.avatar_url = gallery[0] || null;
   db.updateCharacter(character.id, patch)
-    .then((updated) => { character = { ...character, ...updated }; rerenderIdentity(); })
+    .then(() => { Object.assign(character, patch); rerenderIdentity(); })
     .catch((e) => showMsg(e.message));
 };
 window.onLoreFile = (input) => {
   const file = input.files && input.files[0]; if (!file) return;
   db.uploadLoreFile(file, 'characters')
-    .then((entry) => db.updateCharacter(character.id, { lore_files: [...(character.lore_files || []), entry] }))
-    .then((updated) => { character = { ...character, ...updated }; input.value = ''; rerenderIdentity(); })
+    .then((entry) => {
+      const patch = { lore_files: [...(character.lore_files || []), entry] };
+      return db.updateCharacter(character.id, patch).then(() => patch);
+    })
+    .then((patch) => { Object.assign(character, patch); input.value = ''; rerenderIdentity(); })
     .catch((e) => showMsg(e.message));
 };
 window.rmLoreFile = async (i) => {
@@ -1684,8 +2252,9 @@ window.rmLoreFile = async (i) => {
   if (!ok) return;
   const lore_files = [...(character.lore_files || [])];
   lore_files.splice(i, 1);
-  db.updateCharacter(character.id, { lore_files })
-    .then((updated) => { character = { ...character, ...updated }; rerenderIdentity(); })
+  const patch = { lore_files };
+  db.updateCharacter(character.id, patch)
+    .then(() => { Object.assign(character, patch); rerenderIdentity(); })
     .catch((e) => showMsg(e.message));
 };
 window.finishOnboarding = async () => {
@@ -1695,6 +2264,7 @@ window.finishOnboarding = async () => {
     char_class: character.char_class || '', subclass: character.subclass || '', bio: character.bio || '', onboarding_done: true };
   db.updateCharacter(character.id, patch).then(async (updated) => {
     character = { ...character, ...updated };
+    _identityDirty = false;
     if (character.char_class) { try { await resyncClassDefaults(character.id, character.char_class, character.subclass); } catch (_) {} }
     inOnboarding = false;
     $('mesa-menu').style.display = '';
@@ -1811,7 +2381,10 @@ window.openDamagePopover = (trigger, resourceId) => {
 // com nenhum status também é procurado nas Proficiências (pelo "nome na fórmula"): vira 1 se o
 // personagem tem, 0 se não tem. É assim que "Medicina = SAB + (PROF_MEDICINA ? PROF : 0)" funciona
 // sem precisar de um caminho de avaliação separado — sem profCtx, comportamento é o de sempre.
-function evalStatIn(attrs, values, a, bonuses = {}, seen = new Set(), profCtx = null) {
+// funções de fórmula reconhecidas quando o token é seguido de "(" — traduzidas direto pro
+// equivalente JS já validado (não são resolvidas como referência de status/proficiência)
+const FORMULA_FUNCS = { arredondar: 'Math.round', piso: 'Math.floor', teto: 'Math.ceil', maior: 'Math.max', menor: 'Math.min' };
+function evalStatIn(attrs, values, a, bonuses = {}, seen = new Set(), profCtx = null, level = null) {
   if (a.kind !== 'computed') {
     const n = Number(values[a.id] ?? a.default_value ?? '');
     const b = bonuses[a.id]; // {total, sources} vindo de bonusMapFrom() — não é um número puro
@@ -1820,23 +2393,32 @@ function evalStatIn(attrs, values, a, bonuses = {}, seen = new Set(), profCtx = 
   if (seen.has(a.id)) return null; const s2 = new Set(seen); s2.add(a.id);
   const byKey = (key) => attrs.find((x) => (x.formula_key || '').trim() === (key || '').trim());
   const profByKey = (key) => (profCtx?.catalog || []).find((p) => (p.formula_key || '').trim() === (key || '').trim());
-  const tokens = (a.formula || '').match(/[A-Za-zÀ-ú_][A-Za-zÀ-ú0-9_]*|\d+\.?\d*|[+\-*/()]/g) || [];
+  const tokens = (a.formula || '').match(/[A-Za-zÀ-ú_][A-Za-zÀ-ú0-9_]*|\d+\.?\d*|[+\-*/(),]/g) || [];
   try {
-    const expr = tokens.map((t) => {
-      if (/^[\d.]/.test(t) || /^[+\-*/()]$/.test(t)) return t;
+    const expr = tokens.map((t, i) => {
+      if (/^[\d.]/.test(t) || /^[+\-*/(),]$/.test(t)) return t;
+      const fn = FORMULA_FUNCS[t.toLowerCase()];
+      if (fn && tokens[i + 1] === '(') return fn;
+      if (t.toLowerCase() === 'nivel') { const lv = Number(level); return '(' + (level == null || isNaN(lv) ? 0 : lv) + ')'; }
+      const profBonusKey = (sys?.system?.proficiency_bonus_formula_key || '').trim();
+      if (profBonusKey && t === profBonusKey) {
+        const v = evalStatIn(attrs, values, { id: '__prof_bonus__', kind: 'computed', formula: sys?.system?.proficiency_bonus_formula || '0' }, bonuses, s2, profCtx, level);
+        return '(' + (v == null ? 0 : v) + ')';
+      }
       const ref = byKey(t);
-      if (ref) { const v = evalStatIn(attrs, values, ref, bonuses, s2, profCtx); return '(' + (v == null ? 0 : v) + ')'; }
+      if (ref) { const v = evalStatIn(attrs, values, ref, bonuses, s2, profCtx, level); return '(' + (v == null ? 0 : v) + ')'; }
       const pf = profByKey(t);
       if (pf) return '(' + (profCtx.granted[pf.id] ? 1 : 0) + ')';
       return '(0)';
     }).join(' ');
-    if (!/^[\d+\-*/().\s]*$/.test(expr)) return null;
+    const safetyProbe = expr.replace(/Math\.(round|floor|ceil|max|min)/g, '');
+    if (!/^[\d+\-*/(),.\s]*$/.test(safetyProbe)) return null;
     const r = Function('"use strict";return (' + expr + ')')();
     return isFinite(r) ? Math.round(r * 100) / 100 : null;
   } catch (_) { return null; }
 }
 function profCtxFrom(grantedMap) { return { catalog: sys?.proficiencies || [], granted: grantedMap || {} }; }
-function evalStat(a, seen = new Set()) { return evalStatIn(_fichaAttrs, _fichaValues, a, _fichaSkillBonus, seen, _fichaProfCtx); }
+function evalStat(a, seen = new Set()) { return evalStatIn(_fichaAttrs, _fichaValues, a, _fichaSkillBonus, seen, _fichaProfCtx, character?.level); }
 // soma, por atributo, o total dos bônus de esferas + a lista de fontes (pra anotar "+1 (Esfera: X)")
 function bonusMapFrom(list) {
   const map = {};
@@ -1844,16 +2426,26 @@ function bonusMapFrom(list) {
     e.total += b.amount; e.sources.push({ name: b.source_name, amount: b.amount }); map[b.stat_id] = e; });
   return map;
 }
-// bônus dos itens EQUIPADOS — modifiers do item usam {name, value} (o mesmo apelido/"nome na
-// fórmula" do datalist "stat-keys" no editor de item), então resolve pro stat_id certo aqui antes
-// de somar no mesmo formato de bonusMapFrom (pra poder mesclar com o bônus de esferas de habilidade).
+// avalia o `amount` cru de cada bônus de getSkillBonuses (número "3" ou fórmula "piso(nivel/2)")
+// antes de somar — reaproveita evalStatIn com um status computado sintético, mesmo truque já
+// usado pro bônus de proficiência (ver evalStatIn acima). Retrocompatível: um valor já numérico
+// avalia pro mesmo número de sempre, então dado antigo (Traço/esfera com "+3") não muda em nada.
+function resolveBonusAmounts(list, attrs, values, level, profCtx) {
+  return (list || []).map((b) => {
+    const v = evalStatIn(attrs, values, { id: '__bonus__', kind: 'computed', formula: String(b.amount ?? '') }, {}, new Set(), profCtx, level);
+    return { ...b, amount: v == null ? 0 : v };
+  });
+}
+// bônus dos itens EQUIPADOS — modifiers do item usam {stat_id, value} (select de verdade no editor
+// de item, não mais texto livre), soma no mesmo formato de bonusMapFrom pra mesclar com o bônus de
+// esferas de habilidade.
 function equipBonusMap(items, attrs) {
   const map = {};
   (items || []).filter((it) => it.equipped).forEach((it) => {
     (it.modifiers || []).forEach((m) => {
-      const key = (m.name || '').trim(); const amount = Number(m.value);
-      if (!key || !amount) return;
-      const stat = attrs.find((a) => (a.formula_key || '').trim() === key || a.name === key);
+      const amount = Number(m.value);
+      if (!m.stat_id || !amount) return;
+      const stat = attrs.find((a) => a.id === m.stat_id);
       if (!stat) return;
       const e = map[stat.id] || { total: 0, sources: [] };
       e.total += amount; e.sources.push({ name: it.name, amount }); map[stat.id] = e;
@@ -1861,18 +2453,39 @@ function equipBonusMap(items, attrs) {
   });
   return map;
 }
-function mergeBonusMaps(a, b) {
+// rótulo de exibição de um modificador de item {stat_id, value} — resolve o nome do status contra
+// uma lista de stats (sys.stats, ou b.stats no bundle da campanha, ou _fichaAttrs na ficha própria
+// — todas têm o mesmo formato {id, name}), mesmo padrão de modLabel() pra modificador de árvore.
+function itemModLabel(m, statsList) {
+  const s = (statsList || sys?.stats || []).find((x) => x.id === m.stat_id);
+  return (s ? esc(s.name) : '(status removido)') + ' ' + esc(String(m.value));
+}
+function mergeBonusMaps(...srcs) {
   const map = {};
-  [a, b].forEach((src) => Object.entries(src || {}).forEach(([id, e]) => {
+  srcs.forEach((src) => Object.entries(src || {}).forEach(([id, e]) => {
     const cur = map[id] || { total: 0, sources: [] };
     cur.total += e.total; cur.sources = cur.sources.concat(e.sources); map[id] = cur;
   }));
   return map;
 }
+// bônus das condições ATIVAS num personagem — mesmo formato de bonusMapFrom, pra entrar no mesmo
+// mergeBonusMaps que já soma esferas de árvore + itens equipados (nenhum código de cálculo novo,
+// só mais uma fonte somada no mesmo pipeline)
+function conditionBonusMap(conditions, activeIds) {
+  const map = {};
+  (conditions || []).filter((c) => activeIds && activeIds.has(c.id)).forEach((c) => {
+    (c.modifiers || []).forEach((m) => {
+      const amount = Number(m.amount); if (!m.stat_id || !amount) return;
+      const e = map[m.stat_id] || { total: 0, sources: [] };
+      e.total += amount; e.sources.push({ name: c.name, amount }); map[m.stat_id] = e;
+    });
+  });
+  return map;
+}
 function bonusTitle(entry) { return entry ? entry.sources.map((s) => `${s.name}: +${s.amount}`).join(', ') : ''; }
 window.recalcComputed = () => {
   _fichaAttrs.forEach((a) => { if (a.kind !== 'computed') { const el = $('attr-' + a.id); if (el) _fichaValues[a.id] = el.value; } });
-  _fichaAttrs.forEach((a) => { if (a.kind === 'computed' && !a.is_resource) { const el = $('comp-' + a.id); if (el) { const v = evalStat(a); el.innerHTML = v == null ? `<span class="ic">${ICONS.warning}</span>${a.is_skill ? '' : 'fórmula'}` : (a.is_skill ? String(v) : '= ' + v); } } });
+  _fichaAttrs.forEach((a) => { if (a.kind === 'computed' && !a.is_resource) { const el = $('comp-' + a.id); if (el) { const v = evalStat(a); el.innerHTML = v == null ? `<span class="ic" style="color:var(--escarlate)" title="Fórmula com erro">${ICONS.warning}</span>${a.is_skill ? '' : 'fórmula'}` : (a.is_skill ? String(v) : '= ' + v); } } });
   _fichaAttrs.forEach((a) => { if (a.is_resource) refreshRes(a.id); });
   _fichaAttrs.forEach((a) => { if (a.kind !== 'computed' && !a.is_resource) refreshSecRow(a.id); });
 };
@@ -1891,9 +2504,10 @@ async function patchFichaLive() {
     _fichaProficiencies = proficiencies || {}; _fichaProfCtx = profCtxFrom(_fichaProficiencies);
     const inv = await db.listInventory(ch.id).catch(() => _fichaInventory);
     _fichaInventory = inv;
-    try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, ch.user_id)), equipBonusMap(inv, attributes)); }
-    catch (_) { _fichaSkillBonus = equipBonusMap(inv, attributes); }
-    _fichaProtection = protectionTotalIn(inv, attributes, _fichaValues, _fichaSkillBonus, _fichaProfCtx);
+    _fichaConditions = await db.getCharacterConditions(ch.id).catch(() => _fichaConditions);
+    try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(resolveBonusAmounts(await db.getSkillBonuses(campaignId, ch.user_id), attributes, values, ch.level, _fichaProfCtx)), equipBonusMap(inv, attributes), conditionBonusMap(sys?.conditions, _fichaConditions)); }
+    catch (_) { _fichaSkillBonus = mergeBonusMaps(equipBonusMap(inv, attributes), conditionBonusMap(sys?.conditions, _fichaConditions)); }
+    _fichaProtection = protectionTotalIn(inv, attributes, _fichaValues, _fichaSkillBonus, _fichaProfCtx, ch.level);
     const lvlTag = $('char-level-tag'); if (lvlTag) lvlTag.textContent = 'Nível ' + (ch.level || 1);
     recalcComputed();
   } catch (_) { /* silencioso — pior caso é só atualizar de verdade na próxima vez que a aba abrir */ }
@@ -1906,22 +2520,19 @@ async function patchFichaLive() {
 // dá pra chamar de novo sempre que a ficha é aberta — se o Mestre editou os valores padrão
 // depois, isso é o que faz a mudança aparecer sem precisar reescolher a classe/subclasse.
 // devolve true se algo mudou (útil pra saber se vale a pena recarregar a ficha).
+// as até 4 chamadas (classe+subclasse × status base+proficiências) não dependem uma da outra —
+// disparadas em paralelo (Promise.allSettled, cada uma com sua própria falha tolerada) em vez de
+// em série, senão cada abertura da ficha pagava o round-trip de rede de cada RPC uma atrás da outra
 async function resyncClassDefaults(characterId, className, subName) {
   if (!sys || !className) return false;
-  let changed = false;
   const cl = sys.classes.find((x) => !x.parent_id && x.name === className);
-  if (cl) {
-    try { if (await db.applyClassDefaults(characterId, cl.id)) changed = true; } catch (_) {}
-    try { if (await db.applyClassProficiencies(characterId, cl.id)) changed = true; } catch (_) {}
-  }
-  if (cl && subName) {
-    const sub = sys.classes.find((x) => x.parent_id === cl.id && x.name === subName);
-    if (sub) {
-      try { if (await db.applyClassDefaults(characterId, sub.id)) changed = true; } catch (_) {}
-      try { if (await db.applyClassProficiencies(characterId, sub.id)) changed = true; } catch (_) {}
-    }
-  }
-  return changed;
+  const sub = (cl && subName) ? sys.classes.find((x) => x.parent_id === cl.id && x.name === subName) : null;
+  const calls = [];
+  if (cl) { calls.push(db.applyClassDefaults(characterId, cl.id), db.applyClassProficiencies(characterId, cl.id)); }
+  if (sub) { calls.push(db.applyClassDefaults(characterId, sub.id), db.applyClassProficiencies(characterId, sub.id)); }
+  if (!calls.length) return false;
+  const results = await Promise.allSettled(calls);
+  return results.some((r) => r.status === 'fulfilled' && r.value);
 }
 // classe/subclasse vivem na aba Ficha (não mais na Biografia — são ligadas ao sistema/status,
 // não à história do personagem), e por isso gravam direto ao trocar, sem passar pelo botão
@@ -1936,7 +2547,13 @@ window.pickClass = async (className) => {
   character.char_class = className; character.subclass = '';
   db.updateCharacter(character.id, { char_class: className, subclass: '' }).then(async (updated) => {
     character = { ...character, ...updated };
-    if (className) { try { await resyncClassDefaults(character.id, className, ''); } catch (_) {} }
+    if (className) {
+      try { await resyncClassDefaults(character.id, className, ''); } catch (_) {}
+      // item inicial é uma trava de execução única (characters.starting_items_granted_at) — só
+      // uma das duas chamadas (aqui ou em pickSubclass) realmente concede, a outra é um no-op
+      const cl = sys?.classes?.find((x) => !x.parent_id && x.name === className);
+      if (cl) { try { const n = await db.applyClassStartingItems(character.id, cl.id); if (n) showMsg(`${n} ${n === 1 ? 'item inicial recebido' : 'itens iniciais recebidos'}.`, 'ok'); } catch (_) {} }
+    }
     refreshCharTags();
     if (currentTab === 'ficha') patchFichaLive();
   }).catch((e) => showMsg(e.message));
@@ -1948,7 +2565,49 @@ window.pickSubclass = async (subName) => {
   character.subclass = subName;
   db.updateCharacter(character.id, { subclass: subName }).then(async (updated) => {
     character = { ...character, ...updated };
-    if (character.char_class) { try { await resyncClassDefaults(character.id, character.char_class, subName); } catch (_) {} }
+    if (character.char_class) {
+      try { await resyncClassDefaults(character.id, character.char_class, subName); } catch (_) {}
+      const cl = sys?.classes?.find((x) => !x.parent_id && x.name === character.char_class);
+      const sub = (cl && subName) ? sys.classes.find((x) => x.parent_id === cl.id && x.name === subName) : null;
+      if (sub) { try { const n = await db.applyClassStartingItems(character.id, sub.id); if (n) showMsg(`${n} ${n === 1 ? 'item inicial recebido' : 'itens iniciais recebidos'}.`, 'ok'); } catch (_) {} }
+    }
+    refreshCharTags();
+    if (currentTab === 'ficha') patchFichaLive();
+  }).catch((e) => showMsg(e.message));
+};
+// mesmo espírito de resyncClassDefaults, pro eixo de Raça/Origem
+// mesmo motivo de resyncClassDefaults: todas as chamadas são independentes, disparadas em paralelo
+async function resyncOriginDefaults(characterId, originName, variantName) {
+  if (!sys || !originName) return false;
+  const o = (sys.origins || []).find((x) => !x.parent_id && x.name === originName);
+  const v = (o && variantName) ? sys.origins.find((x) => x.parent_id === o.id && x.name === variantName) : null;
+  const calls = [];
+  if (o) { calls.push(db.applyOriginDefaults(characterId, o.id), db.applyOriginProficiencies(characterId, o.id)); }
+  if (v) { calls.push(db.applyOriginDefaults(characterId, v.id), db.applyOriginProficiencies(characterId, v.id)); }
+  if (!calls.length) return false;
+  const results = await Promise.allSettled(calls);
+  return results.some((r) => r.status === 'fulfilled' && r.value);
+}
+window.pickOrigin = async (originName) => {
+  if (!originName) return;
+  const ok = await confirmModal({ title: 'Escolher raça', desc: `Escolher "${originName}" é definitivo — não dá pra trocar de raça depois pela própria ficha. Os status base dela entram na hora.`, confirmLabel: 'Escolher', danger: false });
+  if (!ok) { refreshCharTags(); return; }
+  character.origin_name = originName; character.origin_variant_name = '';
+  db.updateCharacter(character.id, { origin_name: originName, origin_variant_name: '' }).then(async (updated) => {
+    character = { ...character, ...updated };
+    if (originName) { try { await resyncOriginDefaults(character.id, originName, ''); } catch (_) {} }
+    refreshCharTags();
+    if (currentTab === 'ficha') patchFichaLive();
+  }).catch((e) => showMsg(e.message));
+};
+window.pickOriginVariant = async (variantName) => {
+  if (!variantName) return;
+  const ok = await confirmModal({ title: 'Escolher variação', desc: `Escolher "${variantName}" é definitivo — não dá pra trocar de variação depois pela própria ficha.`, confirmLabel: 'Escolher', danger: false });
+  if (!ok) { refreshCharTags(); return; }
+  character.origin_variant_name = variantName;
+  db.updateCharacter(character.id, { origin_variant_name: variantName }).then(async (updated) => {
+    character = { ...character, ...updated };
+    if (character.origin_name) { try { await resyncOriginDefaults(character.id, character.origin_name, variantName); } catch (_) {} }
     refreshCharTags();
     if (currentTab === 'ficha') patchFichaLive();
   }).catch((e) => showMsg(e.message));
@@ -1969,7 +2628,15 @@ window.onAgeInput = (input) => {
   character.age = digits; markIdentityDirty();
 };
 window.onIdentityFieldChange = (key, value) => { character[key] = value; markIdentityDirty(); };
-function markIdentityDirty() { const b = $('identity-save-btn'); if (b) b.style.display = ''; }
+window.onGenderSelectChange = (v) => {
+  const row = $('gender-custom-row');
+  if (v === '__custom__') { if (row) { row.style.display = ''; row.querySelector('input')?.focus(); } character.gender = character.gender && !['', 'Masculino', 'Feminino'].includes(character.gender) ? character.gender : ''; markIdentityDirty(); return; }
+  if (row) row.style.display = 'none';
+  onIdentityFieldChange('gender', v);
+};
+let _identityDirty = false; // checado em openTab antes de trocar de aba (e no beforeunload abaixo, pro onboarding — que não tem "trocar de aba" pra interceptar)
+addEventListener('beforeunload', (e) => { if (_identityDirty) { e.preventDefault(); e.returnValue = ''; } });
+function markIdentityDirty() { _identityDirty = true; const b = $('identity-save-btn'); if (b) b.style.display = ''; }
 window.saveIdentity = () => {
   if (!character) return;
   const btn = $('identity-save-btn'); if (btn) { btn.classList.add('loading'); btn.disabled = true; }
@@ -1978,6 +2645,7 @@ window.saveIdentity = () => {
     appearance: character.appearance || '', origin: character.origin || '' };
   db.updateCharacter(character.id, patch).then((updated) => {
     character = { ...character, ...updated };
+    _identityDirty = false;
     if (btn) btn.style.display = 'none';
     showMsg('Salvo.', 'ok');
   }).catch((e) => showMsg(e.message))
@@ -1992,6 +2660,24 @@ async function renderInventario(c) {
   const eqSlots = (sys && sys.equipmentSlots) || [];
   const hasSystem = !!mesa.system_id;
   const requests = hasSystem ? await db.listMyItemRequests(character.id).catch(() => []) : [];
+  // peso/carga é opcional por sistema (systems.weight_enabled) — só monta a linha de carga quando
+  // ligado, pra não obrigar todo mundo a lidar com isso (mesmo espírito de skills_enabled)
+  let weightHtml = '';
+  if (hasSystem && sys?.system?.weight_enabled) {
+    try {
+      const sheet = await db.loadSheet(campaignId);
+      const { attributes, values, character: ch, proficiencies } = sheet;
+      const profCtx = profCtxFrom(proficiencies);
+      let bonuses;
+      try { bonuses = mergeBonusMaps(bonusMapFrom(resolveBonusAmounts(await db.getSkillBonuses(campaignId, ch.user_id), attributes, values, ch.level, profCtx)), equipBonusMap(items, attributes)); }
+      catch (_) { bonuses = equipBonusMap(items, attributes); }
+      const capStat = attributes.find((a) => a.id === sys.system.carry_capacity_stat_id);
+      const capacity = capStat ? evalStatIn(attributes, values, capStat, bonuses, new Set(), profCtx, ch.level) : null;
+      const totalWeight = Math.round(items.reduce((sum, it) => sum + (Number(it.weight) || 0) * (Number(it.qty) || 1), 0) * 100) / 100;
+      const over = capacity != null && totalWeight > capacity;
+      weightHtml = `<div class="section-title" role="heading" aria-level="2" style="font-size:12px">Carga <span style="color:${over ? 'var(--escarlate)' : 'var(--ink-faint)'};text-transform:none;letter-spacing:0">(${totalWeight}${capacity != null ? ' / ' + capacity : ''})</span></div>`;
+    } catch (_) {}
+  }
   const slotIds = new Set(eqSlots.map((s) => s.id));
   // com slots configurados, o que está "equipado" mora no tabuleiro; um item que ficou marcado
   // equipped=true mas sem slot válido (equipo antigo, de antes dos slots existirem) some da mochila
@@ -2001,26 +2687,28 @@ async function renderInventario(c) {
   const equipped = eqSlots.length ? [] : orphanEquipped;
   const unequipped = items.filter((it) => !it.equipped);
   c.innerHTML = `
-    <div class="section-title">Mochila</div>
+    <div class="section-title" role="heading" aria-level="2">Mochila</div>
     <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:0 0 14px">
       ${eqSlots.length ? 'Arraste um item da mochila pra um espaço do boneco pra equipar (ou use o botão no card).'
         : 'Arraste um item entre Mochila e Equipado pra trocar de estado (ou use o botão no card, se preferir).'}</p>
 
+    ${weightHtml}
+
     ${eqSlots.length ? `
-    <div class="section-title" style="font-size:12px">Equipamentos</div>
+    <div class="section-title" role="heading" aria-level="2" style="font-size:12px">Equipamentos</div>
     <div id="inv-eq-board">${eqBoardHtml(eqSlots, boarded)}</div>
     <div id="inv-orphan-section" style="${orphanEquipped.length ? '' : 'display:none'}">
-      <div class="section-title" style="font-size:12px;margin-top:14px">Equipados sem espaço compatível <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(${orphanEquipped.length})</span></div>
+      <div class="section-title" role="heading" aria-level="2" style="font-size:12px;margin-top:14px">Equipados sem espaço compatível <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(${orphanEquipped.length})</span></div>
       <div class="item-grid" id="inv-orphan-grid">${orphanEquipped.map(invRow).join('')}</div>
     </div>
     ` : ''}
 
-    <div class="section-title" style="font-size:12px">Mochila <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0" id="inv-mochila-count">(${unequipped.length})</span></div>
+    <div class="section-title" role="heading" aria-level="2" style="font-size:12px">Mochila <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0" id="inv-mochila-count">(${unequipped.length})</span></div>
     <div class="item-grid inv-dropzone" id="inv-mochila-grid" ondragover="onInvDragOver(event)" ondragleave="onInvDragLeave(event)" ondrop="onInvDrop(event, false)">
       ${unequipped.length ? unequipped.map(invRow).join('') : '<div class="empty" style="grid-column:1/-1">Nada aqui.</div>'}
     </div>
     ${!eqSlots.length ? `
-    <div class="section-title" style="font-size:12px;margin-top:14px">Equipado <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0" id="inv-equipado-count">(${equipped.length})</span></div>
+    <div class="section-title" role="heading" aria-level="2" style="font-size:12px;margin-top:14px">Equipado <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0" id="inv-equipado-count">(${equipped.length})</span></div>
     <div class="item-grid inv-dropzone" id="inv-equipado-grid" ondragover="onInvDragOver(event)" ondragleave="onInvDragLeave(event)" ondrop="onInvDrop(event, true)">
       ${equipped.length ? equipped.map(invRow).join('') : '<div class="empty" style="grid-column:1/-1">Arraste aqui um item com dano, proteção ou modificador pra equipar.</div>'}
     </div>` : ''}
@@ -2030,13 +2718,13 @@ async function renderInventario(c) {
       : 'Adicione itens no campo abaixo.') : ''}
 
     ${hasSystem ? (sysItems.length ? `
-    <div class="section-title" style="margin-top:18px">Solicitar item do sistema <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(o Mestre precisa aprovar antes de entrar na mochila)</span></div>
+    <div class="section-title" role="heading" aria-level="2" style="margin-top:18px">Solicitar item do sistema <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(o Mestre precisa aprovar antes de entrar na mochila)</span></div>
     <div class="inline-form">
-      <select id="inv-sys-item" class="fld-input">${sysItems.map((it) => `<option value="${it.id}">${esc(it.name)}${(it.modifiers && it.modifiers.length) ? ' — ' + it.modifiers.map((m) => esc(m.name + ' ' + m.value)).join(', ') : ''}</option>`).join('')}</select>
+      <select id="inv-sys-item" class="fld-input">${sysItems.map((it) => `<option value="${it.id}">${esc(it.name)}${(it.modifiers && it.modifiers.length) ? ' — ' + it.modifiers.map((m) => itemModLabel(m)).join(', ') : ''}</option>`).join('')}</select>
       <button class="btn auto" onclick="requestSysItem()">Solicitar</button>
     </div>
     <div id="inv-requests-section" style="${requests.length ? '' : 'display:none'}">
-      <div class="section-title" style="margin-top:18px;font-size:12px">Meus pedidos</div>
+      <div class="section-title" role="heading" aria-level="2" style="margin-top:18px;font-size:12px">Meus pedidos</div>
       <div class="list" id="inv-requests-list">${requests.map(requestRow).join('')}</div>
     </div>` : '') : `
     <form class="inline-form" style="margin-top:14px" onsubmit="return addInv(event)">
@@ -2179,7 +2867,7 @@ function eqBoardHtml(slots, boardedItems, readOnly = false) {
         title="${esc(s.name)}${s.accepts_type ? ' — aceita: ' + esc(s.accepts_type) : ''}${it ? ' — ' + esc(it.name) : ''}">
         ${it ? rarityFxLayers(rarity) : ''}
         ${it && !bg ? `<div class="eq-slot-item-fallback">${esc(it.name)}</div>` : ''}
-        ${it && !readOnly ? `<button class="btn sm danger auto" style="position:absolute;top:-10px;right:-10px;padding:2px 5px;line-height:1" onclick="event.stopPropagation();unequipFromBoard('${it.id}')" title="Desequipar">×</button>` : ''}
+        ${it && !readOnly ? `<button class="btn sm danger auto" style="position:absolute;top:-10px;right:-10px;padding:2px 5px;line-height:1" onclick="event.stopPropagation();unequipFromBoard('${it.id}')" title="Desequipar" aria-label="Desequipar ${esc(it.name)}">×</button>` : ''}
         <span class="eq-slot-label">${esc(s.name)}</span>
       </div>`;
     }).join('')}
@@ -2210,7 +2898,7 @@ let _invDrafts = {};
 function invDraft(id) { return _invDrafts[id] || (_invDrafts[id] = {}); }
 function invRow(it) {
   const hasProtection = it.protection != null && it.protection !== '';
-  const badges = `${it.weapon_damage ? `<span class="badge mod">Dano ${esc(it.weapon_damage)}${it.damage_scale ? ' + ' + esc(it.damage_scale) : ''}</span>` : ''}${hasProtection ? `<span class="badge mod">Proteção ${esc(String(it.protection))}${it.protection_scale ? ' + ' + esc(it.protection_scale) : ''}</span>` : ''}${(it.modifiers || []).map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}`;
+  const badges = `${it.weapon_damage ? `<span class="badge mod">Dano ${esc(it.weapon_damage)}${it.damage_scale ? ' + ' + esc(it.damage_scale) : ''}</span>` : ''}${hasProtection ? `<span class="badge mod">Proteção ${esc(String(it.protection))}${it.protection_scale ? ' + ' + esc(it.protection_scale) : ''}</span>` : ''}${(it.modifiers || []).map((m) => `<span class="badge mod">${itemModLabel(m)}</span>`).join('')}`;
   const mods = badges ? `<div class="mods" style="justify-content:center">${badges}</div>` : '';
   // equipar só faz sentido se o item tiver algum efeito pra aplicar (modificador, dano ou proteção)
   const canEquip = (it.modifiers && it.modifiers.length) || it.weapon_damage || hasProtection;
@@ -2234,12 +2922,13 @@ function invRow(it) {
         <h4 class="poster-name">${esc(it.name)}</h4>
         <span class="rar-pill" data-rarity="${esc(rarity)}">${esc(rarity)}</span>
         ${mods}
-        <input class="poster-desc" style="background:transparent;border:0;text-align:center;width:100%;padding:0;font-family:var(--serif);font-size:11.5px;color:var(--ink-dim)"
-          placeholder="descrição..." value="${esc(it.description)}" oninput="onInvFieldChange('${it.id}','description',this.value)">
+        <input class="poster-desc" style="background:transparent;border:0;border-bottom:1px dashed var(--line2);text-align:center;width:100%;padding:0 0 2px;font-family:var(--serif);font-size:11.5px;color:var(--ink-dim)"
+          title="Clique para editar a descrição" placeholder="descrição..." value="${esc(it.description)}" oninput="onInvFieldChange('${it.id}','description',this.value)">
         <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:2px">
           <input type="number" min="0" value="${it.qty}" style="width:56px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--mono);padding:6px;text-align:center"
             oninput="onInvFieldChange('${it.id}','qty',this.value)">
           <button class="btn sm auto" onclick="openInvItemDetail('${it.id}')" title="Ver o item por completo">Detalhes</button>
+          ${(it.consume_effects && it.consume_effects.length) ? `<button class="btn sm go auto" onclick="consumeInv('${it.id}')" title="Aplica o efeito e gasta 1 unidade">Consumir</button>` : ''}
           ${it.equipped && it.weapon_damage ? `<button class="btn sm go auto" onclick="rollWeaponDamage('${it.id}')" title="Rola a fórmula de dano da arma">Rolar dano</button>` : ''}
           ${canEquip ? `<button class="btn sm auto" style="${it.equipped ? 'border-color:var(--maq);color:var(--maq)' : ''}" onclick="onEquipBtn('${it.id}', ${!it.equipped})" title="Equipado aplica os modificadores/dano/proteção automaticamente">${it.equipped ? 'Desequipar' : 'Equipar'}</button>` : ''}
           <button class="btn sm go auto" id="inv-save-${it.id}" style="display:none" onclick="saveInvRow('${it.id}')"><span class="spin"></span>Salvar</button>
@@ -2271,7 +2960,7 @@ window.openInvItemDetail = (id) => {
       ${it.equipped ? `<span class="badge" style="border-color:var(--maq);color:var(--maq)">Equipado</span>` : ''}
     </div>
     ${it.description ? `<p class="gintro">${esc(it.description)}</p>` : `<p class="gintro" style="color:var(--ink-faint)">Sem descrição.</p>`}
-    ${(it.modifiers && it.modifiers.length) ? `<div class="mods" style="margin-bottom:12px">${it.modifiers.map((m) => `<span class="badge mod">${esc(m.name)} ${esc(m.value)}</span>`).join('')}</div>` : ''}
+    ${(it.modifiers && it.modifiers.length) ? `<div class="mods" style="margin-bottom:12px">${it.modifiers.map((m) => `<span class="badge mod">${itemModLabel(m)}</span>`).join('')}</div>` : ''}
     <div class="idet-creator">Quantidade: ${esc(String(it.qty))}</div>
     <div class="idet-actions">
       ${it.equipped && it.weapon_damage ? `<button class="btn auto" id="idet-roll">Rolar dano</button>` : ''}
@@ -2344,6 +3033,9 @@ window.delItem = async (id) => {
   if (!ok) return;
   db.deleteItem(id).then(() => patchInventarioLive()).catch((e) => showMsg(e.message));
 };
+window.consumeInv = async (id) => {
+  db.consumeInventoryItem(character.id, id).then(() => patchInventarioLive()).catch((e) => showMsg(e.message));
+};
 
 // cartão de uma habilidade já desbloqueada — compartilhado entre a aba do próprio jogador
 // (renderHabilidades) e a sub-aba do Mestre (renderGmHabilidades), pra garantir que os dois
@@ -2368,14 +3060,14 @@ async function renderHabilidades(c) {
   const byTree = new Map();
   abilities.forEach((a) => { if (!byTree.has(a.tree_name)) byTree.set(a.tree_name, []); byTree.get(a.tree_name).push(a); });
   c.innerHTML = [...byTree.entries()].map(([treeName, list]) => `
-    <div class="section-title">${esc(treeName)}</div>
+    <div class="section-title" role="heading" aria-level="2">${esc(treeName)}</div>
     <div class="list">${list.map(abilityCardHtml).join('')}</div>`).join('');
 }
 async function renderAnotacoes(c) {
   character = character || await db.ensureCharacter(campaignId);
   const notes = await db.listNotes(character.id);
   c.innerHTML = `
-    <div class="section-title">Anotações <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(privadas — o Mestre não vê)</span></div>
+    <div class="section-title" role="heading" aria-level="2">Anotações <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(privadas — o Mestre não vê)</span></div>
     <button class="btn auto sm" onclick="addNote()">+ Nova anotação</button>
     <div class="list" id="note-list" style="margin-top:14px">${notes.length ? notes.map(noteRow).join('') : emptyState(ICONS.pencil, 'Nenhuma anotação ainda',
       'Um caderno só seu — segredos, planos, pistas. O Mestre nunca vê o que você escreve aqui.',
@@ -2428,7 +3120,7 @@ window.delNote = async (id) => {
 /* ============================ ROLADOR DE DADOS + CHAT ============================ */
 async function mountDice() {
   const fab = document.createElement('button');
-  fab.className = 'dice-fab'; fab.innerHTML = `<span class="ic">${ICONS.dice}</span>Dados`;
+  fab.className = 'dice-fab'; fab.innerHTML = `<span class="ic">${ICONS.dice}</span>Dados<span class="unread-dot" id="unread-fab" style="display:none"></span>`;
   fab.onclick = toggleDice;
   const panel = document.createElement('div');
   panel.className = 'dice-panel'; panel.id = 'dice-panel';
@@ -2438,6 +3130,11 @@ async function mountDice() {
     <div class="dice-builder">
       <input type="number" id="dice-qty" min="1" max="20" value="1" class="dice-qty" title="Quantidade de dados">
       <select id="dice-die">${diceOpts.map((d) => `<option ${d === 'd20' ? 'selected' : ''}>${d}</option>`).join('')}</select>
+      <select id="dice-adv" title="Rola o primeiro d20 duas vezes e fica com o maior (vantagem) ou o menor (desvantagem)">
+        <option value="">normal</option>
+        <option value="adv">vantagem</option>
+        <option value="dis">desvantagem</option>
+      </select>
       ${role === 'player' ? `
         <select id="dice-mod-type" onchange="onDiceModTypeChange()">
           <option value="">+ nada</option>
@@ -2447,9 +3144,9 @@ async function mountDice() {
         <select id="dice-mod-ref" style="display:none"></select>` : ''}
       <button class="btn go sm" type="button" onclick="rollBuilder()"><span class="ic">${ICONS.dice}</span>Rolar</button>
     </div>
-    <div class="rail-tabs" id="rail-tabs">
-      <button type="button" class="on" data-rt="rolls" onclick="selectRailTab('rolls')">Rolagens</button>
-      <button type="button" data-rt="chat" onclick="selectRailTab('chat')">Conversa</button>
+    <div class="rail-tabs" id="rail-tabs" role="tablist">
+      <button type="button" class="on" role="tab" aria-selected="true" data-rt="rolls" onclick="selectRailTab('rolls')">Rolagens<span class="unread-dot" id="unread-rolls" style="display:none"></span></button>
+      <button type="button" role="tab" aria-selected="false" data-rt="chat" onclick="selectRailTab('chat')">Conversa<span class="unread-dot" id="unread-chat" style="display:none"></span></button>
     </div>
     <div class="dice-log" id="dice-log"><div class="empty" style="border:0">Sem rolagens ainda.</div></div>
     <div class="chat-log" id="chat-log" style="display:none"><div class="empty" style="border:0">Sem mensagens ainda.</div></div>
@@ -2464,7 +3161,7 @@ async function mountDice() {
   _unsubChat = db.subscribeMessages(campaignId, addMsgToLog);
   loadStatMap();
 }
-window.toggleDice = () => { const p = $('dice-panel'); const open = !p.classList.contains('open'); p.classList.toggle('open'); if (open) loadStatMap(); };
+window.toggleDice = () => { const p = $('dice-panel'); const open = !p.classList.contains('open'); p.classList.toggle('open'); if (open) { loadStatMap(); const fabDot = $('unread-fab'); if (fabDot) fabDot.style.display = 'none'; const activeTab = $('rail-tabs')?.querySelector('button.on')?.dataset.rt; if (activeTab) markRailTabRead(activeTab); } };
 window.closeDice = () => $('dice-panel').classList.remove('open');
 
 /* ============================ PEDIDOS DE ITEM (só o Mestre) ============================ */
@@ -2497,13 +3194,24 @@ window.resolveRequest = (id, approve) => {
 };
 window.selectRailTab = (tab) => {
   const isRolls = tab === 'rolls';
-  document.querySelectorAll('#rail-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.rt === tab));
+  document.querySelectorAll('#rail-tabs button').forEach((b) => { const on = b.dataset.rt === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
   $('dice-log').style.display = isRolls ? '' : 'none';
   $('chat-log').style.display = isRolls ? 'none' : '';
   const icon = $('dice-panel-icon'), label = $('dice-panel-label');
   if (icon) icon.innerHTML = isRolls ? ICONS.dice : ICONS.chat;
   if (label) label.textContent = isRolls ? 'Rolagens' : 'Conversa';
+  markRailTabRead(tab);
 };
+// mostra uma bolinha na aba (Rolagens/Conversa) quando chega algo novo com o painel fechado ou a
+// pessoa olhando a outra aba — soma no lado que recebeu e some assim que a aba abre/fica ativa
+window.markRailTabUnread = (tab) => {
+  const panelOpen = $('dice-panel')?.classList.contains('open');
+  if (!panelOpen) { const fabDot = $('unread-fab'); if (fabDot) fabDot.style.display = ''; return; }
+  const activeTab = $('rail-tabs')?.querySelector('button.on')?.dataset.rt;
+  if (activeTab === tab) return;
+  const dot = $('unread-' + tab); if (dot) dot.style.display = '';
+};
+window.markRailTabRead = (tab) => { const dot = $('unread-' + tab); if (dot) dot.style.display = 'none'; };
 addEventListener('beforeunload', () => {
   if (_unsub) _unsub();
   if (_unsubChat) _unsubChat();
@@ -2513,6 +3221,8 @@ addEventListener('beforeunload', () => {
   if (_unsubCampaign) _unsubCampaign();
   if (_unsubGmView) _unsubGmView();
   if (_unsubPresence) _unsubPresence();
+  if (_unsubCombat) _unsubCombat();
+  if (_unsubInitiative) _unsubInitiative();
 });
 
 // mapa dos status do jogador (pra rolar 1d20+FORCA etc.) + listas pro montador interativo
@@ -2523,12 +3233,17 @@ async function loadStatMap() {
     const sheet = await db.loadSheet(campaignId);
     const { attributes, values, character: ch, proficiencies } = sheet;
     const inv = await db.listInventory(ch.id).catch(() => []);
-    try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(await db.getSkillBonuses(campaignId, ch.user_id)), equipBonusMap(inv, attributes)); }
-    catch (_) { _fichaSkillBonus = equipBonusMap(inv, attributes); }
+    const conds = await db.getCharacterConditions(ch.id).catch(() => new Set());
     const profCtx = profCtxFrom(proficiencies);
-    const map = {}; attributes.forEach((a) => { if (a.formula_key) map[a.formula_key.trim()] = evalStatIn(attributes, values, a, _fichaSkillBonus, new Set(), profCtx) ?? 0; });
+    try { _fichaSkillBonus = mergeBonusMaps(bonusMapFrom(resolveBonusAmounts(await db.getSkillBonuses(campaignId, ch.user_id), attributes, values, ch.level, profCtx)), equipBonusMap(inv, attributes), conditionBonusMap(sys?.conditions, conds)); }
+    catch (_) { _fichaSkillBonus = mergeBonusMaps(equipBonusMap(inv, attributes), conditionBonusMap(sys?.conditions, conds)); }
+    const map = {}; attributes.forEach((a) => { if (a.formula_key) map[a.formula_key.trim()] = evalStatIn(attributes, values, a, _fichaSkillBonus, new Set(), profCtx, ch.level) ?? 0; });
+    // "nivel" é palavra reservada em toda fórmula (ver evalStatIn) mesmo não sendo um Status de
+    // verdade — sem isso, rollFormula (rolagem rápida, dano de arma que escala com nível) não
+    // conseguia resolver o termo, já que só existe no tokenizer de evalStatIn, não no de statMap
+    map.nivel = Number(ch.level) || 0;
     _statMap = map;
-    _diceStats = attributes.filter((a) => a.formula_key).map((a) => ({ name: a.name, key: a.formula_key.trim(), value: map[a.formula_key.trim()] }));
+    _diceStats = [{ name: 'Nível', key: 'nivel', value: map.nivel }, ...attributes.filter((a) => a.formula_key).map((a) => ({ name: a.name, key: a.formula_key.trim(), value: map[a.formula_key.trim()] }))];
     const formulas = await db.listCharacterFormulas(ch.id);
     _diceFormulas = formulas.map((f) => ({ id: f.id, name: f.name, total: Math.round(evalFormulaIn(attributes, values, f, profCtx) * 100) / 100 }));
   } catch (_) { _statMap = {}; _diceStats = []; _diceFormulas = []; }
@@ -2545,6 +3260,7 @@ window.onDiceModTypeChange = () => {
 window.rollBuilder = () => {
   const qty = Math.min(20, Math.max(1, parseInt($('dice-qty').value) || 1));
   const die = $('dice-die').value;
+  const advMode = $('dice-adv')?.value || null;
   const modType = $('dice-mod-type')?.value || '';
   const modRef = $('dice-mod-ref')?.value;
   let formula = qty + die, label = null;
@@ -2555,19 +3271,34 @@ window.rollBuilder = () => {
     const f = _diceFormulas.find((x) => x.id === modRef);
     if (f) { formula += '+' + f.total; label = f.name; }
   }
-  doRoll(formula, label);
+  doRoll(formula, label, advMode);
 };
 
-function rollFormula(input, statMap) {
+// advMode ('adv'|'dis'|null) só se aplica ao PRIMEIRO termo "1d20" da fórmula (o clássico "role 2x,
+// fique com o maior/menor") — não faz sentido pra grupos de dado (2d6 etc.) nem pra outros tamanhos
+// de dado, então fica restrito a exatamente 1d20, igual a convenção de mesa de verdade.
+function rollFormula(input, statMap, advMode) {
   const f = (input || '').trim(); if (!f) throw new Error('Digite uma fórmula (ex.: 1d20+3).');
   const re = /([+\-]?)\s*(\d*d\d+|\d+\.?\d*|[A-Za-zÀ-ú_][A-Za-zÀ-ú0-9_]*)/gi;
-  let m, total = 0, parts = [], count = 0;
+  let m, total = 0, parts = [], count = 0, usedAdv = false;
   while ((m = re.exec(f))) {
     count++; const sign = m[1] === '-' ? -1 : 1; const term = m[2];
     const dm = /^(\d*)d(\d+)$/i.exec(term);
     if (dm) {
       const n = Math.min(Math.max(parseInt(dm[1] || '1'), 1), 100), faces = parseInt(dm[2]);
       if (faces < 1) throw new Error('Dado inválido: ' + term);
+      if (advMode && !usedAdv && n === 1 && faces === 20) {
+        usedAdv = true;
+        const r1 = 1 + Math.floor(Math.random() * 20), r2 = 1 + Math.floor(Math.random() * 20);
+        const kept = advMode === 'dis' ? Math.min(r1, r2) : Math.max(r1, r2);
+        const discarded = kept === r1 ? r2 : r1;
+        total += sign * kept;
+        // formatado como "1d20[kept]" de propósito — é o mesmo formato que rollExtremity() já
+        // reconhece pra destacar crítico/falha crítica, só que só com o dado QUE FICOU (não os 2),
+        // senão um [7, 20] com vantagem nunca acenderia o crítico por causa do 7 descartado
+        parts.push({ sign, text: `1d20[${kept}] (${advMode === 'dis' ? 'desvantagem' : 'vantagem'} — descartado ${discarded})` });
+        continue;
+      }
       const rolls = []; for (let i = 0; i < n; i++) rolls.push(1 + Math.floor(Math.random() * faces));
       total += sign * rolls.reduce((a, b) => a + b, 0);
       parts.push({ sign, text: `${n}d${faces}[${rolls.join(', ')}]` });
@@ -2580,8 +3311,8 @@ function rollFormula(input, statMap) {
   const detail = parts.map((p, i) => (i === 0 ? (p.sign < 0 ? '−' : '') : (p.sign < 0 ? ' − ' : ' + ')) + p.text).join('');
   return { total: Math.round(total * 100) / 100, detail };
 }
-function doRoll(f, label) {
-  try { const { total, detail } = rollFormula(f, _statMap || {});
+function doRoll(f, label, advMode) {
+  try { const { total, detail } = rollFormula(f, _statMap || {}, advMode);
     const finalDetail = label ? `${detail} (${label})` : detail;
     // no bloco da rolagem quem aparece é o personagem, não a conta — o Mestre não tem
     // personagem nesta mesa, então continua caindo no nome de perfil (fallback do addRoll)
@@ -2631,6 +3362,7 @@ function addRollToLog(r) {
   if (log.querySelector(`[data-id="${r.id}"]`)) return;   // evita duplicar (realtime + eco local)
   const empty = log.querySelector('.empty'); if (empty) empty.remove();
   log.insertBefore(rollEl(r, true), log.firstChild);
+  markRailTabUnread('rolls');
 }
 
 /* ============================ CHAT DA MESA (aba "Conversa" ao lado das rolagens) ============================ */
@@ -2663,6 +3395,7 @@ function addMsgToLog(m) {
   if (log.querySelector(`[data-id="${m.id}"]`)) return;   // evita duplicar (realtime + eco local)
   const empty = log.querySelector('.empty'); if (empty) empty.remove();
   log.insertBefore(msgEl(m, true), log.firstChild);
+  markRailTabUnread('chat');
 }
 
 </script>

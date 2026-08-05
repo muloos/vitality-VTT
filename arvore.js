@@ -31,7 +31,7 @@ function showBootError(msg) {
 // no banner central acima, com a mensagem exata, em vez de travar tudo em silêncio.
 let db, mountHelp, mountThemeToggle, openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme, trapFocus;
 try {
-  db = await import('./lib/db.js?v=30');
+  db = await import('./lib/db.js?v=40');
   ({ mountHelp, mountThemeToggle, openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme, trapFocus } = await import('./lib/ui.js?v=4'));
 } catch (e) {
   showBootError(`Não deu pra carregar os módulos da página (db.js/ui.js): ${e && e.message ? e.message : e}`);
@@ -386,6 +386,17 @@ function renderViaChips() {
   // mesmos chips, no painel de edição em lote — aplica a via pra toda a seleção de área de uma vez
   $('batch-fac').innerHTML = vias.map((v) =>
     `<div class="chip" style="--vc:${v.color}" onclick="batchSet('fac','${v.key}')">${esc(v.name)}</div>`).join('');
+  renderViaLegend();
+}
+// legenda fixa "nome da via — cor" num canto do canvas — antes só dava pra saber a via de uma
+// esfera clicando nela uma a uma; com 1 via só (a "Núcleo" padrão) não há distinção nenhuma pra
+// mostrar, então a legenda fica escondida
+function renderViaLegend() {
+  const el = $('via-legend'); if (!el) return;
+  if (vias.length <= 1) { el.style.display = 'none'; return; }
+  el.innerHTML = vias.map((v) =>
+    `<div class="via-legend-row"><span class="via-legend-dot" style="background:${esc(v.color)}"></span><span class="via-legend-name">${esc(v.name)}</span></div>`).join('');
+  el.style.display = '';
 }
 function renderViaManager() {
   $('via-edit').innerHTML = vias.map((v) => `

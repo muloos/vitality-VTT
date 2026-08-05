@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=35">
+<link rel="stylesheet" href="lib/theme.css?v=41">
 <style>
   /* fundo cósmico original (sobrescreve o solido do tema, SÓ nesta tela) */
   /* body PRECISA ficar transparente aqui: #fallback e #fx (o canvas de partículas) usam z-index
@@ -130,6 +130,14 @@
     text-align:right;white-space:pre-wrap;overflow-wrap:break-word;pointer-events:none}
   .count.ok{color:#7fd48a}
   .count.err{color:var(--escarlate,#e2645a)}
+  /* legenda fixa de Via/afinidade — mesmo nome+cor que já aparecia por esfera ao clicar, só que
+     todo mundo de uma vez, sem precisar abrir cada esfera pra descobrir a que via ela pertence */
+  .via-legend{position:fixed;top:var(--toolbar-bottom,64px);left:12px;z-index:30;display:flex;flex-direction:column;gap:5px;
+    background:rgba(18,22,32,.9);border:1px solid var(--line2);border-radius:11px;padding:9px 11px;pointer-events:none;
+    font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);max-width:180px}
+  .via-legend-row{display:flex;align-items:center;gap:7px}
+  .via-legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .via-legend-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* aparece por cima de tudo (inclusive dentro do iframe embutido na mesa) quando o boot falha —
      ver showBootError() no script */
   .boot-error-banner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:50;
@@ -339,6 +347,7 @@ try { if (new URLSearchParams(location.search).get('embed') === '1') document.bo
   <div class="tools" title="Poeira cósmica (partículas)"><button class="tool on" id="particles-toggle" onclick="toggleParticles()" aria-pressed="true"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="2.4"/></svg></span>Poeira</button></div>
 </div>
 <div class="count" id="count"></div>
+<div class="via-legend" id="via-legend" style="display:none"></div>
 
 <script src="arvore.js?v=16"></script>
 </body>

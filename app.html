@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=35">
+<link rel="stylesheet" href="lib/theme.css?v=41">
 </head>
 <body class="home-page"> 
 <div id="fallback" class="solid"></div>
@@ -40,10 +40,10 @@
 
   <div id="onboard"></div>
 
-  <nav class="home-tabs">
-    <button data-sec="mesas" class="on" onclick="showSec('mesas')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" transform="rotate(45 12 12)"/><circle cx="12" cy="9.2" r="1" fill="currentColor" stroke="none"/><circle cx="9.2" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="14.8" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="14.8" r="1" fill="currentColor" stroke="none"/></svg></span>Mesas</button>
-    <button data-sec="sistemas" onclick="showSec('sistemas')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M20.5 12h-2.6M6.1 12H3.5M17.7 6.3l-1.8 1.8M8.1 15.9l-1.8 1.8M17.7 17.7l-1.8-1.8M8.1 8.1 6.3 6.3"/></svg></span>Sistemas</button>
-    <button data-sec="itens" onclick="showSec('itens')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/></svg></span>Itens</button>
+  <nav class="home-tabs" role="tablist">
+    <button data-sec="mesas" class="on" role="tab" aria-selected="true" onclick="showSec('mesas')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" transform="rotate(45 12 12)"/><circle cx="12" cy="9.2" r="1" fill="currentColor" stroke="none"/><circle cx="9.2" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="14.8" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="14.8" r="1" fill="currentColor" stroke="none"/></svg></span>Mesas</button>
+    <button data-sec="sistemas" role="tab" aria-selected="false" onclick="showSec('sistemas')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M20.5 12h-2.6M6.1 12H3.5M17.7 6.3l-1.8 1.8M8.1 15.9l-1.8 1.8M17.7 17.7l-1.8-1.8M8.1 8.1 6.3 6.3"/></svg></span>Sistemas</button>
+    <button data-sec="itens" role="tab" aria-selected="false" onclick="showSec('itens')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/></svg></span>Itens</button>
   </nav>
 
   <div id="msg" class="msg" role="status" aria-live="polite"></div>
@@ -55,7 +55,8 @@
         <h4>Criar mesa</h4>
         <p>Escolha o sistema que a mesa vai usar — ela puxa os status, classes, árvores e itens dele. Você vira o Mestre e recebe um código de convite.</p>
         <form onsubmit="return doCreate(event)">
-          <div class="fld"><label for="new-system">Sistema da campanha</label><select id="new-system" class="fld-input" onchange="onNewSystemChange()"></select>
+          <div class="fld"><label for="new-system">Sistema da campanha</label><select id="new-system" class="fld-input" required onchange="onNewSystemChange()"></select>
+            <div class="fld-err" id="new-system-err">Escolha um sistema para a mesa.</div>
             <div id="new-system-preview" style="font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-top:6px"></div></div>
           <div class="inline-form">
             <input id="new-name" placeholder="Nome da mesa" required maxlength="60">
@@ -72,7 +73,7 @@
         </form>
       </div>
     </div>
-    <div class="section-title">Minhas mesas</div>
+    <div class="section-title" role="heading" aria-level="2">Minhas mesas</div>
     <div id="mesas"><div class="empty">Carregando…</div></div>
   </section>
 
@@ -86,13 +87,13 @@
 
     <!-- ---------- LOJA (sistemas publicados por outros criadores) ---------- -->
     <div id="sys-loja">
-      <div class="section-title">Sistemas publicados por outros criadores</div>
+      <div class="section-title" role="heading" aria-level="2">Sistemas publicados por outros criadores</div>
       <div id="store-systems" class="grid"><div class="empty">Carregando…</div></div>
     </div>
 
     <!-- ---------- FAVORITOS ---------- -->
     <div id="sys-favoritos" style="display:none">
-      <div class="section-title">Sistemas favoritados</div>
+      <div class="section-title" role="heading" aria-level="2">Sistemas favoritados</div>
       <div id="fav-systems" class="grid"><div class="empty">Carregando…</div></div>
     </div>
 
@@ -108,7 +109,7 @@
           </form>
         </div>
       </div>
-      <div class="section-title">Meus sistemas</div>
+      <div class="section-title" role="heading" aria-level="2">Meus sistemas</div>
       <div id="systems" class="grid"><div class="empty">Carregando…</div></div>
     </div>
   </section>
@@ -149,7 +150,7 @@
     <!-- ---------- CRIAR (biblioteca do próprio usuário) ---------- -->
     <div id="itens-criar" style="display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div class="section-title" style="margin:0">Sua biblioteca de itens</div>
+        <div class="section-title" role="heading" aria-level="2" style="margin:0">Sua biblioteca de itens</div>
         <button class="btn go auto sm" onclick="openItemForm()">+ Criar item</button>
       </div>
 
@@ -217,7 +218,7 @@
     <!-- ---------- PACOTES (grupos de itens da biblioteca, pra importar de uma vez num sistema) ---------- -->
     <div id="itens-pacotes" style="display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div class="section-title" style="margin:0">Meus pacotes de itens</div>
+        <div class="section-title" role="heading" aria-level="2" style="margin:0">Meus pacotes de itens</div>
         <button class="btn go auto sm" onclick="openPackageForm()">+ Criar pacote</button>
       </div>
       <p style="font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6;margin:0 0 14px">
@@ -231,7 +232,7 @@
 </main>
 
 <script type="module">
-import * as db from './lib/db.js?v=30';
+import * as db from './lib/db.js?v=40';
 import { mountHelp, mountThemeToggle, openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme, trapFocus } from './lib/ui.js?v=4';
 
 mountHelp('home');
@@ -327,7 +328,7 @@ let myUserId = null;
 let _favIds = new Set();      // ids favoritados pelo usuário atual
 const _itemById = new Map();  // cache de todo item já visto (loja/favoritos/criar), pra abrir o modal de detalhe por id
 
-function showMsg(t, kind) { const m = $('msg'); m.textContent = t; m.className = 'msg show ' + (kind || 'err'); setTimeout(() => { if (m.textContent === t) m.className = 'msg'; }, 4000); }
+function showMsg(t, kind) { const m = $('msg'); m.textContent = t; m.className = 'msg show ' + (kind || 'err'); }
 // aceita tanto um <form> (procura o botão type=submit dentro) quanto o próprio botão (ex.:
 // savePackage passa ev.currentTarget de um <button type="button">, que não tem filho nenhum —
 // antes disso o querySelector sempre voltava vazio e o loading/disabled nunca ligava de verdade)
@@ -412,7 +413,7 @@ window.doLogout = async () => {
 
 /* ---------- seções ---------- */
 window.showSec = (sec) => {
-  document.querySelectorAll('.home-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.sec === sec));
+  document.querySelectorAll('.home-tabs button').forEach((b) => { const on = b.dataset.sec === sec; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
   $('sec-mesas').style.display = sec === 'mesas' ? '' : 'none';
   $('sec-sistemas').style.display = sec === 'sistemas' ? '' : 'none';
   $('sec-itens').style.display = sec === 'itens' ? '' : 'none';
@@ -471,7 +472,7 @@ window.doCreateSystem = (ev) => { ev.preventDefault(); const name = $('sys-name'
 function systemCardHtml(s) {
   const isFav = _favSysIds.has(s.id);
   return `
-    <div class="card-tile" onclick='openSystemDetail("${s.id}")' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(s.name)}">
+    <div class="card-tile" onclick='openSystemDetail("${s.id}")' onkeydown='if(event.key==="Enter"||event.key===" "){event.preventDefault();openSystemDetail("${s.id}")}' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(s.name)}">
       <button class="poster-fav ${isFav ? 'on' : ''}" style="position:absolute;top:10px;right:10px" onclick='event.stopPropagation();toggleFavoriteSystem("${s.id}")' aria-label="${isFav ? 'Remover dos favoritos' : 'Favoritar'}" aria-pressed="${isFav}">${HEART_ICON}</button>
       <h3 style="padding-right:26px">${esc(s.name)}</h3>
       ${s.description ? `<p class="meta" style="white-space:normal;-webkit-line-clamp:3;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;margin:2px 0">${esc(s.description)}</p>` : ''}
@@ -582,7 +583,12 @@ async function renderMesas() {
 }
 window.doCreate = (ev) => { ev.preventDefault(); const name = $('new-name').value.trim(); const systemId = $('new-system').value;
   if (!name) return false;
-  if (!systemId) { showMsg('Crie um sistema primeiro (aba Sistemas) para usar na mesa.'); showSec('sistemas'); return false; }
+  const sysSel = $('new-system'); sysSel.classList.remove('invalid'); sysSel.removeAttribute('aria-invalid'); $('new-system-err').classList.remove('show');
+  if (!systemId) {
+    if (sysSel.disabled) { showMsg('Crie um sistema primeiro (aba Sistemas) para usar na mesa.'); showSec('sistemas'); return false; }
+    sysSel.classList.add('invalid'); sysSel.setAttribute('aria-invalid', 'true'); $('new-system-err').classList.add('show'); sysSel.focus();
+    return false;
+  }
   busy(ev.target, true);
   db.createCampaign(name, systemId).then((c) => { location.href = 'mesa.html?id=' + c.id; }).catch((e) => { showMsg('Não deu pra criar a mesa: ' + friendlyError(e)); busy(ev.target, false); }); return false; };
 function fillSystemPicker(mine, favorites, store) {
@@ -788,7 +794,7 @@ function itemCardHtml(it) {
   const bgStyle = it.image_url ? ` style="background-image:url('${esc(it.image_url)}')"` : '';
   return `
     <div class="rar-frame" data-rarity="${esc(rarity)}">
-      <div class="poster-card" onclick='openItemDetail("${it.id}")' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(it.name)}">
+      <div class="poster-card" onclick='openItemDetail("${it.id}")' onkeydown='if(event.key==="Enter"||event.key===" "){event.preventDefault();openItemDetail("${it.id}")}' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(it.name)}">
         ${posterRarityLayers(rarity)}
         ${isMine ? `<span class="poster-pub ${it.is_published ? 'on' : ''}">${it.is_published ? 'Publicado' : 'Privado'}</span>` : ''}
         <button class="poster-fav ${isFav ? 'on' : ''}" onclick='event.stopPropagation();toggleFavorite("${it.id}")' aria-label="${isFav ? 'Remover dos favoritos' : 'Favoritar'}" aria-pressed="${isFav}">${HEART_ICON}</button>
