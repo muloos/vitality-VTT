@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=41">
+<link rel="stylesheet" href="lib/theme.css?v=46">
 <style>
   /* modo embutido (dentro da mesa, via iframe — ver mesa.html: viewSistemaInline/renderSistema):
      mesmo padrão de arvore.html — esconde a topbar própria (a mesa já tem a dela por fora) e troca
@@ -53,7 +53,7 @@ try { if (new URLSearchParams(location.search).get('embed') === '1') document.bo
 </div>
 
 <script type="module">
-import * as db from './lib/db.js?v=40';
+import * as db from './lib/db.js?v=42';
 import { mountHelp, mountThemeToggle, trapFocus } from './lib/ui.js?v=4';
 
 // embutido dentro da mesa (iframe) — ver comentário grande no <style> acima e em arvore.js (mesmo
@@ -242,6 +242,10 @@ const ICONS = {
   levelUp: ic('<path d="M4 20v-5M4 20h4M10 20v-9M10 20h4M16 20v-13M16 20h4"/><path d="M4 12l6-6 4 4 7-7"/>'),
   equip: ic('<path d="M8 4 4 7l2 3 2-1.3V19h8V8.7L18 10l2-3-4-3-2 2h-4L8 4Z"/>'),
   plus: ic('<path d="M12 5v14M5 12h14"/>'),
+  combat: ic('<path d="M4 4l7 7M20 4l-7 7M4 20l7-7M20 20l-7-7"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>'),
+  eyeOff: ic('<path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6 0 9.5 5.5 9.5 7a11.6 11.6 0 0 1-2.6 3.4M6.6 6.6C3.8 8.3 2.5 11 2.5 12c0 1.5 3.5 7 9.5 7 1.4 0 2.6-.3 3.7-.8"/><path d="M9.9 10a3 3 0 0 0 4.2 4.2"/>'),
+  calc: ic('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8"/><path d="M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/>'),
+  doc: ic('<path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12h7M8.5 15.5h7M8.5 8.5h3"/>'),
 };
 // deriva ícone + cor de uma categoria de proficiência a partir do texto — sem precisar de campo
 // novo no banco (categoria continua sendo texto livre). Cobre os tipos mais comuns por palavra-
@@ -285,7 +289,7 @@ function showMsg(t, kind) { const m = $('msg'); m.textContent = t; m.className =
 // arvore.html não leva "&embed=1" (é usado normalmente fora da mesa também), e carregar esse link
 // aqui dentro criaria um iframe dentro de outro iframe, com chrome duplicado e o botão "voltar"
 // indo pro lugar errado. A mesa já tem sua PRÓPRIA aba Árvores, com um caminho de embed correto.
-const TABS = [['geral', `<span class="ic">${ICONS.gear}</span>Geral`], ['status', `<span class="ic">${ICONS.bolt}</span>Status`], ['pericias', `<span class="ic">${ICONS.target}</span>Perícias`], ['proficiencias', `<span class="ic">${ICONS.checklist}</span>Proficiências`], ['classes', `<span class="ic">${ICONS.shield}</span>Classes`], ['racas', `<span class="ic">${ICONS.heart}</span>Raças`], ['condicoes', `<span class="ic">${ICONS.warning}</span>Condições`], ['nivel', `<span class="ic">${ICONS.levelUp}</span>Nível`], ...(embedded ? [] : [['arvores', `<span class="ic">${ICONS.tree}</span>Árvores`]]), ['itens', `<span class="ic">${ICONS.bag}</span>Itens`], ['equipamento', `<span class="ic">${ICONS.equip}</span>Equipamento`]];
+const TABS = [['geral', `<span class="ic">${ICONS.gear}</span>Geral`], ['status', `<span class="ic">${ICONS.bolt}</span>Status`], ['combate', `<span class="ic">${ICONS.combat}</span>Combate`], ['pericias', `<span class="ic">${ICONS.target}</span>Perícias`], ['calculos', `<span class="ic">${ICONS.calc}</span>Cálculos`], ['proficiencias', `<span class="ic">${ICONS.checklist}</span>Proficiências`], ['classes', `<span class="ic">${ICONS.shield}</span>Classes`], ['racas', `<span class="ic">${ICONS.heart}</span>Raças`], ['condicoes', `<span class="ic">${ICONS.warning}</span>Condições`], ['nivel', `<span class="ic">${ICONS.levelUp}</span>Nível`], ...(embedded ? [] : [['arvores', `<span class="ic">${ICONS.tree}</span>Árvores`]]), ['itens', `<span class="ic">${ICONS.bag}</span>Itens`], ['equipamento', `<span class="ic">${ICONS.equip}</span>Equipamento`]];
 
 (async () => {
   if (!systemId) { location.href = 'app.html'; return; }
@@ -325,7 +329,7 @@ window.openTab = async (name) => {
   currentTab = name;
   [...$('tabs').children].forEach((b) => { const on = b.dataset.tab === name; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
   const c = $('content'); c.innerHTML = '<div class="empty">Carregando…</div>';
-  ({ geral: renderGeral, status: renderStatus, pericias: renderPericias, proficiencias: renderProficiencias, classes: renderClasses, racas: renderRacas, condicoes: renderCondicoes, nivel: renderNivel, arvores: renderArvores, itens: renderItens, equipamento: renderEquipamento }[name])(c)
+  ({ geral: renderGeral, status: renderStatus, combate: renderCombate, pericias: renderPericias, calculos: renderCalculos, proficiencias: renderProficiencias, classes: renderClasses, racas: renderRacas, condicoes: renderCondicoes, nivel: renderNivel, arvores: renderArvores, itens: renderItens, equipamento: renderEquipamento }[name])(c)
     .catch((e) => { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
 };
 
@@ -373,7 +377,16 @@ async function renderGeral(c) {
     </div>
     <button class="btn go sm" id="geral-save-btn" style="display:none" onclick="saveGeral()"><span class="spin"></span>Salvar alterações</button>
 
-    <div class="section-title" role="heading" aria-level="2">Monte seu sistema — ordem recomendada</div>
+    <div class="section-title" role="heading" aria-level="2">Documentos do sistema <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0">(regras, lore — opcional)</span></div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 12px">
+      Isso é a primeira coisa que o jogador vê ao entrar na mesa, antes de criar o personagem — junto
+      com a descrição acima. Ele também consegue reabrir depois, na própria aba "Sistema" da ficha dele.</p>
+    <div class="list" id="sys-doc-list">${(system.documents || []).length ? system.documents.map((d, i) => sysDocRow(d, i)).join('') : emptyState(ICONS.doc, 'Nenhum documento ainda',
+      'Anexe imagens, PDFs ou textos com regras ou história do sistema.')}</div>
+    <input type="file" id="sys-doc-file" accept="image/*,application/pdf,text/plain" style="display:none" onchange="onSysDocFile(this)">
+    <button type="button" class="btn auto sm" style="margin-top:10px" onclick="document.getElementById('sys-doc-file').click()">+ Adicionar documento</button>
+
+    <div class="section-title" role="heading" aria-level="2" style="margin-top:22px">Monte seu sistema — ordem recomendada</div>
     <div class="onboard" style="margin-bottom:22px"><div class="steps" style="margin-top:0">
       ${guide.map((g, i) => `<div class="ostep"><div class="n">${i + 1}</div>
         <div><b>${g[0]}</b><p>${g[1]}</p><button class="btn sm auto" onclick="openTab('${g[2]}')">Abrir</button></div></div>`).join('')}
@@ -404,6 +417,37 @@ window.saveGeral = () => {
     showMsg('Salvo.', 'ok');
   }).catch((e) => showMsg(e.message))
     .finally(() => { if (btn) { btn.classList.remove('loading'); btn.disabled = false; } });
+};
+// documentos do sistema (regras/lore) — grava na hora (não passa pelo botão "Salvar alterações" da
+// identidade), mesmo padrão dos "arquivos de lore" do personagem em mesa.html. Só troca a lista
+// própria (#sys-doc-list) em vez de re-renderizar a aba inteira, pra não perder nome/descrição
+// ainda não salvos se o Mestre tiver acabado de editar esses campos.
+function sysDocRow(d, i) {
+  return `<div class="list-row"><a class="grow nm" href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--maq);text-decoration:none">${esc(d.name)}</a>
+    <button class="btn sm danger auto" onclick="rmSysDoc(${i})" aria-label="Remover documento ${esc(d.name)}"><span class="ic">${ICONS.x}</span></button></div>`;
+}
+function renderSysDocList() {
+  const list = $('sys-doc-list'); if (!list) return;
+  const documents = system.documents || [];
+  list.innerHTML = documents.length ? documents.map((d, i) => sysDocRow(d, i)).join('') : emptyState(ICONS.doc, 'Nenhum documento ainda',
+    'Anexe imagens, PDFs ou textos com regras ou história do sistema.');
+}
+window.onSysDocFile = (input) => {
+  const file = input.files && input.files[0]; if (!file) return;
+  db.uploadLoreFile(file, 'systems')
+    .then((entry) => {
+      const documents = [...(system.documents || []), entry];
+      return db.updateSystem(systemId, { documents }).then(() => documents);
+    })
+    .then((documents) => { system.documents = documents; input.value = ''; renderSysDocList(); })
+    .catch((e) => showMsg(e.message));
+};
+window.rmSysDoc = async (i) => {
+  const ok = await confirmModal({ title: 'Remover documento', desc: 'Não dá pra desfazer.', confirmLabel: 'Remover' });
+  if (!ok) return;
+  const documents = [...(system.documents || [])];
+  documents.splice(i, 1);
+  db.updateSystem(systemId, { documents }).then(() => { system.documents = documents; renderSysDocList(); }).catch((e) => showMsg(e.message));
 };
 window.delSys = async () => {
   const ok = await confirmModal({ title: 'Excluir sistema', desc: `Excluir "${system.name}"? Apaga status, classes, árvores e vínculos. Não dá pra desfazer.`, confirmLabel: 'Excluir', confirmText: system.name });
@@ -486,8 +530,8 @@ let _profsCache = []; // proficiências com "nome na fórmula" — pro testador 
 async function renderStatus(c) {
   const [stats, profs] = await Promise.all([db.listStats(systemId), db.listProficiencies(systemId)]);
   _statusStats = stats; _profsCache = profs; _statusDrafts = {};
-  const recursos = stats.filter((s) => s.is_resource);
-  const status = stats.filter((s) => !s.is_resource && !s.is_skill);
+  const recursos = stats.filter((s) => s.is_resource && !s.is_hidden);
+  const status = stats.filter((s) => !s.is_resource && !s.is_skill && !s.is_combat && !s.is_hidden);
   c.innerHTML = `
     <div class="section-title" role="heading" aria-level="2">Status do sistema</div>
     <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
@@ -526,6 +570,57 @@ async function renderStatus(c) {
     ${formulaTutorial(stats)}`;
   wireDragReorder($('recursos-list'), '.list-row[data-id]', 'system_stats');
   wireDragReorder($('status-list'), '.list-row[data-id]', 'system_stats');
+}
+// aba separada pra status que não são "atributo cru" nem recurso, mas também não deveriam viver
+// misturados no meio de Status — defesas, testes de resistência, rolagem de ataque. Reaproveita
+// toda a infra de Status (mesmos _statusStats/_statusDrafts/onStatFieldChange/statusSaveBarHtml,
+// mesmo agrupamento por categoria com cabeçalho colorido que Proficiências já usa)
+async function renderCombate(c) {
+  const [stats, profs] = await Promise.all([db.listStats(systemId), db.listProficiencies(systemId)]);
+  _statusStats = stats; _profsCache = profs; _statusDrafts = {};
+  const combat = stats.filter((s) => s.is_combat && !s.is_hidden);
+  c.innerHTML = `
+    <div class="section-title" role="heading" aria-level="2">Combate</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
+      Defesas, testes de resistência e rolagem de ataque — o que fica separado de Status pra não
+      virar uma lista só com atributo, defesa e teste misturados. Marque "Virar combate" num status
+      lá na aba Status pra ele aparecer aqui. Use a categoria (ex.: Defesas/Testes/Ataques) pra
+      agrupar visualmente.</p>
+
+    ${statusSaveBarHtml()}
+
+    ${combat.length ? groupProfsByCategory(combat).map(([cat, list], gi) => `
+      <div class="prof-cat-head" style="--pcc:${profCategoryColor(cat)}"><span class="ic">${profCategoryIcon(cat)}</span>${esc(cat)}</div>
+      <div class="list" id="combat-cat-list-${gi}" style="margin-bottom:18px">${list.map(statRow).join('')}</div>
+    `).join('') : emptyState(ICONS.combat, 'Nenhum status de combate ainda',
+      'Vá na aba Status e clique em "Virar combate" num status (ex.: uma defesa ou um teste) pra ele aparecer aqui.')}`;
+  groupProfsByCategory(combat).forEach((_, gi) => wireDragReorder($('combat-cat-list-' + gi), '.list-row[data-id]', 'system_stats'));
+}
+// aba pra status que existem só pra alimentar outras fórmulas (ex.: um multiplicador
+// intermediário) — nunca aparecem na ficha nem em Status/Combate/Recursos, mas continuam
+// funcionando normalmente como referência (nome na fórmula) pra qualquer outra fórmula do
+// sistema. "Ocultar" num status em qualquer aba manda ele pra cá; "Mostrar" devolve pra onde ele
+// já estava categorizado (Status/Combate/Recurso, o flag original não muda).
+async function renderCalculos(c) {
+  const [stats, profs] = await Promise.all([db.listStats(systemId), db.listProficiencies(systemId)]);
+  _statusStats = stats; _profsCache = profs; _statusDrafts = {};
+  const hidden = stats.filter((s) => s.is_hidden);
+  c.innerHTML = `
+    <div class="section-title" role="heading" aria-level="2">Cálculos</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;margin:0 0 14px">
+      Status ocultos — existem só pra fazer conta (referenciados pelo "nome na fórmula" em outras
+      fórmulas), mas nunca aparecem na ficha, em Status, Combate ou Recursos. Útil pra valores
+      intermediários que o jogador não precisa ver. Clique em "Ocultar" em qualquer status, em
+      qualquer aba, pra mandar ele pra cá.</p>
+
+    ${statusSaveBarHtml()}
+
+    ${hidden.length ? groupProfsByCategory(hidden).map(([cat, list], gi) => `
+      <div class="prof-cat-head" style="--pcc:${profCategoryColor(cat)}"><span class="ic">${profCategoryIcon(cat)}</span>${esc(cat)}</div>
+      <div class="list" id="calc-cat-list-${gi}" style="margin-bottom:18px">${list.map(statRow).join('')}</div>
+    `).join('') : emptyState(ICONS.calc, 'Nenhum cálculo oculto ainda',
+      'Vá em Status, Recursos ou Combate e clique em "Ocultar" num status (ex.: um multiplicador intermediário) pra ele aparecer aqui.')}`;
+  groupProfsByCategory(hidden).forEach((_, gi) => wireDragReorder($('calc-cat-list-' + gi), '.list-row[data-id]', 'system_stats'));
 }
 // barra única de salvar, reaproveitada por Status e Perícias (as duas abas compartilham
 // _statusStats/_statusDrafts/onStatFieldChange) — troca os N botões "Salvar" por linha (que
@@ -569,6 +664,7 @@ window.saveAllStats = async () => {
     if (draft.name !== undefined) patch.name = s.name;
     if (draft.formula_key !== undefined) patch.formula_key = key;
     if (draft.color !== undefined) patch.color = s.color;
+    if (draft.category !== undefined) patch.category = s.category.trim() || null;
     if (s.kind === 'computed') { if (draft.formula !== undefined) patch.formula = s.formula; }
     else if (draft.default_value !== undefined) patch.default_value = s.default_value;
     ops.push(db.updateStat(id, patch));
@@ -602,6 +698,8 @@ function statRow(s) {
       <input class="nm grow" style="background:transparent;border:0;color:var(--ink);font-family:var(--serif);font-size:15px" value="${esc(s.name)}" onchange="onStatFieldChange('${s.id}','name',this.value)">
       <button type="button" class="color-swatch" style="--sw:${esc(s.color || '#7ee6dc')};flex-shrink:0" title="Cor da caixa na ficha" onclick="openColorPicker(this, '${esc(s.color || '#7ee6dc')}', (v)=>onStatFieldChange('${s.id}','color',v))"></button>
       <button class="btn sm auto" style="flex-shrink:0;${s.is_resource ? 'border-color:var(--maq);color:var(--maq)' : ''}" onclick="toggleResource('${s.id}', ${!s.is_resource})" title="Recurso: mostra atual/máximo na ficha (ex.: HP)">${s.is_resource ? `<span class="ic">${ICONS.heart}</span>recurso` : 'Virar recurso'}</button>
+      <button class="btn sm auto" style="flex-shrink:0;${s.is_combat ? 'border-color:var(--escarlate);color:var(--escarlate)' : ''}" onclick="toggleCombat('${s.id}', ${!s.is_combat})" title="Combate: fica na aba Combate em vez de Status, junto com defesas/ataques/testes">${s.is_combat ? `<span class="ic">${ICONS.combat}</span>combate` : 'Virar combate'}</button>
+      <button class="btn sm auto" style="flex-shrink:0;${s.is_hidden ? 'border-color:var(--ink-faint);color:var(--ink-faint)' : ''}" onclick="toggleHidden('${s.id}', ${!s.is_hidden})" title="Ocultar: some da ficha e de Status/Combate/Recursos — continua funcionando em fórmulas de outros status, só pra cálculo">${s.is_hidden ? `<span class="ic">${ICONS.eyeOff}</span>oculto` : 'Ocultar'}</button>
       ${isC ? `<button class="btn sm auto" style="flex-shrink:0" onclick="toggleTest('${s.id}')" title="Testar a fórmula"><span class="ic">${ICONS.flask}</span>Testar</button>` : ''}
       <button class="btn sm danger auto" style="flex-shrink:0" title="Excluir status" aria-label="Excluir status ${esc(s.name)}" onclick="delStat('${s.id}')"><span class="ic">${ICONS.x}</span></button>
     </div>
@@ -613,6 +711,9 @@ function statRow(s) {
         style="flex:1;min-width:140px;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:${isC?'var(--maq)':'var(--ink)'};font-family:var(--mono);font-size:12px;padding:8px 10px"
         onchange="onStatFieldChange('${s.id}','${isC?'formula':'default_value'}',this.value)">
       ${isC ? `<button type="button" class="btn sm auto" style="flex-shrink:0" title="Inserir função ou apelido" onclick="openFuncPicker(this, this.previousElementSibling)">ƒ(x)</button>` : ''}
+      <input value="${esc(s.category || '')}" placeholder="categoria (opcional)" title="Agrupa esse status com outros da mesma categoria na aba"
+        onchange="onStatFieldChange('${s.id}','category',this.value)"
+        style="width:130px;flex-shrink:0;background:var(--field);border:1px solid var(--line2);border-radius:8px;color:var(--ink-dim);font-family:var(--mono);font-size:12px;padding:8px 10px">
     </div>
   </div>
   ${isC ? `<div id="test-${s.id}" class="surface" style="display:none;margin:-2px 0 8px"></div>` : ''}`;
@@ -621,7 +722,19 @@ window.toggleResource = (id, val) => {
   const s = _statusStats.find((x) => x.id === id); if (s) s.is_resource = val;
   const patch = { is_resource: val };
   if (val && s && !s.color) patch.color = '#7ee6dc'; // cor padrão ao virar recurso
-  db.updateStat(id, patch).then(() => openTab('status')).catch((e) => showMsg(e.message));
+  db.updateStat(id, patch).then(() => openTab(currentTab)).catch((e) => showMsg(e.message));
+};
+// vira/desliga a aba onde esse status aparece (Combate em vez de Status) — mesmo padrão de
+// toggleResource, só que pra separar Defesas/Testes/Ataques do resto dos status "crus"
+window.toggleCombat = (id, val) => {
+  const s = _statusStats.find((x) => x.id === id); if (s) s.is_combat = val;
+  db.updateStat(id, { is_combat: val }).then(() => openTab(currentTab)).catch((e) => showMsg(e.message));
+};
+// mesmo padrão de toggleResource/toggleCombat — some da ficha e de Status/Combate/Recursos, mas o
+// status continua existindo normalmente (formula_key intacto) pra qualquer outra fórmula referenciar
+window.toggleHidden = (id, val) => {
+  const s = _statusStats.find((x) => x.id === id); if (s) s.is_hidden = val;
+  db.updateStat(id, { is_hidden: val }).then(() => openTab(currentTab)).catch((e) => showMsg(e.message));
 };
 window.formulaTutorial = (stats) => {
   const exemplos = stats.filter((s) => s.formula_key).slice(0, 3).map((s) => s.formula_key);
@@ -984,7 +1097,9 @@ const statByKey = (key) => {
 // funções de fórmula reconhecidas quando o token é seguido de "(" — traduzidas direto pro
 // equivalente JS já validado (não são resolvidas como referência de status/proficiência). Mantido
 // em espelho com FORMULA_FUNCS de mesa.html — qualquer função nova entra nos dois ao mesmo tempo.
-const FORMULA_FUNCS = { arredondar: 'Math.round', piso: 'Math.floor', teto: 'Math.ceil', maior: 'Math.max', menor: 'Math.min' };
+// porcentagem não mapeia pra um único método do Math (precisa de 2 argumentos e uma conta), por
+// isso é uma função anônima imediatamente invocada em vez de um nome do Math global como as outras
+const FORMULA_FUNCS = { arredondar: 'Math.round', piso: 'Math.floor', teto: 'Math.ceil', maior: 'Math.max', menor: 'Math.min', porcentagem: '(function(v,p){return v*p/100;})' };
 // metadados só pro seletor de função (openFuncPicker) — não precisa espelhar em mesa.html, que não
 // tem campo de fórmula editável, só avalia. As keys aqui têm que bater com FORMULA_FUNCS.
 const FORMULA_FUNC_INFO = [
@@ -993,6 +1108,7 @@ const FORMULA_FUNC_INFO = [
   { key: 'teto', args: 1, label: 'teto(x)', desc: 'Arredonda pra cima.', example: 'teto(7.1) = 8' },
   { key: 'maior', args: 2, label: 'maior(a, b)', desc: 'Devolve o maior valor entre os dois.', example: 'maior(FORCA, DES)' },
   { key: 'menor', args: 2, label: 'menor(a, b)', desc: 'Devolve o menor valor entre os dois.', example: 'menor(FORCA, DES)' },
+  { key: 'porcentagem', args: 2, label: 'porcentagem(valor, percentual)', desc: 'Calcula X% de um valor.', example: 'porcentagem(80, 30) = 24' },
 ];
 // palavras reservadas — tokens especiais que não são um Status/apelido de verdade, tratados à
 // parte dentro do tokenizer de fórmula (ver computeStat). Só metadado de UI, mesmo raciocínio de
@@ -1159,7 +1275,7 @@ function computeStat(stat, baseVals, seen = new Set(), level) {
     if (!ref) throw new Error(`"${tok}" não é um status`);
     return '(' + computeStat(ref, baseVals, seen2, level) + ')';
   }).join(' ');
-  const safetyProbe = expr.replace(/Math\.(round|floor|ceil|max|min)/g, '');
+  const safetyProbe = expr.replace(/Math\.(round|floor|ceil|max|min)/g, '').replace(/\(function\(v,p\)\{return v\*p\/100;\}\)/g, '');
   if (!/^[\d+\-*/(),.\s]*$/.test(safetyProbe)) {
     const bad = safetyProbe.match(/[^\d+\-*/(),.\s]+/);
     throw new Error(`fórmula usa algo não permitido: "${bad ? bad[0] : safetyProbe.trim()}"`);

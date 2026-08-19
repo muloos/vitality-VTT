@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=41">
+<link rel="stylesheet" href="lib/theme.css?v=46">
 </head>
 <body class="mesa-page">
 <script>try{
@@ -66,7 +66,7 @@
 </button>
 
 <script type="module">
-import * as db from './lib/db.js?v=40';
+import * as db from './lib/db.js?v=42';
 import { openHelpGuide, openProfileModal, openSettingsModal, toggleTheme, getTheme, trapFocus } from './lib/ui.js?v=4';
 import { mountYtPlayer } from './lib/ytplayer.js?v=5';
 
@@ -137,6 +137,8 @@ const ICONS = {
   heart: ic('<path d="M12 20.2 4.6 13c-2-2-2-5 0-6.8 1.9-1.8 4.7-1.6 6.4.4l1 1.2 1-1.2c1.7-2 4.5-2.2 6.4-.4 2 1.8 2 4.8 0 6.8L12 20.2Z"/>'),
   hammer: ic('<path d="M15 4l5 5-2 2-5-5Z"/><path d="M12.5 6.5l5 5-2.5 2.5-5-5Z"/><path d="M3 21l7.5-7.5"/>'),
   checklist: ic('<path d="M4.5 6.5l1.3 1.3L8 5.5"/><path d="M4.5 12.5l1.3 1.3 2.2-2.3"/><path d="M4.5 18.5l1.3 1.3 2.2-2.3"/><path d="M11.5 6.5h8M11.5 12.5h8M11.5 18.5h8"/>'),
+  combat: ic('<path d="M4 4l7 7M20 4l-7 7M4 20l7-7M20 20l-7-7"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>'),
+  doc: ic('<path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12h7M8.5 15.5h7M8.5 8.5h3"/>'),
 };
 const emptyState = (icon, title, desc, cta) => `<div class="empty-cta"><div class="ec-icon">${icon}</div>
   <div class="ec-title">${title}</div><div class="ec-desc">${desc}</div>${cta || ''}</div>`;
@@ -168,8 +170,9 @@ function tabsFor() {
   const icSparkle = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/><circle cx="12" cy="12" r="2.4"/></svg></span>';
   const icPaw = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7.5" r="2"/><circle cx="12" cy="5.5" r="2"/><circle cx="17" cy="7.5" r="2"/><path d="M8 15.5c0-3 1.8-5 4-5s4 2 4 5c0 2.5-1.8 4-4 4s-4-1.5-4-4Z"/></svg></span>';
   const icSwords = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 13l4.5 4.5"/><path d="M21 3l-3 3M18 6l3 3"/><path d="M6 21l3-3"/></svg></span>';
+  const icDoc = '<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M8.5 12h7M8.5 15.5h7M8.5 8.5h3"/></svg></span>';
   if (role === 'gm') return [['jogadores', icGroup + 'Jogadores'], ['criaturas', icPaw + 'Criaturas'], ['combate', icSwords + 'Combate'], ['atributos', (hasSys ? icGear : icChart) + (hasSys ? 'Sistema' : 'Atributos')], ['arvores', icTree + 'Árvores']];
-  return [['ficha', icScroll + 'Ficha'], ['biografia', icDna + 'Biografia'], ['inventario', icBag + 'Inventário'], ['habilidades', icSparkle + 'Habilidades'], ['combate', icSwords + 'Combate'], ['anotacoes', icPencil + 'Anotações'], ['arvores', icTree + 'Árvores']];
+  return [['ficha', icScroll + 'Ficha'], ['biografia', icDna + 'Biografia'], ['inventario', icBag + 'Inventário'], ['habilidades', icSparkle + 'Habilidades'], ['combate', icSwords + 'Combate'], ['anotacoes', icPencil + 'Anotações'], ['arvores', icTree + 'Árvores'], ...(hasSys ? [['sistema', icDoc + 'Sistema']] : [])];
 }
 
 (async () => {
@@ -202,9 +205,18 @@ function tabsFor() {
 
   if (role === 'player') {
     character = await db.ensureCharacter(campaignId);
+    // antes de tudo — mesmo antes do formulário de criação de personagem — o jogador conhece o
+    // sistema (descrição do Mestre + documentos de regra/lore). Só uma vez (intro_seen trava isso,
+    // mesmo padrão de onboarding_done); depois ele consegue reabrir isso a qualquer hora na aba
+    // "Sistema" da própria ficha.
+    if (!character.intro_seen) {
+      setMesaChromeVisible(false);
+      renderSystemIntro($('content')).catch((e) => { $('content').innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
+      return;
+    }
     if (!character.onboarding_done) {
       inOnboarding = true;
-      $('mesa-menu').style.display = 'none';
+      setMesaChromeVisible(false);
       renderCharSetup($('content'), true).catch((e) => { $('content').innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
       return; // só entra na mesa de verdade depois de concluir a criação do personagem
     }
@@ -212,8 +224,17 @@ function tabsFor() {
 
   enterMesa();
 })();
+// menu/aba superior + rail lateral de jogadores/dados só fazem sentido dentro da mesa de verdade —
+// enquanto o jogador ainda está vendo a intro do sistema ou criando o personagem, a tela fica só
+// com o conteúdo central (nada de "mesa" ainda pra mostrar naquela barra lateral mesmo). Classe
+// "onboard-solo" (theme.css) faz o esconder/mostrar sem tocar em rail-collapsed/dice-collapsed,
+// pra não bagunçar a preferência que o jogador já tinha salva quando ele entrar na mesa de verdade.
+function setMesaChromeVisible(visible) {
+  document.body.classList.toggle('onboard-solo', !visible);
+}
 
 function enterMesa() {
+  setMesaChromeVisible(true);
   buildTabs();
   renderParty();
   openTab(tabsFor()[0][0]);
@@ -322,7 +343,7 @@ window.openTab = async (name) => {
   if (name === 'atributos') _lastSistemaEmbedTabRendered = _sistemaEmbedTab;
   const fn = { jogadores: renderJogadores, criaturas: renderCriaturas, combate: renderCombate, atributos: renderAtributos, arvores: renderArvores,
                ficha: renderFicha, biografia: renderBiografia, inventario: renderInventario, anotacoes: renderAnotacoes,
-               habilidades: renderHabilidades }[name];
+               habilidades: renderHabilidades, sistema: renderSistemaInfo }[name];
   fn(c).catch((e) => { c.innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
 };
 
@@ -577,9 +598,10 @@ function renderNpcFicha(c) {
   const n = _npcViewData;
   const attrs = sys?.stats || [];
   const ctx = { attrs, values: _npcViewValues, bonusMap: {}, profCtx: null, level: n.level, idPrefix: 'npcval-' };
-  const primaries = attrs.filter((a) => a.is_resource);
+  const primaries = attrs.filter((a) => a.is_resource && !a.is_hidden);
   const npcSkills = sys?.system?.skills_enabled ? attrs.filter((a) => a.is_skill) : [];
-  const secondary = attrs.filter((a) => !a.is_resource && !a.is_skill);
+  const combatStats = attrs.filter((a) => !a.is_resource && !a.is_skill && a.is_combat && !a.is_hidden);
+  const secondary = attrs.filter((a) => !a.is_resource && !a.is_skill && !a.is_combat && !a.is_hidden);
   c.innerHTML = `
     <button class="btn auto sm" onclick="openTab('criaturas')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>Voltar às criaturas</button>
     <div class="char-card" style="margin-top:14px">
@@ -604,11 +626,12 @@ function renderNpcFicha(c) {
     <div class="status-hud" style="margin-top:18px">
       ${primaries.length ? `<div class="hud-sec-label">Recursos<span class="ln"></span></div>
         <div class="hud-bars">${primaries.map((a) => resourceTileHtml(a, { ...ctx, current: _npcViewResources[a.id], adjustFn: 'npcAdjustResource' })).join('')}</div>` : ''}
-      <div class="hud-sec-label">Status${secondary.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
+      <div class="hud-sec-label" style="margin-top:18px">Status${secondary.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
       <div class="stat-grid">
         ${secondary.map((a) => statTileHtml(a, { ...ctx, adjustFn: 'npcAdjustStat' })).join('')}
         ${secondary.length ? '' : '<div class="empty" style="grid-column:1/-1">Sem status secundários.</div>'}
       </div>
+      ${combatBlockHtml(combatStats, (a) => statTileHtml(a, { ...ctx, adjustFn: 'npcAdjustStat', compact: true }))}
       ${npcSkills.length ? `<div class="hud-sec-label" style="margin-top:18px">Perícias<span class="ln"></span></div>
       <div class="skill-grid">${npcSkills.map((a) => skillChipHtml(a, ctx)).join('')}</div>` : ''}
     </div>
@@ -980,6 +1003,7 @@ async function viewPlayer(userId, name) {
       </div>
       <nav class="home-tabs" id="gmview-tabs" role="tablist" style="margin-top:18px">
         <button role="tab" aria-selected="false" data-tab="ficha" onclick="gmViewTab('ficha')">Ficha</button>
+        <button role="tab" aria-selected="false" data-tab="combate" onclick="gmViewTab('combate')">Combate</button>
         <button role="tab" aria-selected="false" data-tab="biografia" onclick="gmViewTab('biografia')">Biografia</button>
         <button role="tab" aria-selected="false" data-tab="inventario" onclick="gmViewTab('inventario')">Inventário</button>
         <button role="tab" aria-selected="false" data-tab="habilidades" onclick="gmViewTab('habilidades')">Habilidades</button>
@@ -999,7 +1023,7 @@ window.gmViewTab = (name) => {
   _gmViewTab = name;
   document.querySelectorAll('#gmview-tabs button').forEach((b) => { const on = b.dataset.tab === name; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
   const c = $('gmview-content'); if (!c) return;
-  ({ ficha: renderGmFicha, biografia: renderGmBiografia, inventario: renderGmInventario,
+  ({ ficha: renderGmFicha, combate: renderGmCombate, biografia: renderGmBiografia, inventario: renderGmInventario,
      habilidades: renderGmHabilidades, arvores: renderGmArvores }[name] || renderGmFicha)(c);
 };
 // três blocos de ficha parametrizados (attrs/values/bonus/profCtx/nível vêm todos de `ctx`, nunca
@@ -1028,14 +1052,15 @@ function resourceTileHtml(a, ctx) {
   </div>`;
 }
 function statTileHtml(a, ctx) {
-  const { attrs, values, bonusMap, profCtx, level, idPrefix, adjustFn } = ctx;
+  const { attrs, values, bonusMap, profCtx, level, idPrefix, adjustFn, compact } = ctx;
+  const cls = compact ? 'stat-tile compact' : 'stat-tile';
   if (a.kind === 'computed') {
     const v = evalStatIn(attrs, values, a, bonusMap, new Set(), profCtx, level);
-    return `<div class="stat-tile computed" style="--stc:${esc(a.color || '#7ee6dc')}"><div class="stat-val calc">${v == null ? `<span style="color:var(--escarlate)" title="Fórmula com erro">${ICONS.warning}</span>` : v}</div><div class="stat-name">${esc(a.name)}</div></div>`;
+    return `<div class="${cls} computed" style="--stc:${esc(a.color || '#7ee6dc')}"><div class="stat-val calc">${v == null ? `<span style="color:var(--escarlate)" title="Fórmula com erro">${ICONS.warning}</span>` : v}</div><div class="stat-name">${esc(a.name)}</div></div>`;
   }
   const val = values[a.id] ?? a.default_value ?? 0;
   const bonus = bonusMap[a.id];
-  return `<div class="stat-tile" style="--stc:${esc(a.color || '#7ee6dc')}">
+  return `<div class="${cls}" style="--stc:${esc(a.color || '#7ee6dc')}">
     ${bonus ? `<span class="mod-badge" title="${esc(bonusTitle(bonus))}">+${bonus.total}</span>` : ''}
     <div class="stat-val" id="${idPrefix || ''}${a.id}">${esc(val)}</div>
     <div class="stat-name">${esc(a.name)}</div>
@@ -1056,15 +1081,16 @@ function skillChipHtml(a, ctx) {
 function renderGmFicha(c) {
   const attributes = _gmViewAttrs, values = _gmViewValues, character = _gmViewChar;
   const ctx = { attrs: attributes, values, bonusMap: _gmViewSkillBonus, profCtx: _gmViewProfCtx, level: character?.level, idPrefix: 'gmval-' };
-  const primaries = attributes.filter((a) => a.is_resource);
+  const primaries = attributes.filter((a) => a.is_resource && !a.is_hidden);
   const gmSkills = sys?.system?.skills_enabled ? attributes.filter((a) => a.is_skill) : [];
-  const secondary = attributes.filter((a) => !a.is_resource && !a.is_skill);
+  const combatStats = attributes.filter((a) => !a.is_resource && !a.is_skill && a.is_combat && !a.is_hidden);
+  const secondary = attributes.filter((a) => !a.is_resource && !a.is_skill && !a.is_combat && !a.is_hidden);
   const hasBaseSec = secondary.some((a) => a.kind === 'base');
   c.innerHTML = `
     <div class="status-hud">
       ${primaries.length ? `<div class="hud-sec-label">Recursos<span class="ln"></span></div>
         <div class="hud-bars">${primaries.map((a) => resourceTileHtml(a, { ...ctx, current: _gmViewResources?.[a.id], protection: _gmViewProtection, adjustFn: 'gmAdjustResource' })).join('')}</div>` : ''}
-      <div class="hud-sec-label">Status${secondary.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
+      <div class="hud-sec-label" style="margin-top:18px">Status${secondary.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
       <div class="stat-grid">
         ${secondary.map((a) => statTileHtml(a, { ...ctx, adjustFn: 'gmAdjustStat' })).join('')}
         ${secondary.length ? '' : '<div class="empty" style="grid-column:1/-1">Sem status secundários.</div>'}
@@ -1077,6 +1103,7 @@ function renderGmFicha(c) {
           <button class="plus" title="Dar 1 ponto" onclick="gmAdjustPoints(1)">+</button>
         </div>
       </div>` : ''}
+      ${combatBlockHtml(combatStats, (a) => statTileHtml(a, { ...ctx, adjustFn: 'gmAdjustStat', compact: true }))}
       ${gmSkills.length ? `<div class="hud-sec-label" style="margin-top:18px">Perícias<span class="ln"></span></div>
       <div class="skill-grid">${gmSkills.map((a) => skillChipHtml(a, ctx)).join('')}</div>` : ''}
       ${sys?.proficiencies?.length ? `<div class="hud-sec-label" style="margin-top:18px">Proficiências <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(clique pra conceder/revogar)</span><span class="ln"></span></div>
@@ -1084,6 +1111,14 @@ function renderGmFicha(c) {
       ${sys?.conditions?.length ? `<div class="hud-sec-label" style="margin-top:18px">Condições <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">(clique pra aplicar/remover)</span><span class="ln"></span></div>
       <div class="prof-groups">${conditionChipsHtml(_gmViewConditions, true)}</div>` : ''}
     </div>`;
+}
+function renderGmCombate(c) {
+  const attributes = _gmViewAttrs, values = _gmViewValues, character = _gmViewChar;
+  const ctx = { attrs: attributes, values, bonusMap: _gmViewSkillBonus, profCtx: _gmViewProfCtx, level: character?.level, idPrefix: 'gmval-' };
+  const combatStats = attributes.filter((a) => !a.is_resource && !a.is_skill && a.is_combat && !a.is_hidden);
+  c.innerHTML = combatStats.length
+    ? `<div class="status-hud">${combatBlockHtml(combatStats, (a) => statTileHtml(a, { ...ctx, adjustFn: 'gmAdjustStat', compact: true }))}</div>`
+    : '<div class="empty">Este sistema não tem status de combate.</div>';
 }
 function renderGmBiografia(c) {
   const character = _gmViewChar;
@@ -1563,6 +1598,18 @@ function profCategoryColor(cat) {
   let h = 0; for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) >>> 0;
   return `hsl(${h % 360} 58% 58%)`;
 }
+// bloco "Combate" (defesas/testes/rolagem de ataque etc, os status com is_combat=true no sistema)
+// — separado de Status/Recursos/Perícias, agrupado por categoria com o mesmo cabeçalho colorido
+// que Proficiências já usa na ficha. renderTile(a) desenha 1 tile; cada visão (ficha do jogador,
+// Mestre, NPC) já tem sua própria convenção de base-vs-computado, então recebe a função em vez de
+// duplicá-la aqui.
+function combatBlockHtml(combatStats, renderTile) {
+  if (!combatStats || !combatStats.length) return '';
+  return `<div class="hud-sec-label" style="margin-top:18px"><span class="ic">${ICONS.combat}</span>Combate<span class="ln"></span></div>
+    ${groupProfsForFicha(combatStats).map(([cat, list]) => `
+      <div class="prof-cat" style="--pcc:${profCategoryColor(cat)}"><span class="ic">${profCategoryIcon(cat)}</span>${esc(cat)}</div>
+      <div class="stat-grid compact" style="margin:6px 0 4px">${list.map(renderTile).join('')}</div>`).join('')}`;
+}
 // selo de condição — mesmo padrão visual/interativo de profChipsHtml. Mestre (editable=true) vê o
 // catálogo inteiro e clica pra aplicar/remover; jogador só vê as que estão ATIVAS agora, sem poder
 // mexer (aplicar/remover é sempre decisão do Mestre — de propósito, ver Fase 6 do roteiro).
@@ -1645,24 +1692,17 @@ function classSubclassChips(ch) {
     const c = color || 'var(--ink-dim)';
     return `<span class="char-tag class-tag" style="border-color:${c};color:${c};background:color-mix(in srgb, ${c} 16%, transparent)">${esc(label)}</span>`;
   };
-  let classHtml, subHtml = '';
+  let classHtml = '', subHtml = '';
   if (ch.char_class) {
     classHtml = chip(ch.char_class, classColor(ch.char_class));
     if (ch.subclass) subHtml = chip(ch.subclass, classColor(ch.char_class));
-  } else if (sys) {
-    const roots = sys.classes.filter((x) => !x.parent_id);
-    classHtml = `<select class="class-pick-inline" title="Só pode ser escolhida uma vez" onchange="pickClass(this.value)"><option value="">Escolher classe…</option>${roots.map((cl) => `<option>${esc(cl.name)}</option>`).join('')}</select>`;
-  } else {
+  } else if (!sys) {
+    // sem sistema vinculado não existe catálogo de classes pra mostrar cartão nenhum — só aqui
+    // sobra o campo de texto livre (com sistema, a escolha acontece nos cartões da Biografia)
     classHtml = `<input class="class-pick-inline" placeholder="Classe" title="Só pode ser escolhida uma vez" onchange="onClassTextChange('char_class', this.value)">`;
   }
-  if (ch.char_class && !ch.subclass) {
-    if (sys) {
-      const cl = sys.classes.find((x) => !x.parent_id && x.name === ch.char_class);
-      const subOpts = cl ? sys.classes.filter((x) => x.parent_id === cl.id) : [];
-      if (subOpts.length) subHtml = `<select class="class-pick-inline" title="Só pode ser escolhida uma vez" onchange="pickSubclass(this.value)"><option value="">Escolher subclasse…</option>${subOpts.map((s) => `<option>${esc(s.name)}</option>`).join('')}</select>`;
-    } else {
-      subHtml = `<input class="class-pick-inline" placeholder="Subclasse" title="Só pode ser escolhida uma vez" onchange="onClassTextChange('subclass', this.value)">`;
-    }
+  if (ch.char_class && !ch.subclass && !sys) {
+    subHtml = `<input class="class-pick-inline" placeholder="Subclasse" title="Só pode ser escolhida uma vez" onchange="onClassTextChange('subclass', this.value)">`;
   }
   return classHtml + subHtml;
 }
@@ -1677,21 +1717,144 @@ function originVariantChips(ch) {
     const c = color || 'var(--ink-dim)';
     return `<span class="char-tag class-tag" style="border-color:${c};color:${c};background:color-mix(in srgb, ${c} 16%, transparent)">${esc(label)}</span>`;
   };
-  let originHtml, variantHtml = '';
+  let originHtml = '', variantHtml = '';
+  // sem origem ainda: nada aqui, a escolha acontece nos cartões da Biografia (não repete um
+  // segundo <select> que continuaria funcionando mesmo depois do personagem travado)
   if (ch.origin_name) {
     originHtml = chip(ch.origin_name, originColor(ch.origin_name));
     if (ch.origin_variant_name) variantHtml = chip(ch.origin_variant_name, originColor(ch.origin_name));
-  } else {
-    const roots = sys.origins.filter((x) => !x.parent_id);
-    originHtml = `<select class="class-pick-inline" title="Só pode ser escolhida uma vez" onchange="pickOrigin(this.value)"><option value="">Escolher raça…</option>${roots.map((o) => `<option>${esc(o.name)}</option>`).join('')}</select>`;
-  }
-  if (ch.origin_name && !ch.origin_variant_name) {
-    const o = sys.origins.find((x) => !x.parent_id && x.name === ch.origin_name);
-    const variantOpts = o ? sys.origins.filter((x) => x.parent_id === o.id) : [];
-    if (variantOpts.length) variantHtml = `<select class="class-pick-inline" title="Só pode ser escolhida uma vez" onchange="pickOriginVariant(this.value)"><option value="">Escolher variação…</option>${variantOpts.map((v) => `<option>${esc(v.name)}</option>`).join('')}</select>`;
   }
   return originHtml + variantHtml;
 }
+// cartões de escolha de Classe/Subclasse e Raça/Variação — vivem na Biografia logo após Identidade
+// (pedido do usuário: antes ficavam comprimidas num <select> ao lado da foto, sem prévia de bônus).
+// Mostram descrição + prévia do que cada opção aplica antes de escolher; a escolha em si continua
+// batendo nos mesmos pickClass/pickSubclass/pickOrigin/pickOriginVariant de sempre, só a UI de
+// escolha muda pra cartão — as etiquetas de char-tags continuam existindo à parte, como lembrete
+// compacto no topo da ficha.
+const _classBonusCache = new Map();
+function classBonusPreview(classId) {
+  if (_classBonusCache.has(classId)) return _classBonusCache.get(classId);
+  const p = db.getClassBaseStats(classId).then((map) => Object.entries(map).map(([sid, v]) => {
+    const s = (sys?.stats || []).find((x) => x.id === sid);
+    if (!s) return null;
+    const n = Number(v);
+    return `${esc(s.name)} ${Number.isFinite(n) && n >= 0 ? '+' : ''}${esc(String(v))}`;
+  }).filter(Boolean).join(' · ')).catch(() => '');
+  _classBonusCache.set(classId, p);
+  return p;
+}
+const _originBonusCache = new Map();
+function originBonusPreview(originId) {
+  if (_originBonusCache.has(originId)) return _originBonusCache.get(originId);
+  const p = db.listOriginFeatures(originId).then((features) => features.map((f) => {
+    const mods = (f.modifiers || []).map((m) => {
+      const s = (sys?.stats || []).find((x) => x.id === m.stat_id);
+      if (!s) return null;
+      const n = Number(m.amount);
+      return `${esc(s.name)} ${Number.isFinite(n) && n >= 0 ? '+' : ''}${esc(String(m.amount))}`;
+    }).filter(Boolean).join(', ');
+    return esc(f.name) + (mods ? ': ' + mods : '') + (f.level ? ` (nível ${f.level}+)` : '');
+  }).join(' · ')).catch(() => '');
+  _originBonusCache.set(originId, p);
+  return p;
+}
+// embutir nome de classe/raça direto num atributo onclick="..." — mesmo escape de aspas que a
+// linha de "Ver ficha" do log de combate já usa pra esse mesmo risco (nome com apóstrofo)
+const jsStr = (s) => esc(s).replace(/'/g, "\\'");
+function pickerCard(node, color, bonusText, onclick, selected) {
+  const c = color || 'var(--maq)';
+  return `<button type="button" class="picker-card${selected ? ' selected' : ''}" style="--pc:${c}" onclick="${onclick}">
+    <div class="picker-card-name">${esc(node.name)}${selected ? `<span class="ic picker-check">${ICONS.check}</span>` : ''}</div>
+    ${node.description ? `<div class="picker-card-desc">${esc(node.description)}</div>` : ''}
+    <div class="picker-card-bonus${bonusText ? '' : ' muted'}">${bonusText || 'Sem bônus direto'}</div>
+  </button>`;
+}
+function pickerCardLocked(node, color, bonusText) {
+  const c = color || 'var(--maq)';
+  return `<div class="picker-card locked" style="--pc:${c}">
+    <div class="picker-card-name">${esc(node.name)}<span class="ic picker-lock">${ICONS.lock}</span></div>
+    ${node.description ? `<div class="picker-card-desc">${esc(node.description)}</div>` : ''}
+    ${bonusText ? `<div class="picker-card-bonus">${bonusText}</div>` : ''}
+  </div>`;
+}
+// enquanto ainda está criando o personagem (inOnboarding), classe/subclasse/raça/variação ficam
+// livres pra trocar — mostra sempre as raízes (com a escolhida atual marcada) e, se já tiver uma
+// raiz escolhida, também os filhos dela logo abaixo. Só trava (pickerCardLocked, sem clique) depois
+// que o jogador confirma em finishOnboarding — dali em diante nem essa função nem onClassTextChange
+// recebem mais cliques, porque os cartões viram <div> em vez de <button>.
+async function classAxisHtml(ch) {
+  if (!sys || !sys.classes || !sys.classes.length) return '';
+  const roots = sys.classes.filter((x) => !x.parent_id);
+  if (!inOnboarding) {
+    if (!ch.char_class) return '';
+    const root = roots.find((x) => x.name === ch.char_class);
+    const children = root ? sys.classes.filter((x) => x.parent_id === root.id) : [];
+    const node = ch.subclass ? children.find((x) => x.name === ch.subclass) : root;
+    const bonus = node ? await classBonusPreview(node.id) : '';
+    return `<div class="section-title" role="heading" aria-level="2" style="margin-top:22px">Classe</div>
+      ${pickerCardLocked(node || { name: ch.char_class }, classColor(ch.char_class), bonus)}`;
+  }
+  const rootCards = await Promise.all(roots.map(async (r) =>
+    pickerCard(r, r.color, await classBonusPreview(r.id), `pickClass('${jsStr(r.name)}')`, r.name === ch.char_class)));
+  let subHtml = '';
+  const root = roots.find((x) => x.name === ch.char_class);
+  const children = root ? sys.classes.filter((x) => x.parent_id === root.id) : [];
+  if (children.length) {
+    const subCards = await Promise.all(children.map(async (s) =>
+      pickerCard(s, classColor(ch.char_class), await classBonusPreview(s.id), `pickSubclass('${jsStr(s.name)}')`, s.name === ch.subclass)));
+    subHtml = `<div class="section-title" role="heading" aria-level="2" style="margin-top:14px">Subclasse <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">de ${esc(ch.char_class)}</span></div>
+      <div class="picker-grid">${subCards.join('')}</div>`;
+  }
+  return `<div class="section-title" role="heading" aria-level="2" style="margin-top:22px">Classe</div>
+    <div class="picker-grid">${rootCards.join('')}</div>${subHtml}`;
+}
+async function originAxisHtml(ch) {
+  if (!sys || !sys.origins || !sys.origins.length) return '';
+  const roots = sys.origins.filter((x) => !x.parent_id);
+  if (!inOnboarding) {
+    if (!ch.origin_name) return '';
+    const root = roots.find((x) => x.name === ch.origin_name);
+    const children = root ? sys.origins.filter((x) => x.parent_id === root.id) : [];
+    const node = ch.origin_variant_name ? children.find((x) => x.name === ch.origin_variant_name) : root;
+    const bonus = node ? await originBonusPreview(node.id) : '';
+    return `<div class="section-title" role="heading" aria-level="2" style="margin-top:22px">Raça / Origem</div>
+      ${pickerCardLocked(node || { name: ch.origin_name }, originColor(ch.origin_name), bonus)}`;
+  }
+  const rootCards = await Promise.all(roots.map(async (r) =>
+    pickerCard(r, r.color, await originBonusPreview(r.id), `pickOrigin('${jsStr(r.name)}')`, r.name === ch.origin_name)));
+  let varHtml = '';
+  const root = roots.find((x) => x.name === ch.origin_name);
+  const children = root ? sys.origins.filter((x) => x.parent_id === root.id) : [];
+  if (children.length) {
+    const varCards = await Promise.all(children.map(async (v) =>
+      pickerCard(v, originColor(ch.origin_name), await originBonusPreview(v.id), `pickOriginVariant('${jsStr(v.name)}')`, v.name === ch.origin_variant_name)));
+    varHtml = `<div class="section-title" role="heading" aria-level="2" style="margin-top:14px">Variação <span style="text-transform:none;letter-spacing:0;color:var(--ink-faint)">de ${esc(ch.origin_name)}</span></div>
+      <div class="picker-grid">${varCards.join('')}</div>`;
+  }
+  return `<div class="section-title" role="heading" aria-level="2" style="margin-top:22px">Raça / Origem</div>
+    <div class="picker-grid">${rootCards.join('')}</div>${varHtml}`;
+}
+async function classOriginInner(ch) {
+  if (!sys) return '';
+  const [classHtml, originHtml] = await Promise.all([classAxisHtml(ch), originAxisHtml(ch)]);
+  if (!classHtml && !originHtml) return '';
+  const hint = inOnboarding ? `<p style="font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin:10px 2px 0">Pode trocar à vontade — só trava quando você concluir o personagem lá embaixo.</p>` : '';
+  return classHtml + originHtml + hint;
+}
+async function classOriginSection(ch) {
+  const inner = await classOriginInner(ch);
+  return inner ? `<div id="class-origin-section">${inner}</div>` : '';
+}
+// troca só o conteúdo interno do wrapper (preserva o id) — chamado depois de cada escolha pra
+// avançar o cartão pro próximo eixo (classe → subclasse) sem recarregar a ficha/biografia inteira
+async function refreshClassOriginSection() {
+  const el = $('class-origin-section'); if (!el || !character) return;
+  el.innerHTML = await classOriginInner(character);
+}
+// as duas telas que mostram classe/raça (a etiqueta compacta em char-tags e os cartões novos na
+// Biografia) mudam juntas sempre que uma escolha é feita ou recusada — chamado no lugar das duas
+function refreshClassPickers() { refreshCharTags(); refreshClassOriginSection(); }
 function charTagsHtml(ch) {
   const otherTags = [ch.age ? 'Idade: ' + esc(ch.age) : '', ch.gender ? esc(ch.gender) : ''].filter(Boolean);
   return `<span class="char-tag" id="char-level-tag">Nível ${ch.level || 1}</span>` +
@@ -1742,10 +1905,18 @@ async function renderFicha(c) {
     } catch (_) {}
   }
 
-  const primaries = attributes.filter((a) => a.is_resource);
+  const primaries = attributes.filter((a) => a.is_resource && !a.is_hidden);
   const skills = sys?.system?.skills_enabled ? attributes.filter((a) => a.is_skill) : [];
-  const secondaries = attributes.filter((a) => !a.is_resource && !a.is_skill);
+  const combatStats = attributes.filter((a) => !a.is_resource && !a.is_skill && a.is_combat && !a.is_hidden);
+  const secondaries = attributes.filter((a) => !a.is_resource && !a.is_skill && !a.is_combat && !a.is_hidden);
   const hasBaseSecondary = secondaries.some((a) => a.kind === 'base');
+  // Status usa o cartão grande de sempre; Combate usa a versão .compact (nome + valor lado a lado)
+  // pra não competir visualmente nem ocupar tanto espaço com uma lista de defesas/testes que pode ficar longa
+  const tileHtml = (a, compact) => a.kind === 'computed'
+    ? `<div class="stat-tile${compact ? ' compact' : ''} computed" style="--stc:${esc(a.color || '#7ee6dc')}"><div class="stat-val calc" id="comp-${a.id}">—</div><div class="stat-name">${esc(a.name)}</div></div>`
+    : secStatRow(a, compact);
+  const secTile = (a) => tileHtml(a, false);
+  const secTileCompact = (a) => tileHtml(a, true);
 
   const tagsHtml = charTagsHtml(ch);
   const coverSrc = ch.cover_url || ch.avatar_url;
@@ -1797,11 +1968,9 @@ async function renderFicha(c) {
         <div class="hud-sec-label">Recursos<span class="ln"></span></div>
         <div class="hud-bars">${primaries.map(resourceRow).join('')}</div>` : ''}
 
-      <div class="hud-sec-label">Status${secondaries.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
+      <div class="hud-sec-label" style="margin-top:18px">Status${secondaries.length ? '' : ' — o sistema não tem'}<span class="ln"></span></div>
       <div class="stat-grid" id="sec-stat-grid">
-        ${secondaries.map((a) => a.kind === 'computed'
-          ? `<div class="stat-tile computed" style="--stc:${esc(a.color || '#7ee6dc')}"><div class="stat-val calc" id="comp-${a.id}">—</div><div class="stat-name">${esc(a.name)}</div></div>`
-          : secStatRow(a)).join('')}
+        ${secondaries.map(secTile).join('')}
         ${secondaries.length ? '' : '<div class="empty">Sem status.</div>'}
       </div>
       ${hasBaseSecondary ? `<div class="points-bar">
@@ -1810,6 +1979,7 @@ async function renderFicha(c) {
         <span class="pb-hint">disponíveis para distribuir nos status acima</span>
         <button class="btn go auto sm" id="stat-save-btn" style="display:none" onclick="commitStatPoints()"><span class="spin"></span>Salvar status</button>
       </div>` : ''}
+      ${combatBlockHtml(combatStats, secTileCompact)}
       ${skills.length ? `<div class="hud-sec-label" style="margin-top:18px">Perícias<span class="ln"></span></div>
       <div class="skill-grid">${skills.map(skillChip).join('')}</div>` : ''}
       ${sys?.proficiencies?.length ? `<div class="hud-sec-label" style="margin-top:18px">Proficiências<span class="ln"></span></div>
@@ -2030,12 +2200,12 @@ window.saveFormulaBuilder = () => {
 let _pendingDelta = {}; // statId -> quantos pontos foram alocados no rascunho (ainda não salvos)
 function pendingSum() { return Object.values(_pendingDelta).reduce((s, v) => s + v, 0); }
 function pointsLeft() { return (character.stat_points || 0) - pendingSum(); }
-function secStatRow(a) {
+function secStatRow(a, compact) {
   const base = Number(_fichaValues[a.id] ?? a.default_value ?? 0) || 0;
   const pend = _pendingDelta[a.id] || 0;
   const canSpend = pointsLeft() > 0;
   const bonus = _fichaSkillBonus[a.id];
-  return `<div class="stat-tile" style="--stc:${esc(a.color || '#7ee6dc')}">
+  return `<div class="stat-tile${compact ? ' compact' : ''}" style="--stc:${esc(a.color || '#7ee6dc')}">
     <span class="mod-badge" id="secbonus-${a.id}" style="${bonus ? '' : 'display:none;'}" title="${bonus ? esc(bonusTitle(bonus)) : ''}">${bonus ? `+${bonus.total}` : ''}</span>
     <div class="stat-val" id="secval-${a.id}">${base + pend + (bonus ? bonus.total : 0)}</div>
     <div class="stat-name">${esc(a.name)}</div>
@@ -2102,19 +2272,69 @@ window.commitStatPoints = async () => {
   }
 };
 
+/* ============================ SOBRE O SISTEMA (intro + aba "Sistema" da ficha) ============================ */
+// linha de documento do sistema (regras/lore) — só leitura pro jogador, quem mantém é o Mestre lá
+// no construtor (aba Geral)
+function sysDocRow(d) {
+  return `<div class="list-row"><a class="grow nm" href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--maq);text-decoration:none"><span class="ic">${ICONS.doc}</span>${esc(d.name)}</a></div>`;
+}
+// descrição + documentos do sistema — mesmo conteúdo usado tanto na primeira tela (antes de criar
+// personagem) quanto na aba "Sistema" que fica disponível depois, pra reabrir quando quiser
+function systemAboutHtml() {
+  const description = sys?.system?.description || '';
+  const documents = sys?.system?.documents || [];
+  return `
+    ${description ? `<p style="font-family:var(--serif);font-size:14px;color:var(--ink-dim);line-height:1.75;margin:0;white-space:pre-wrap">${esc(description)}</p>`
+      : `<p style="font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin:0">O Mestre ainda não escreveu uma descrição para este sistema.</p>`}
+    ${documents.length ? `<div class="section-title" role="heading" aria-level="2" style="margin-top:20px">Documentos</div>
+    <div class="list">${documents.map(sysDocRow).join('')}</div>` : ''}`;
+}
+// primeira tela que o jogador vê ao entrar na mesa — antes até do formulário de criação de
+// personagem. Só aparece uma vez (intro_seen); depois disso o mesmo conteúdo continua acessível
+// na aba "Sistema" (renderSistemaInfo), sem o botão "Continuar".
+async function renderSystemIntro(c) {
+  c.innerHTML = `
+    <div class="onboard">
+      <div class="ohead"><h3><span class="ic">${ICONS.doc}</span>${esc(sys?.system?.name || mesa.name)}</h3></div>
+      <p style="font-family:var(--serif);font-size:13.5px;color:var(--ink-dim);margin:8px 2px 0;line-height:1.6">
+        Antes de criar seu personagem, conheça o sistema que você vai jogar nesta mesa.</p>
+    </div>
+    ${systemAboutHtml()}
+    <div class="full actions" style="margin-top:24px;display:flex;justify-content:flex-end">
+      <button class="btn go auto" onclick="continueFromIntro()"><span class="spin"></span>Continuar</button>
+    </div>`;
+}
+window.continueFromIntro = () => {
+  db.updateCharacter(character.id, { intro_seen: true }).then((updated) => {
+    character = { ...character, ...updated };
+    if (!character.onboarding_done) {
+      inOnboarding = true;
+      renderCharSetup($('content'), true).catch((e) => { $('content').innerHTML = '<div class="empty">Erro: ' + esc(e.message) + '</div>'; });
+    } else {
+      $('mesa-menu').style.display = '';
+      enterMesa();
+    }
+  }).catch((e) => showMsg(e.message));
+};
+// aba "Sistema" do jogador — mesmo conteúdo da tela de entrada, só que sem o botão "Continuar" e
+// acessível a qualquer momento pelo menu, pra reler a descrição/documentos quando quiser
+async function renderSistemaInfo(c) {
+  c.innerHTML = `<div class="section-title" role="heading" aria-level="2">${esc(sys?.system?.name || 'Sistema')}</div>${systemAboutHtml()}`;
+}
+
 /* ============================ BIOGRAFIA / CRIAÇÃO DO PERSONAGEM ============================ */
 async function renderCharSetup(c, onboarding) {
   character = character || await db.ensureCharacter(campaignId);
   _identityDirty = false;
-  c.innerHTML = identitySection(character, onboarding);
+  c.innerHTML = await identitySection(character, onboarding);
 }
 async function renderBiografia(c) {
   character = character || await db.ensureCharacter(campaignId);
   _identityDirty = false;
-  c.innerHTML = identitySection(character, false);
+  c.innerHTML = await identitySection(character, false);
 }
 
-function identitySection(ch, onboarding) {
+async function identitySection(ch, onboarding) {
   const f = (label, key, val, ph, id) => `<div class="fld row"><label>${label}</label>
       <input ${id ? `id="${id}"` : ''} value="${esc(val)}" placeholder="${ph || ''}" oninput="onIdentityFieldChange('${key}', this.value)"></div>`;
   const ta = (label, key, val, ph) => `<div class="fld"><label>${label}</label>
@@ -2148,6 +2368,8 @@ function identitySection(ch, onboarding) {
     ${f('Nome <span style="color:var(--escarlate)">*</span>', 'name', ch.name, 'Nome do personagem', 'ident-name')}
     ${ageField}
     ${genderField}
+
+    ${await classOriginSection(ch)}
 
     <div class="section-title" role="heading" aria-level="2">Fotos do personagem</div>
     <div class="char-gallery" id="char-gallery">${gallery.length ? gallery.map((url, i) => galleryThumb(url, i, ch.avatar_url)).join('') : emptyState(ICONS.image, 'Nenhuma foto ainda',
@@ -2257,17 +2479,34 @@ window.rmLoreFile = async (i) => {
     .then(() => { Object.assign(character, patch); rerenderIdentity(); })
     .catch((e) => showMsg(e.message));
 };
+// ponto único e definitivo de trava: até aqui classe/subclasse/raça/variação eram só rascunho
+// (pickClass/pickSubclass/pickOrigin/pickOriginVariant só gravavam o nome, sem aplicar nada) — é
+// só agora, com a escolha final confirmada, que os status base/proficiências e o item inicial da
+// classe realmente entram. Depois disso os cartões da Biografia viram travados (inOnboarding vira
+// false, classAxisHtml/originAxisHtml passam a mostrar só o resumo travado).
 window.finishOnboarding = async () => {
   const name = (character.name || '').trim();
   if (!name) { showMsg('Preencha ao menos o nome do personagem.'); $('ident-name')?.focus(); return; }
+  const ok = await confirmModal({
+    title: 'Personagem pronto?',
+    desc: 'Depois de concluir, não dá mais pra trocar de classe, subclasse ou raça pela própria ficha — só o Mestre consegue mudar isso depois.',
+    confirmLabel: 'Concluir personagem', danger: false,
+  });
+  if (!ok) return;
   const patch = { name, age: character.age || '', gender: character.gender || '',
     char_class: character.char_class || '', subclass: character.subclass || '', bio: character.bio || '', onboarding_done: true };
   db.updateCharacter(character.id, patch).then(async (updated) => {
     character = { ...character, ...updated };
     _identityDirty = false;
-    if (character.char_class) { try { await resyncClassDefaults(character.id, character.char_class, character.subclass); } catch (_) {} }
+    if (character.char_class) {
+      try { await resyncClassDefaults(character.id, character.char_class, character.subclass); } catch (_) {}
+      const cl = sys?.classes?.find((x) => !x.parent_id && x.name === character.char_class);
+      const sub = (cl && character.subclass) ? sys.classes.find((x) => x.parent_id === cl.id && x.name === character.subclass) : null;
+      const finalNode = sub || cl;
+      if (finalNode) { try { const n = await db.applyClassStartingItems(character.id, finalNode.id); if (n) showMsg(`${n} ${n === 1 ? 'item inicial recebido' : 'itens iniciais recebidos'}.`, 'ok'); } catch (_) {} }
+    }
+    if (character.origin_name) { try { await resyncOriginDefaults(character.id, character.origin_name, character.origin_variant_name); } catch (_) {} }
     inOnboarding = false;
-    $('mesa-menu').style.display = '';
     enterMesa();
   }).catch((e) => showMsg(e.message));
 };
@@ -2383,7 +2622,7 @@ window.openDamagePopover = (trigger, resourceId) => {
 // sem precisar de um caminho de avaliação separado — sem profCtx, comportamento é o de sempre.
 // funções de fórmula reconhecidas quando o token é seguido de "(" — traduzidas direto pro
 // equivalente JS já validado (não são resolvidas como referência de status/proficiência)
-const FORMULA_FUNCS = { arredondar: 'Math.round', piso: 'Math.floor', teto: 'Math.ceil', maior: 'Math.max', menor: 'Math.min' };
+const FORMULA_FUNCS = { arredondar: 'Math.round', piso: 'Math.floor', teto: 'Math.ceil', maior: 'Math.max', menor: 'Math.min', porcentagem: '(function(v,p){return v*p/100;})' };
 function evalStatIn(attrs, values, a, bonuses = {}, seen = new Set(), profCtx = null, level = null) {
   if (a.kind !== 'computed') {
     const n = Number(values[a.id] ?? a.default_value ?? '');
@@ -2411,7 +2650,7 @@ function evalStatIn(attrs, values, a, bonuses = {}, seen = new Set(), profCtx = 
       if (pf) return '(' + (profCtx.granted[pf.id] ? 1 : 0) + ')';
       return '(0)';
     }).join(' ');
-    const safetyProbe = expr.replace(/Math\.(round|floor|ceil|max|min)/g, '');
+    const safetyProbe = expr.replace(/Math\.(round|floor|ceil|max|min)/g, '').replace(/\(function\(v,p\)\{return v\*p\/100;\}\)/g, '');
     if (!/^[\d+\-*/(),.\s]*$/.test(safetyProbe)) return null;
     const r = Function('"use strict";return (' + expr + ')')();
     return isFinite(r) ? Math.round(r * 100) / 100 : null;
@@ -2534,45 +2773,26 @@ async function resyncClassDefaults(characterId, className, subName) {
   const results = await Promise.allSettled(calls);
   return results.some((r) => r.status === 'fulfilled' && r.value);
 }
-// classe/subclasse vivem na aba Ficha (não mais na Biografia — são ligadas ao sistema/status,
-// não à história do personagem), e por isso gravam direto ao trocar, sem passar pelo botão
-// "Salvar alterações" da identidade (esse botão só existe na Biografia).
-// escolher classe/subclasse é definitivo (não dá pra trocar depois pela ficha, só o Mestre edita
-// direto no banco) — antes o único aviso disso era um title= de tooltip, que nunca aparece em
-// touch; agora confirma de verdade antes de gravar, e desfaz a seleção visual do <select> se recusar
-window.pickClass = async (className) => {
-  if (!className) return;
-  const ok = await confirmModal({ title: 'Escolher classe', desc: `Escolher "${className}" é definitivo — não dá pra trocar de classe depois pela própria ficha. Os status base dela entram na hora.`, confirmLabel: 'Escolher', danger: false });
-  if (!ok) { refreshCharTags(); return; }
+// classe/subclasse/raça/variação são livres pra trocar enquanto o personagem ainda está sendo
+// criado (inOnboarding) — os cartões só existem nessa fase, então nenhuma dessas funções roda mais
+// depois que o jogador confirma em finishOnboarding (os cartões viram <div> travada, sem onclick).
+// Por isso escolher aqui é só uma seleção de rascunho: grava direto (pra sobreviver um F5 no meio
+// da criação), mas sem aplicar status base/proficiências/item inicial ainda — isso só acontece uma
+// vez, com a escolha final, dentro de finishOnboarding.
+window.pickClass = (className) => {
+  if (!className || className === character.char_class) return;
   character.char_class = className; character.subclass = '';
-  db.updateCharacter(character.id, { char_class: className, subclass: '' }).then(async (updated) => {
+  db.updateCharacter(character.id, { char_class: className, subclass: '' }).then((updated) => {
     character = { ...character, ...updated };
-    if (className) {
-      try { await resyncClassDefaults(character.id, className, ''); } catch (_) {}
-      // item inicial é uma trava de execução única (characters.starting_items_granted_at) — só
-      // uma das duas chamadas (aqui ou em pickSubclass) realmente concede, a outra é um no-op
-      const cl = sys?.classes?.find((x) => !x.parent_id && x.name === className);
-      if (cl) { try { const n = await db.applyClassStartingItems(character.id, cl.id); if (n) showMsg(`${n} ${n === 1 ? 'item inicial recebido' : 'itens iniciais recebidos'}.`, 'ok'); } catch (_) {} }
-    }
-    refreshCharTags();
-    if (currentTab === 'ficha') patchFichaLive();
+    refreshClassPickers();
   }).catch((e) => showMsg(e.message));
 };
-window.pickSubclass = async (subName) => {
-  if (!subName) return;
-  const ok = await confirmModal({ title: 'Escolher subclasse', desc: `Escolher "${subName}" é definitivo — não dá pra trocar de subclasse depois pela própria ficha.`, confirmLabel: 'Escolher', danger: false });
-  if (!ok) { refreshCharTags(); return; }
+window.pickSubclass = (subName) => {
+  if (!subName || subName === character.subclass) return;
   character.subclass = subName;
-  db.updateCharacter(character.id, { subclass: subName }).then(async (updated) => {
+  db.updateCharacter(character.id, { subclass: subName }).then((updated) => {
     character = { ...character, ...updated };
-    if (character.char_class) {
-      try { await resyncClassDefaults(character.id, character.char_class, subName); } catch (_) {}
-      const cl = sys?.classes?.find((x) => !x.parent_id && x.name === character.char_class);
-      const sub = (cl && subName) ? sys.classes.find((x) => x.parent_id === cl.id && x.name === subName) : null;
-      if (sub) { try { const n = await db.applyClassStartingItems(character.id, sub.id); if (n) showMsg(`${n} ${n === 1 ? 'item inicial recebido' : 'itens iniciais recebidos'}.`, 'ok'); } catch (_) {} }
-    }
-    refreshCharTags();
-    if (currentTab === 'ficha') patchFichaLive();
+    refreshClassPickers();
   }).catch((e) => showMsg(e.message));
 };
 // mesmo espírito de resyncClassDefaults, pro eixo de Raça/Origem
@@ -2588,28 +2808,20 @@ async function resyncOriginDefaults(characterId, originName, variantName) {
   const results = await Promise.allSettled(calls);
   return results.some((r) => r.status === 'fulfilled' && r.value);
 }
-window.pickOrigin = async (originName) => {
-  if (!originName) return;
-  const ok = await confirmModal({ title: 'Escolher raça', desc: `Escolher "${originName}" é definitivo — não dá pra trocar de raça depois pela própria ficha. Os status base dela entram na hora.`, confirmLabel: 'Escolher', danger: false });
-  if (!ok) { refreshCharTags(); return; }
+window.pickOrigin = (originName) => {
+  if (!originName || originName === character.origin_name) return;
   character.origin_name = originName; character.origin_variant_name = '';
-  db.updateCharacter(character.id, { origin_name: originName, origin_variant_name: '' }).then(async (updated) => {
+  db.updateCharacter(character.id, { origin_name: originName, origin_variant_name: '' }).then((updated) => {
     character = { ...character, ...updated };
-    if (originName) { try { await resyncOriginDefaults(character.id, originName, ''); } catch (_) {} }
-    refreshCharTags();
-    if (currentTab === 'ficha') patchFichaLive();
+    refreshClassPickers();
   }).catch((e) => showMsg(e.message));
 };
-window.pickOriginVariant = async (variantName) => {
-  if (!variantName) return;
-  const ok = await confirmModal({ title: 'Escolher variação', desc: `Escolher "${variantName}" é definitivo — não dá pra trocar de variação depois pela própria ficha.`, confirmLabel: 'Escolher', danger: false });
-  if (!ok) { refreshCharTags(); return; }
+window.pickOriginVariant = (variantName) => {
+  if (!variantName || variantName === character.origin_variant_name) return;
   character.origin_variant_name = variantName;
-  db.updateCharacter(character.id, { origin_variant_name: variantName }).then(async (updated) => {
+  db.updateCharacter(character.id, { origin_variant_name: variantName }).then((updated) => {
     character = { ...character, ...updated };
-    if (character.origin_name) { try { await resyncOriginDefaults(character.id, character.origin_name, variantName); } catch (_) {} }
-    refreshCharTags();
-    if (currentTab === 'ficha') patchFichaLive();
+    refreshClassPickers();
   }).catch((e) => showMsg(e.message));
 };
 // classe/subclasse sem sistema vinculado (inputs de texto livre): grava ao sair do campo (blur/onchange)
@@ -2617,9 +2829,9 @@ window.onClassTextChange = async (key, value) => {
   if (!value) return;
   const label = key === 'char_class' ? 'classe' : 'subclasse';
   const ok = await confirmModal({ title: 'Escolher ' + label, desc: `Escolher "${value}" é definitivo — não dá pra trocar depois pela própria ficha.`, confirmLabel: 'Escolher', danger: false });
-  if (!ok) { refreshCharTags(); return; }
+  if (!ok) { refreshClassPickers(); return; }
   character[key] = value;
-  db.updateCharacter(character.id, { [key]: value }).then((updated) => { character = { ...character, ...updated }; refreshCharTags(); })
+  db.updateCharacter(character.id, { [key]: value }).then((updated) => { character = { ...character, ...updated }; refreshClassPickers(); })
     .catch((e) => showMsg(e.message));
 };
 window.onAgeInput = (input) => {

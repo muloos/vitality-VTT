@@ -188,6 +188,25 @@ body{font-family:var(--serif);color:var(--ink);-webkit-font-smoothing:antialiase
   border:1px solid var(--line2);box-shadow:var(--glass-rim),var(--glass-lift)}
 .action-card h4{font-family:var(--disp);font-size:15px;font-weight:600;margin:0 0 4px;color:var(--bone)}
 .action-card p{font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.5;margin:0 0 14px}
+
+/* cartões de escolha de Classe/Subclasse e Raça/Variação na Biografia (mesa.html) — mesmo visual
+   de .card-tile, coloridos pela --pc que cada classe/raça já define no sistema */
+.picker-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:10px}
+.picker-card{--pc:var(--maq);position:relative;text-align:left;border-radius:14px;padding:14px 16px;cursor:pointer;
+  border:1px solid var(--line2);background:var(--surface);display:flex;flex-direction:column;gap:6px;
+  font-family:inherit;transition:transform var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease)}
+.picker-card:hover{border-color:var(--pc);transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.28),0 0 0 1px color-mix(in srgb,var(--pc) 35%,transparent)}
+.picker-card.locked{cursor:default;background:color-mix(in srgb,var(--pc) 8%,var(--surface));border-color:color-mix(in srgb,var(--pc) 45%,var(--line2))}
+.picker-card.locked:hover{transform:none}
+/* .selected: só existe enquanto o personagem ainda está sendo criado — marca qual opção está
+   escolhida NO MOMENTO, mas o cartão continua clicável (trocar de ideia é o ponto) até confirmar */
+.picker-card.selected{background:color-mix(in srgb,var(--pc) 14%,var(--surface));box-shadow:0 0 0 1px var(--pc)}
+.picker-card-name{font-family:var(--disp);font-size:15px;font-weight:600;color:var(--pc);display:flex;align-items:center;gap:6px}
+.picker-lock,.picker-check{width:13px;height:13px;opacity:.85}
+.picker-card-desc{font-family:var(--serif);font-size:12.5px;color:var(--ink-dim);line-height:1.5}
+.picker-card-bonus{font-family:var(--mono);font-size:10.5px;letter-spacing:.02em;color:var(--ink);background:color-mix(in srgb,var(--pc) 14%,transparent);border-radius:8px;padding:5px 8px;width:fit-content}
+.picker-card-bonus.muted{color:var(--ink-faint);background:transparent;padding:0}
+
 .inline-form{display:flex;gap:8px}
 .inline-form input{flex:1;background:var(--field);border:1px solid var(--line2);border-radius:10px;
   color:var(--ink);font-family:var(--serif);font-size:14px;padding:10px 12px}
@@ -912,6 +931,19 @@ select option{background:var(--panel);color:var(--ink)}
   text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .stat-ctl{display:flex;align-items:center;gap:8px;margin-top:10px}
 
+/* .compact: Combate (e qualquer bloco fora de Status) usa esse modificador — Status continua com o
+   cartão grande de sempre (é o bloco "principal" da ficha), mas Combate/defesas/testes não deveriam
+   competir visualmente nem ocupar tanto espaço com uma lista que pode ficar longa. Mesma marcação
+   HTML de sempre (badge/valor/nome/controles) — só reordenada visualmente via `order` e reduzida,
+   sem precisar de um componente novo nem duplicar o HTML dos dois tamanhos. */
+.stat-grid.compact{grid-template-columns:repeat(auto-fill,minmax(148px,1fr))}
+.stat-tile.compact{flex-direction:row;align-items:center;gap:7px;min-width:0;border-radius:10px;padding:7px 9px}
+.stat-tile.compact .mod-badge{position:static;order:2;font-size:9.5px;padding:1px 5px}
+.stat-tile.compact .stat-val{order:3;font-size:14px;margin:0;flex:0 0 auto}
+.stat-tile.compact .stat-name{order:1;flex:1;min-width:0;text-align:left;max-width:none}
+.stat-tile.compact .stat-ctl{order:4;margin-top:0;gap:4px;flex:0 0 auto}
+.stat-tile.compact .stat-ctl .plus{width:20px;height:20px;font-size:12px}
+
 /* perícias: mesmo visual do "points-card/points-bar" (borda + fundo na cor, translúcidos), só
    que no tamanho enxuto de uma caixinha — cada perícia usa a própria cor (--skc) em vez do brass fixo */
 .skill-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
@@ -1556,6 +1588,20 @@ body:not(.arvore-page) #fx{display:none!important}
   .rail-toggle.right{right:340px;border-radius:8px 0 0 8px;border-right:0}
   .mesa-page.dice-collapsed .rail-toggle.right{right:0}
   .mesa-page.dice-collapsed .rail-toggle.right svg{transform:rotate(180deg)}
+}
+
+/* "onboard-solo": intro do sistema e criação de personagem, antes do jogador ter uma mesa de
+   verdade pra ver do lado — mesmo efeito visual de rail-collapsed+dice-collapsed juntos, mas sem
+   tocar em rail-collapsed/dice-collapsed nem no localStorage, pra não bagunçar a preferência que o
+   jogador já tinha salva quando ele finalmente entrar na mesa de verdade. */
+.mesa-page.onboard-solo #mesa-menu{display:none}
+@media (min-width:821px){
+  .mesa-page.onboard-solo .mesa-body{grid-template-columns:0px 1fr;right:0}
+  .mesa-page.onboard-solo .mesa-rail-left{transform:translateX(-100%);opacity:0;pointer-events:none}
+  .mesa-page.onboard-solo .rail-toggle{display:none!important}
+}
+@media (max-width:820px){
+  .mesa-page.onboard-solo .mesa-rail-left{display:none}
 }
 
 /* ============================================================
