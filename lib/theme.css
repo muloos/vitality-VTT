@@ -179,6 +179,16 @@ body{font-family:var(--serif);color:var(--ink);-webkit-font-smoothing:antialiase
 .role.player{color:var(--maq);border:1px solid rgba(53,198,212,.4)}
 .card-tile .meta{font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:.04em;margin-top:auto}
 
+/* sistema em destaque (fixo no topo da loja, ver listFeaturedSystems) — mesmo cartão de sempre,
+   só com um contorno dourado permanente (não só no hover) e uma fitinha "Destaque" no canto, pra
+   se diferenciar do resto da grade sem precisar de um layout de vitrine à parte */
+.card-tile.featured{border-color:var(--brass);background:linear-gradient(160deg,color-mix(in srgb,var(--brass) 10%,var(--surface)),var(--surface) 65%);box-shadow:0 0 0 1px color-mix(in srgb,var(--brass) 35%,transparent)}
+.card-tile.featured:hover{box-shadow:0 14px 34px rgba(0,0,0,.4),0 0 0 1px color-mix(in srgb,var(--brass) 55%,transparent)}
+.featured-badge{position:absolute;top:-1px;left:14px;transform:translateY(-50%);display:flex;align-items:center;gap:4px;
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--on-primary);background:var(--brass);padding:4px 9px;border-radius:6px}
+.featured-badge svg{width:10px;height:10px}
+
 /* card de ação (criar/entrar) */
 .action-row{display:flex;gap:14px;flex-wrap:wrap}
 .action-card{flex:1;min-width:260px;border-radius:16px;padding:18px;border:1px solid var(--line2);background:var(--surface)}

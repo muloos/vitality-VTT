@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/theme.css?v=46">
+<link rel="stylesheet" href="lib/theme.css?v=47">
 </head>
 <body class="home-page"> 
 <div id="fallback" class="solid"></div>
@@ -259,6 +259,7 @@ const ICON = {
   pouch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M8 8c0-2.8 1.8-5 4-5s4 2.2 4 5"/><path d="M6 8h12l1.4 11.2a2 2 0 0 1-2 2.3H6.6a2 2 0 0 1-2-2.3L6 8Z"/></svg>',
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4.5M12 16.5V21M3 12h4.5M16.5 12H21M6.3 6.3l2.4 2.4M15.3 15.3l2.4 2.4M17.7 6.3l-2.4 2.4M8.7 15.3l-2.4 2.4"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-5.2-5.2"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M12 3.5l2.6 5.6 6 .7-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.8l6-.7Z"/></svg>',
 };
 
 // mapeia erros crus do backend pra mensagens em PT; a causa exata vai só pro console
@@ -469,10 +470,11 @@ window.doCreateSystem = (ev) => { ev.preventDefault(); const name = $('sys-name'
   db.createSystem(name).then((s) => { location.href = 'sistema.html?id=' + s.id; }).catch((e) => { showMsg('Não deu pra criar o sistema: ' + friendlyError(e)); busy(ev.target, false); }); return false; };
 
 /* ---------- card de sistema (Loja/Favoritos — não navega, abre modal de detalhe) ---------- */
-function systemCardHtml(s) {
+function systemCardHtml(s, featured) {
   const isFav = _favSysIds.has(s.id);
   return `
-    <div class="card-tile" onclick='openSystemDetail("${s.id}")' onkeydown='if(event.key==="Enter"||event.key===" "){event.preventDefault();openSystemDetail("${s.id}")}' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(s.name)}">
+    <div class="card-tile${featured ? ' featured' : ''}" onclick='openSystemDetail("${s.id}")' onkeydown='if(event.key==="Enter"||event.key===" "){event.preventDefault();openSystemDetail("${s.id}")}' tabindex="0" role="button" aria-label="Ver detalhes de ${esc(s.name)}${featured ? ' (sistema em destaque)' : ''}">
+      ${featured ? `<div class="featured-badge">${ICON.star}Destaque</div>` : ''}
       <button class="poster-fav ${isFav ? 'on' : ''}" style="position:absolute;top:10px;right:10px" onclick='event.stopPropagation();toggleFavoriteSystem("${s.id}")' aria-label="${isFav ? 'Remover dos favoritos' : 'Favoritar'}" aria-pressed="${isFav}">${HEART_ICON}</button>
       <h3 style="padding-right:26px">${esc(s.name)}</h3>
       ${s.description ? `<p class="meta" style="white-space:normal;-webkit-line-clamp:3;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;margin:2px 0">${esc(s.description)}</p>` : ''}
@@ -482,11 +484,20 @@ function systemCardHtml(s) {
 async function renderStoreSystems() {
   const box = $('store-systems');
   try {
-    const systems = cacheSystems(await db.listStoreSystems());
+    const [featured, storeSystems] = await Promise.all([
+      db.listFeaturedSystems().catch(() => []),
+      db.listStoreSystems(),
+    ]);
+    const featuredIds = new Set(featured.map((s) => s.id));
+    // o dono do sistema em destaque não aparece em listStoreSystems (que exclui os próprios
+    // sistemas de quem está olhando) — sem esse filtro aqui ele apareceria duplicado pra todo
+    // mundo que não é o dono
+    const rest = storeSystems.filter((s) => !featuredIds.has(s.id));
+    const systems = cacheSystems([...featured, ...rest]);
     if (!systems.length) { box.className = ''; box.innerHTML = emptyState(ICON.gear, 'A loja ainda está vazia',
       'Quando outros criadores publicarem sistemas, eles aparecem aqui pra você explorar.'); return; }
     box.className = 'grid';
-    box.innerHTML = systems.map(systemCardHtml).join('');
+    box.innerHTML = featured.map((s) => systemCardHtml(s, true)).join('') + rest.map((s) => systemCardHtml(s, false)).join('');
   } catch (e) { box.className = ''; box.innerHTML = '<div class="empty">Erro: ' + esc(friendlyError(e)) + '</div>'; }
 }
 async function renderFavSystems() {
